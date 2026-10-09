@@ -14,6 +14,7 @@
     "test": "vitest run"
   },
   "dependencies": {
+    "@eslint/css": "^2.0.0",
     "@eslint/js": "^10.0.1",
     "globals": "^17.13.0",
     "typescript-eslint": "^8.71.1"

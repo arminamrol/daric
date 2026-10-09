@@ -4,12 +4,14 @@
   "private": true,
   "type": "module",
   "exports": {
-    ".": "./src/index.ts"
+    ".": "./src/index.ts",
+    "./tailwind.css": "./tailwind.css"
   },
   "scripts": {
     "lint": "eslint .",
     "typecheck": "tsc --noEmit",
-    "test": "vitest run"
+    "test": "vitest run",
+    "generate": "vitest run --update src/tailwind.test.ts"
   },
   "devDependencies": {
     "@daric/config": "workspace:*",

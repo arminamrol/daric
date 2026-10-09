@@ -10,7 +10,7 @@ Personal and household finance: accounts, transactions, budgets, net worth and y
 
 ```
 apps/api               NestJS API (placeholder)
-apps/web               Vite + React web app / PWA (placeholder)
+apps/web               Vite + React web app / PWA
 apps/mobile            Expo app (placeholder)
 packages/core          pure TypeScript domain logic
 packages/api-client    typed API client
@@ -44,6 +44,8 @@ Stop the services with `pnpm services:down` (data persists in the `postgres-data
 
 | Command              | What it does                                      |
 | -------------------- | ------------------------------------------------- |
+| `pnpm dev`           | Start the web app at http://localhost:5173        |
+| `pnpm build`         | Production build of the web app (`apps/web/dist`) |
 | `pnpm lint`          | ESLint in every package                           |
 | `pnpm typecheck`     | `tsc --noEmit` in every package                   |
 | `pnpm test`          | Vitest in every package                           |
@@ -54,6 +56,17 @@ Stop the services with `pnpm services:down` (data persists in the `postgres-data
 | `pnpm services:down` | Stop them                                         |
 
 Run one package's task with a filter, e.g. `pnpm --filter @daric/core test`.
+
+## Web app
+
+Persian and right-to-left by default, light and dark themes, installable as a PWA.
+
+- Styling is Tailwind with the Daric preset from `@daric/design-tokens`. Use semantic colors (`bg-surface`, `text-foreground`, `text-accent`, …); they follow the theme on their own, so `dark:` is not needed.
+- Use logical utilities only (`ms-`/`me-`, `ps-`/`pe-`, `start-`/`end-`, `text-start`/`text-end`). ESLint rejects left/right utilities in `className` and left/right properties in CSS.
+- UI text comes from `@daric/i18n` (`fa.ts` defines the keys); wrap values from outside the dictionary in `isolate()` when they go into a message.
+- After changing `packages/design-tokens/src/tokens.ts`, regenerate the preset with `pnpm --filter @daric/design-tokens generate` (a test fails until you do).
+- After changing `apps/web/public/favicon.svg`, regenerate the PWA icons with `pnpm --filter @daric/web icons`.
+- The service worker only runs in the production build: try it with `pnpm build` then `pnpm --filter @daric/web preview`.
 
 ## Environment variables
 
@@ -76,4 +89,4 @@ Postgres credentials only apply when its volume is first created; after changing
 
 ## Contributing
 
-Work is tracked as local Markdown tickets under `.scratch/`; see [`AGENTS.md`](AGENTS.md). Each ticket gets its own branch and pull request. CI (`.github/workflows/ci.yml`) runs format check, lint, typecheck and test on every pull request and every push to `main`.
+Work is tracked as local Markdown tickets under `.scratch/`; see [`AGENTS.md`](AGENTS.md). Each ticket gets its own branch and pull request. CI (`.github/workflows/ci.yml`) runs format check, lint, typecheck, test and build on every pull request and every push to `main`.
