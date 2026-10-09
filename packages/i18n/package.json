@@ -11,6 +11,9 @@
     "typecheck": "tsc --noEmit",
     "test": "vitest run"
   },
+  "dependencies": {
+    "@daric/core": "workspace:*"
+  },
   "devDependencies": {
     "@daric/config": "workspace:*",
     "eslint": "^10.12.0",

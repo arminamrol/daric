@@ -4,6 +4,8 @@
   "tasks": {
     "lint": {},
     "typecheck": {},
-    "test": {}
+    "test": {},
+    "build": { "outputs": ["dist/**"] },
+    "dev": { "cache": false, "persistent": true }
   }
 }
