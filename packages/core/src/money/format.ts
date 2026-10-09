@@ -1,8 +1,7 @@
 import { IRR, displayDecimals } from './money';
 import type { Money, MoneyDisplay } from './money';
-
-export type Locale = 'fa' | 'en';
-export type Digits = 'persian' | 'latin';
+import { toPersianDigits } from '../locale';
+import type { Digits, Locale } from '../locale';
 
 export interface FormatMoneyOptions {
   readonly locale: Locale;
@@ -24,10 +23,6 @@ const SEPARATORS: Record<Digits, { group: string; decimal: string }> = {
   persian: { group: '٬', decimal: '٫' },
   latin: { group: ',', decimal: '.' },
 };
-
-function toPersianDigits(text: string): string {
-  return text.replace(/\d/g, (d) => String.fromCharCode(0x06f0 + Number(d)));
-}
 
 /** Formats Money for display without converting it to a floating-point number. */
 export function formatMoney(m: Money, options: FormatMoneyOptions): string {
