@@ -4,7 +4,7 @@
 
 **Blocked by:** None (can start immediately)
 
-**Status:** ready-for-agent
+**Status:** in-progress
 
 - [ ] pnpm workspaces + Turborepo with apps (api, web, mobile placeholders) and packages (core, api-client, offline-queue, i18n, design-tokens, config)
 - [ ] TypeScript strict everywhere via shared tsconfig bases; shared ESLint and Vitest presets
