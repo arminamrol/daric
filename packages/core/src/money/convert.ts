@@ -1,4 +1,4 @@
-import { divRound, money } from './money';
+import { divRound, fitsInt64, money } from './money';
 import type { Currency, Money } from './money';
 
 const RATE = /^(\d+)(?:\.(\d+))?$/;
@@ -16,5 +16,7 @@ export function convert(from: Money, to: Currency, rate: string): Money {
 
   const numerator = from.amount * rateNumerator * 10n ** BigInt(to.minorUnits);
   const denominator = 10n ** BigInt(fraction.length + from.currency.minorUnits);
-  return money(divRound(numerator, denominator), to);
+  const amount = divRound(numerator, denominator);
+  if (!fitsInt64(amount)) throw new RangeError('Converted amount does not fit a 64-bit integer');
+  return money(amount, to);
 }

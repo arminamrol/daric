@@ -21,7 +21,7 @@ describe('parseAmount', () => {
     expect(parseAmount('4.35', USD)).toEqual(ok(money(435n, USD)));
   });
 
-  it('parses values beyond 2^53 exactly', () => {
+  it('parses amounts beyond 2^53 exactly', () => {
     expect(parseAmount('9007199254740993', IRR)).toEqual(ok(money(9007199254740993n, IRR)));
     expect(parseAmount('90071992547409.93', USD)).toEqual(ok(money(9007199254740993n, USD)));
   });
@@ -35,6 +35,24 @@ describe('parseAmount', () => {
   it('ignores grouping separators and surrounding whitespace', () => {
     expect(parseAmount(' 1,234,567 ', IRR)).toEqual(ok(money(1234567n, IRR)));
     expect(parseAmount('1 234.50', USD)).toEqual(ok(money(123450n, USD)));
+  });
+
+  it('rejects grouping separators in the wrong place (e.g. a comma used as a decimal point)', () => {
+    for (const text of [
+      '1,5',
+      '1،5',
+      '12,34',
+      '1,2345',
+      '1 2 3',
+      ',123',
+      '123,',
+      '1,,234',
+      '1.234,5',
+    ]) {
+      expect(parseAmount(text, USD), text).toEqual(fail('invalid'));
+    }
+    expect(parseAmount('12,345,678', IRR)).toEqual(ok(money(12345678n, IRR)));
+    expect(parseAmount('1،234', IRR)).toEqual(ok(money(1234n, IRR)));
   });
 
   it('accepts a leading minus sign', () => {

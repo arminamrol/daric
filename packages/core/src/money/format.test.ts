@@ -48,7 +48,7 @@ describe('formatMoney', () => {
     expect(formatMoney(money(1234567n, KWD), en)).toBe('1,234.567 KWD');
   });
 
-  it('formats values beyond 2^53 exactly', () => {
+  it('formats amounts beyond 2^53 exactly', () => {
     expect(formatMoney(money(9007199254740993n, IRR), en)).toBe('9,007,199,254,740,993 Rial');
     expect(formatMoney(money(-9223372036854775808n, USD), en)).toBe(
       '-92,233,720,368,547,758.08 USD',

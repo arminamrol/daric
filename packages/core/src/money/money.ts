@@ -14,6 +14,25 @@ export interface Money {
   readonly currency: Currency;
 }
 
+/** Postgres `bigint` bounds; every stored Amount must fit. */
+export const INT64_MIN = -(2n ** 63n);
+export const INT64_MAX = 2n ** 63n - 1n;
+
+export function fitsInt64(amount: bigint): boolean {
+  return amount >= INT64_MIN && amount <= INT64_MAX;
+}
+
+/** How IRR amounts are shown and typed: as rials, or as tomans (1 toman = 10 rials). */
+export type MoneyDisplay = 'rial' | 'toman';
+
+/**
+ * How many decimals `currency` has when shown or typed in `display`.
+ * In Toman display IRR gains one decimal, since a rial is a tenth of a toman.
+ */
+export function displayDecimals(currency: Currency, display: MoneyDisplay = 'rial'): number {
+  return currency.minorUnits + (display === 'toman' && currency.code === IRR.code ? 1 : 0);
+}
+
 export class CurrencyMismatchError extends Error {
   constructor(a: Currency, b: Currency) {
     super(`Cannot combine ${a.code} with ${b.code}`);

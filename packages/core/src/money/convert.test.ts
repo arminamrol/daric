@@ -31,6 +31,10 @@ describe('convert', () => {
     expect(convert(money(2n ** 53n + 1n, USD), EUR, '3.5')).toEqual(money(31525197391593476n, EUR));
   });
 
+  it('refuses a result that does not fit a 64-bit integer', () => {
+    expect(() => convert(money(2n ** 62n, USD), IRR, '1000000')).toThrow(RangeError);
+  });
+
   it('converts to the same currency with rate 1 unchanged', () => {
     expect(convert(money(1234n, USD), USD, '1')).toEqual(money(1234n, USD));
   });

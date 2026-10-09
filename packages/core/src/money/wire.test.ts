@@ -44,7 +44,7 @@ describe('wire format', () => {
     }
   });
 
-  it('rejects values outside a 64-bit integer', () => {
+  it('rejects amounts outside a 64-bit integer', () => {
     expect(amountSchema.safeParse('9223372036854775808').success).toBe(false);
     expect(amountSchema.safeParse('-9223372036854775809').success).toBe(false);
   });

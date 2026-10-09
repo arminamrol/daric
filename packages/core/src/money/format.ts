@@ -1,6 +1,5 @@
-import { IRR } from './money';
-import type { Money } from './money';
-import type { MoneyDisplay } from './parse';
+import { IRR, displayDecimals } from './money';
+import type { Money, MoneyDisplay } from './money';
 
 export type Locale = 'fa' | 'en';
 export type Digits = 'persian' | 'latin';
@@ -34,16 +33,16 @@ function toPersianDigits(text: string): string {
 export function formatMoney(m: Money, options: FormatMoneyOptions): string {
   const { locale, digits, display = 'rial', label = true, grouping = true } = options;
   const isIrr = m.currency.code === IRR.code;
-  const toman = isIrr && display === 'toman';
+  const scale = displayDecimals(m.currency, display);
+  const toman = scale !== m.currency.minorUnits;
   const { group, decimal } = SEPARATORS[digits];
 
   const negative = m.amount < 0n;
   const magnitude = (negative ? -m.amount : m.amount).toString();
-  // A toman has one decimal (a rial), shown only when it is not zero.
-  const scale = toman ? 1 : m.currency.minorUnits;
   const padded = magnitude.padStart(scale + 1, '0');
   let whole = padded.slice(0, padded.length - scale);
   let fraction = padded.slice(padded.length - scale);
+  // A toman's decimal (a rial) is shown only when it is not zero.
   if (toman && fraction === '0') fraction = '';
 
   if (grouping) whole = whole.replace(/\B(?=(\d{3})+(?!\d))/g, ',');
