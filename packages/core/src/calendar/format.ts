@@ -1,7 +1,8 @@
 import { toPersianDigits } from '../locale';
 import type { Digits, Locale } from '../locale';
+import { fromEpochDay } from './calendar';
 import type { CalendarSystem } from './calendar';
-import { localDateOf } from './period';
+import { instantMs, localEpochDay } from './zone';
 
 export interface FormatDateOptions {
   /** The User's display calendar; it may differ from the Workspace Calendar (ADR-0002). */
@@ -80,7 +81,7 @@ const MONTH_NAMES: Record<CalendarSystem, Record<Locale, readonly string[]>> = {
 /** Formats the day `instant` falls on in `timeZone`, shown in the display calendar. */
 export function formatDate(instant: Date, options: FormatDateOptions): string {
   const { calendar, timeZone, locale, digits, style = 'numeric' } = options;
-  const { year, month, day } = localDateOf(instant, { calendar, timeZone });
+  const { year, month, day } = fromEpochDay(calendar, localEpochDay(instantMs(instant), timeZone));
   const text =
     style === 'long'
       ? `${day} ${MONTH_NAMES[calendar][locale][month - 1]} ${year}`

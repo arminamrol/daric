@@ -38,7 +38,7 @@ export function daysInMonth(calendar: CalendarSystem, year: number, month: numbe
   return GREGORIAN_MONTH_DAYS[month - 1] as number;
 }
 
-export function assertValidDate(calendar: CalendarSystem, date: CalendarDate): void {
+function assertValidDate(calendar: CalendarSystem, date: CalendarDate): void {
   const { year, month, day } = date;
   if (
     !Number.isInteger(year) ||

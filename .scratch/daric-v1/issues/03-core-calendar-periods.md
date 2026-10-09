@@ -4,7 +4,7 @@
 
 **Blocked by:** 01
 
-**Status:** in-progress
+**Status:** done
 
 - [x] Convert between Gregorian and Jalali dates, including leap years (Esfand 29/30)
 - [x] Given a UTC instant, calendar and timezone, return its month and year Period

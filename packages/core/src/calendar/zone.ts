@@ -1,6 +1,6 @@
 import { toEpochDay } from './calendar';
 
-export const DAY_MS = 86_400_000;
+const DAY_MS = 86_400_000;
 
 const formatters = new Map<string, Intl.DateTimeFormat>();
 
@@ -23,7 +23,8 @@ function formatter(timeZone: string): Intl.DateTimeFormat {
   return f;
 }
 
-export function assertValidInstant(instant: Date): number {
+/** Milliseconds since the Unix epoch of `instant`; throws for an invalid Date. */
+export function instantMs(instant: Date): number {
   const t = instant.getTime();
   if (Number.isNaN(t)) throw new RangeError('Invalid instant');
   return t;

@@ -1,6 +1,6 @@
 import { daysInMonth, fromEpochDay, toEpochDay } from './calendar';
 import type { CalendarDate, CalendarSystem } from './calendar';
-import { assertValidInstant, localEpochDay, startOfLocalDay } from './zone';
+import { instantMs, localEpochDay, startOfLocalDay } from './zone';
 
 /** A Workspace's calendar and IANA timezone; together they alone define Periods (ADR-0002). */
 export interface WorkspaceCalendar {
@@ -24,8 +24,7 @@ export type Period = MonthPeriod | YearPeriod;
 
 /** The day `instant` falls on in the Workspace Calendar and timezone. */
 export function localDateOf(instant: Date, workspace: WorkspaceCalendar): CalendarDate {
-  const t = assertValidInstant(instant);
-  return fromEpochDay(workspace.calendar, localEpochDay(t, workspace.timeZone));
+  return fromEpochDay(workspace.calendar, localEpochDay(instantMs(instant), workspace.timeZone));
 }
 
 export function monthPeriodOf(instant: Date, workspace: WorkspaceCalendar): MonthPeriod {
@@ -53,9 +52,9 @@ export function previousPeriod(period: Period): Period {
     : { kind: 'month', year: period.year, month: period.month - 1 };
 }
 
-/** The twelve month Periods of `year`, in order. */
-export function monthsOfYear(year: YearPeriod): MonthPeriod[] {
-  return Array.from({ length: 12 }, (_, i) => ({ kind: 'month', year: year.year, month: i + 1 }));
+/** The twelve month Periods of the year `period`, in order. */
+export function monthsOfYear(period: YearPeriod): MonthPeriod[] {
+  return Array.from({ length: 12 }, (_, i) => ({ kind: 'month', year: period.year, month: i + 1 }));
 }
 
 function firstEpochDay(period: Period, calendar: CalendarSystem): number {
@@ -75,7 +74,10 @@ export function periodEnd(period: Period, workspace: WorkspaceCalendar): Date {
 }
 
 /** Calendar days in `period`. */
-export function daysInPeriod(period: Period, workspace: WorkspaceCalendar): number {
+export function daysInPeriod(
+  period: Period,
+  workspace: Pick<WorkspaceCalendar, 'calendar'>,
+): number {
   const { calendar } = workspace;
   return firstEpochDay(nextPeriod(period), calendar) - firstEpochDay(period, calendar);
 }
