@@ -1,0 +1,9 @@
+packages:
+  - apps/*
+  - packages/*
+
+# Shared tooling versions; reference with `"catalog:"` in package.json.
+catalog:
+  eslint: ^10.12.0
+  typescript: ~6.0.3
+  vitest: ^5.0.3
