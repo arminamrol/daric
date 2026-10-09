@@ -3,7 +3,7 @@ import js from '@eslint/js';
 import { defineConfig } from 'eslint/config';
 import globals from 'globals';
 import tseslint from 'typescript-eslint';
-import { logicalClasses } from './logical-classes.js';
+import { logicalApply, logicalClasses } from './logical-properties.js';
 
 /**
  * Physical properties that do not depend on writing direction, so they stay allowed in CSS:
@@ -43,13 +43,17 @@ const DIRECTION_NEUTRAL = [
 ];
 const VIEWPORT_UNITS = ['vw', 'vh', 'svw', 'svh', 'lvw', 'lvh', 'dvw', 'dvh', 'cqw', 'cqh'];
 
+const daric = {
+  rules: { 'logical-classes': logicalClasses, 'logical-apply': logicalApply },
+};
+
 /** Shared flat config for every Daric package and app. */
 export default defineConfig(
   { ignores: ['**/dist/**', '**/coverage/**', '**/.turbo/**'] },
   {
     files: ['**/*.{js,mjs,cjs,jsx,ts,mts,cts,tsx}'],
     extends: [js.configs.recommended, tseslint.configs.strict, tseslint.configs.stylistic],
-    plugins: { daric: { rules: { 'logical-classes': logicalClasses } } },
+    plugins: { daric },
     languageOptions: {
       ecmaVersion: 2023,
       sourceType: 'module',
@@ -68,7 +72,7 @@ export default defineConfig(
   },
   {
     files: ['**/*.css'],
-    plugins: { css },
+    plugins: { css, daric },
     language: 'css/css',
     languageOptions: { tolerant: true },
     rules: {
@@ -76,6 +80,7 @@ export default defineConfig(
         'error',
         { allowProperties: DIRECTION_NEUTRAL, allowUnits: VIEWPORT_UNITS },
       ],
+      'daric/logical-apply': 'error',
     },
   },
 );

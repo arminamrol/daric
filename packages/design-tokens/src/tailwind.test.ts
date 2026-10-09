@@ -15,12 +15,14 @@ describe('tailwindCss', () => {
 
   it('switches to dark colors by data-theme, or by system preference unless light is chosen', () => {
     const blocks = tailwindCss().split('\n\n');
-    const dark = (selector: string) => blocks.find((b) => b.includes(selector)) ?? '';
-    expect(dark(":root[data-theme='dark'] {")).toContain('--daric-background: #0a1328;');
-    expect(dark('@media (prefers-color-scheme: dark)')).toContain(
+    const blockWith = (text: string) => blocks.find((b) => b.includes(text)) ?? '';
+    expect(blockWith(":root[data-theme='dark'] {")).toContain('--daric-background: #0a1328;');
+    expect(blockWith('@media (prefers-color-scheme: dark)')).toContain(
       ":root:not([data-theme='light']) {",
     );
-    expect(dark('@media (prefers-color-scheme: dark)')).toContain('--daric-background: #0a1328;');
+    expect(blockWith('@media (prefers-color-scheme: dark)')).toContain(
+      '--daric-background: #0a1328;',
+    );
   });
 
   it('replaces Tailwind default colors with the Daric palette', () => {

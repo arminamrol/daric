@@ -3,7 +3,7 @@ export const fa = {
   'app.name': 'دریک',
   'app.tagline': 'دخل و خرج، بودجه و دارایی‌ها در یک جا',
   'shell.skipToContent': 'رفتن به محتوای اصلی',
-  'theme.label': 'ظاهر',
+  'theme.title': 'ظاهر',
   'theme.system': 'سیستم',
   'theme.light': 'روشن',
   'theme.dark': 'تیره',

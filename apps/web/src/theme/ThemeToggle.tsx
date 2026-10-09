@@ -4,10 +4,10 @@ import { useI18n } from '../i18n/locale';
 import { useThemePreference } from './theme';
 import type { ThemePreference } from './theme';
 
-const OPTIONS: readonly { value: ThemePreference; label: PlainMessageKey }[] = [
-  { value: 'system', label: 'theme.system' },
-  { value: 'light', label: 'theme.light' },
-  { value: 'dark', label: 'theme.dark' },
+const OPTIONS: readonly { value: ThemePreference; message: PlainMessageKey }[] = [
+  { value: 'system', message: 'theme.system' },
+  { value: 'light', message: 'theme.light' },
+  { value: 'dark', message: 'theme.dark' },
 ];
 
 /** A segmented radio group: native radios keep arrow-key navigation and screen-reader roles. */
@@ -18,8 +18,8 @@ export function ThemeToggle() {
 
   return (
     <fieldset className="flex rounded-lg bg-surface-muted p-1 text-sm">
-      <legend className="sr-only">{t('theme.label')}</legend>
-      {OPTIONS.map(({ value, label }) => (
+      <legend className="sr-only">{t('theme.title')}</legend>
+      {OPTIONS.map(({ value, message }) => (
         <label
           key={value}
           className="cursor-pointer rounded-md px-3 py-1 text-foreground-muted transition-colors select-none hover:text-foreground has-checked:bg-primary has-checked:font-medium has-checked:text-on-primary has-focus-visible:outline-2 has-focus-visible:outline-offset-2 has-focus-visible:outline-focus"
@@ -32,7 +32,7 @@ export function ThemeToggle() {
             onChange={() => setPreference(value)}
             className="sr-only"
           />
-          {t(label)}
+          {t(message)}
         </label>
       ))}
     </fieldset>

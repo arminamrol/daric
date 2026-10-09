@@ -89,4 +89,4 @@ Postgres credentials only apply when its volume is first created; after changing
 
 ## Contributing
 
-Work is tracked as local Markdown tickets under `.scratch/`; see [`AGENTS.md`](AGENTS.md). Each ticket gets its own branch and pull request. CI (`.github/workflows/ci.yml`) runs format check, lint, typecheck and test on every pull request and every push to `main`.
+Work is tracked as local Markdown tickets under `.scratch/`; see [`AGENTS.md`](AGENTS.md). Each ticket gets its own branch and pull request. CI (`.github/workflows/ci.yml`) runs format check, lint, typecheck, test and build on every pull request and every push to `main`.

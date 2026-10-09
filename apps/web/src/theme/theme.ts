@@ -1,7 +1,9 @@
+import { themes } from '@daric/design-tokens';
+import type { ThemeName } from '@daric/design-tokens';
 import { useCallback, useEffect, useState } from 'react';
 
 /** `system` follows the operating system; the others pin a theme on this device. */
-export type ThemePreference = 'system' | 'light' | 'dark';
+export type ThemePreference = 'system' | ThemeName;
 
 /** Also read by the inline script in index.html, which applies the theme before first paint. */
 export const THEME_STORAGE_KEY = 'daric.theme';
@@ -26,12 +28,18 @@ function savePreference(preference: ThemePreference): void {
 
 /**
  * The design-token stylesheet switches colors on `<html data-theme>` and falls back to
- * `prefers-color-scheme` when the attribute is absent.
+ * `prefers-color-scheme` when the attribute is absent. The browser bar follows through the
+ * per-scheme `theme-color` tags in index.html, which a pinned theme recolors.
  */
 function applyPreference(preference: ThemePreference): void {
   const root = document.documentElement;
   if (preference === 'system') root.removeAttribute('data-theme');
   else root.setAttribute('data-theme', preference);
+
+  for (const meta of document.querySelectorAll<HTMLMetaElement>('meta[name="theme-color"]')) {
+    const scheme: ThemeName = meta.getAttribute('media')?.includes('dark') ? 'dark' : 'light';
+    meta.content = themes[preference === 'system' ? scheme : preference].surface;
+  }
 }
 
 /** The device's theme preference, remembered across visits. */

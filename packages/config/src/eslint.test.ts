@@ -74,6 +74,45 @@ describe('logical properties', () => {
     ).toEqual(['md:hover:ml-2', '-mr-1', '!pl-2', 'pr-[3px]!', 'rtl:left-1']);
   });
 
+  it('rejects utilities pinned to left or right unless mirrored under ltr: and rtl:', async () => {
+    expect(
+      await physicalClasses(
+        '<div className="origin-left origin-top-right perspective-origin-left bg-left bg-bottom-right object-right object-top-left mask-l-from-50% mask-r-to-80%" />',
+      ),
+    ).toEqual([
+      'origin-left',
+      'origin-top-right',
+      'perspective-origin-left',
+      'bg-left',
+      'bg-bottom-right',
+      'object-right',
+      'object-top-left',
+      'mask-l-from-50%',
+      'mask-r-to-80%',
+    ]);
+    expect(
+      await physicalClasses('<div className="ltr:origin-left rtl:origin-right ltr:bg-left" />'),
+    ).toEqual([]);
+    // Utilities with a logical form must use it, even under ltr: or rtl:.
+    expect(await physicalClasses('<div className="ltr:ml-2 rtl:mr-2" />')).toEqual([
+      'ltr:ml-2',
+      'rtl:mr-2',
+    ]);
+  });
+
+  it('rejects left/right arbitrary properties', async () => {
+    expect(
+      await physicalClasses(
+        '<div className="[margin-left:1rem] [left:0] md:[border-top-right-radius:4px] [text-align:right] [margin-inline-start:1rem] [text-align:start]" />',
+      ),
+    ).toEqual([
+      '[margin-left:1rem]',
+      '[left:0]',
+      'md:[border-top-right-radius:4px]',
+      '[text-align:right]',
+    ]);
+  });
+
   it('accepts logical and look-alike utilities', async () => {
     expect(
       await physicalClasses(
@@ -104,6 +143,13 @@ describe('logical properties', () => {
         'a.css',
       ),
     ).toEqual([]);
+  });
+
+  it('rejects left/right utilities in @apply', async () => {
+    const found = await messages('.a { @apply ms-2 ml-2 rtl:bg-right; }\n', 'a.css');
+    expect(found.map((m) => [m.ruleId, /`([^`]+)`/.exec(m.message)?.[1]])).toEqual([
+      ['daric/logical-apply', 'ml-2'],
+    ]);
   });
 
   it('parses Tailwind directives in CSS', async () => {

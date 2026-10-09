@@ -8,7 +8,7 @@ import { routes } from '../app/routes';
 export function renderApp({ path = '/', locale }: { path?: string; locale?: Locale } = {}) {
   const router = createMemoryRouter(routes, { initialEntries: [path] });
   return render(
-    <AppProviders {...(locale && { locale })}>
+    <AppProviders locale={locale}>
       <RouterProvider router={router} />
     </AppProviders>,
   );

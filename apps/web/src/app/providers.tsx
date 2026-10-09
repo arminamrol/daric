@@ -5,11 +5,17 @@ import type { ReactNode } from 'react';
 import { LocaleProvider } from '../i18n/locale';
 
 /** App-wide context: locale and the TanStack Query cache. */
-export function AppProviders({ locale, children }: { locale?: Locale; children: ReactNode }) {
+export function AppProviders({
+  locale,
+  children,
+}: {
+  locale?: Locale | undefined;
+  children: ReactNode;
+}) {
   const [queryClient] = useState(() => new QueryClient());
 
   return (
-    <LocaleProvider {...(locale && { locale })}>
+    <LocaleProvider locale={locale}>
       <QueryClientProvider client={queryClient}>{children}</QueryClientProvider>
     </LocaleProvider>
   );

@@ -1,29 +1,27 @@
 import type { Locale } from '@daric/core';
 import { createTranslator, direction } from '@daric/i18n';
 import type { Direction, Translate } from '@daric/i18n';
-import { createContext, use, useEffect, useMemo, useState } from 'react';
+import { createContext, use, useEffect, useMemo } from 'react';
 import type { ReactNode } from 'react';
 
 interface I18n {
   readonly locale: Locale;
   readonly dir: Direction;
   readonly t: Translate;
-  readonly setLocale: (locale: Locale) => void;
 }
 
 const I18nContext = createContext<I18n | null>(null);
 
 /** Provides the active locale and keeps `<html lang dir>` and the page title in step with it. */
 export function LocaleProvider({
-  locale: initial = 'fa',
+  locale = 'fa',
   children,
 }: {
-  locale?: Locale;
+  locale?: Locale | undefined;
   children: ReactNode;
 }) {
-  const [locale, setLocale] = useState(initial);
   const value = useMemo(
-    () => ({ locale, dir: direction(locale), t: createTranslator(locale), setLocale }),
+    () => ({ locale, dir: direction(locale), t: createTranslator(locale) }),
     [locale],
   );
 
