@@ -5,9 +5,15 @@ import react from '@vitejs/plugin-react';
 import { defineConfig } from 'vite';
 import { VitePWA } from 'vite-plugin-pwa';
 
+// The API shares the web app's origin (ADR-0006: its cookies are same-site and host-only), so
+// development and preview proxy `/v1` to it; production puts both behind one reverse proxy.
+const api = { '/v1': 'http://localhost:3000' };
+
 // The scripts load this file with `--configLoader runner`: workspace packages ship TypeScript
 // source, which the default (bundling) loader leaves to Node, and Node cannot import it.
 export default defineConfig({
+  server: { proxy: api },
+  preview: { proxy: api },
   plugins: [
     react(),
     tailwindcss(),
@@ -42,6 +48,7 @@ export default defineConfig({
         // and answer every navigation with index.html so the shell opens offline.
         globPatterns: ['**/*.{js,css,html,svg,png,ico,woff2}'],
         navigateFallback: 'index.html',
+        navigateFallbackDenylist: [/^\/v1\//],
       },
     }),
   ],

@@ -1,0 +1,143 @@
+import { describe, expect, it } from 'vitest';
+import { ApiError, createApiClient } from './index';
+
+const user = { id: '01900000-0000-7000-8000-000000000000', email: 'sara@example.com' };
+const session = {
+  user,
+  accessTokenExpiresAt: '2026-10-10T10:15:00.000Z',
+  refreshTokenExpiresAt: '2026-11-09T10:00:00.000Z',
+};
+
+interface Sent {
+  url: string;
+  method: string;
+  headers: Headers;
+  credentials: RequestCredentials | undefined;
+  body: unknown;
+}
+
+/**
+ * A fake API and browser cookie store: `routes` answer by "METHOD path",
+ * and a route may set cookies the client can then read.
+ */
+function fakeServer(
+  routes: Record<
+    string,
+    (req: Sent) => { status: number; body?: unknown; cookies?: Record<string, string> }
+  >,
+  initialCookies: Record<string, string> = {},
+) {
+  const cookies = new Map(Object.entries(initialCookies));
+  const sent: Sent[] = [];
+  const fetch: typeof globalThis.fetch = async (input, init) => {
+    const url = String(input);
+    const req: Sent = {
+      url,
+      method: init?.method ?? 'GET',
+      headers: new Headers(init?.headers),
+      credentials: init?.credentials,
+      body: typeof init?.body === 'string' ? JSON.parse(init.body) : undefined,
+    };
+    sent.push(req);
+    const route = routes[`${req.method} ${new URL(url, 'http://web.test').pathname}`];
+    if (!route) return new Response(null, { status: 404 });
+    const res = route(req);
+    for (const [k, v] of Object.entries(res.cookies ?? {})) cookies.set(k, v);
+    return new Response(res.body === undefined ? null : JSON.stringify(res.body), {
+      status: res.status,
+      headers: { 'content-type': 'application/json' },
+    });
+  };
+  const client = createApiClient({ fetch, readCookie: (name) => cookies.get(name) });
+  return { client, sent };
+}
+
+describe('api-client', () => {
+  it('sends credentials so the browser attaches the session cookies', async () => {
+    const { client, sent } = fakeServer({
+      'GET /v1/me': () => ({ status: 200, body: { user, workspaces: [] } }),
+    });
+    expect(await client.me()).toEqual({ user, workspaces: [] });
+    expect(sent[0]?.credentials).toBe('include');
+    expect(sent[0]?.url).toBe('/v1/me');
+  });
+
+  it('echoes the CSRF cookie in the CSRF header on mutating requests', async () => {
+    const { client, sent } = fakeServer(
+      { 'POST /v1/auth/login': () => ({ status: 200, body: session }) },
+      { '__Host-daric_csrf': 'csrf-1' },
+    );
+    const result = await client.login({ email: user.email, password: 'secret password' });
+
+    expect(result).toEqual(session);
+    expect(sent).toHaveLength(1);
+    expect(sent[0]?.headers.get('x-csrf-token')).toBe('csrf-1');
+    expect(sent[0]?.headers.get('content-type')).toBe('application/json');
+    expect(sent[0]?.body).toEqual({ email: user.email, password: 'secret password' });
+    expect(sent[0]?.credentials).toBe('include');
+  });
+
+  it('fetches a CSRF cookie first when the browser has none', async () => {
+    const { client, sent } = fakeServer({
+      'GET /v1/auth/csrf': () => ({ status: 204, cookies: { '__Host-daric_csrf': 'fresh' } }),
+      'POST /v1/auth/register': () => ({ status: 201, body: session }),
+    });
+    await client.register({ email: user.email, password: 'secret password' });
+
+    expect(sent.map((r) => `${r.method} ${r.url}`)).toEqual([
+      'GET /v1/auth/csrf',
+      'POST /v1/auth/register',
+    ]);
+    expect(sent[1]?.headers.get('x-csrf-token')).toBe('fresh');
+  });
+
+  it('does not send a CSRF header on reads', async () => {
+    const { client, sent } = fakeServer(
+      { 'GET /v1/me': () => ({ status: 200, body: { user, workspaces: [] } }) },
+      { '__Host-daric_csrf': 'csrf-1' },
+    );
+    await client.me();
+    expect(sent[0]?.headers.has('x-csrf-token')).toBe(false);
+  });
+
+  it('never asks for tokens: it sends no Authorization header and no mobile client header', async () => {
+    const { client, sent } = fakeServer(
+      { 'POST /v1/auth/login': () => ({ status: 200, body: session }) },
+      { '__Host-daric_csrf': 'csrf-1' },
+    );
+    await client.login({ email: user.email, password: 'secret password' });
+    expect(sent[0]?.headers.has('authorization')).toBe(false);
+    expect(sent[0]?.headers.has('x-daric-client')).toBe(false);
+  });
+
+  it('turns error responses into ApiError with the status', async () => {
+    const { client } = fakeServer(
+      {
+        'POST /v1/auth/login': () => ({
+          status: 401,
+          body: { statusCode: 401, message: 'Email or password is incorrect' },
+        }),
+      },
+      { '__Host-daric_csrf': 'csrf-1' },
+    );
+    const error = await client
+      .login({ email: user.email, password: 'wrong' })
+      .catch((e: unknown) => e);
+    expect(error).toBeInstanceOf(ApiError);
+    expect(error).toMatchObject({ status: 401 });
+  });
+
+  it('prefixes paths with the base URL', async () => {
+    const sent: string[] = [];
+    const client = createApiClient({
+      baseUrl: 'https://api.daric.test',
+      fetch: async (input) => {
+        sent.push(String(input));
+        return new Response(JSON.stringify({ user, workspaces: [] }), { status: 200 });
+      },
+      readCookie: () => undefined,
+    });
+    await client.me();
+    expect(sent).toEqual(['https://api.daric.test/v1/me']);
+  });
+});

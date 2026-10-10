@@ -13,6 +13,7 @@
     "icons": "pnpm dlx @vite-pwa/assets-generator@2 --preset minimal-2023 public/favicon.svg"
   },
   "dependencies": {
+    "@daric/api-client": "workspace:*",
     "@daric/core": "workspace:*",
     "@daric/design-tokens": "workspace:*",
     "@daric/i18n": "workspace:*",

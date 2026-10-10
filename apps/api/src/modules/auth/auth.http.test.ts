@@ -23,6 +23,7 @@ function auditFor(userId: string) {
     .orderBy(desc(auditLogs.createdAt));
 }
 
+// `call` acts as the mobile app; web sign-up with cookies is in web-session.http.test.ts.
 describe('POST /v1/auth/register', () => {
   it('creates the User with a Personal Workspace they own and logs them in', async () => {
     const email = uniqueEmail();
@@ -34,6 +35,8 @@ describe('POST /v1/auth/register', () => {
     expect(res.body.user).toEqual({ id: expect.any(String), email });
     expect(res.body.accessToken).toEqual(expect.any(String));
     expect(res.body.refreshToken).toEqual(expect.any(String));
+    // The mobile app keeps the tokens itself; cookies are only for the web app.
+    expect(res.headers.getSetCookie()).toEqual([]);
 
     const me = await call(t.url, 'GET', '/v1/me', { token: res.body.accessToken });
     expect(me.status).toBe(200);
