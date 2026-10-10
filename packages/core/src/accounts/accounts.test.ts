@@ -25,7 +25,7 @@ describe('accountBalance', () => {
 describe('defaultAccountClass', () => {
   it('makes loans Liabilities and everything else Assets', () => {
     expect(defaultAccountClass('LOAN')).toBe('LIABILITY');
-    for (const type of ['CASH', 'BANK', 'CARD', 'WALLET', 'ASSET'] as const) {
+    for (const type of ['CASH', 'BANK', 'CARD', 'WALLET', 'OTHER_ASSET'] as const) {
       expect(defaultAccountClass(type)).toBe('ASSET');
     }
   });

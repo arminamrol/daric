@@ -1,7 +1,7 @@
 import {
   accountClasses,
-  accountCurrencyCodes,
   accountTypes,
+  currencyCodes,
   defaultAccountClass,
   IRR,
   money,
@@ -95,9 +95,7 @@ export function AccountForm({ account }: { account?: Account }) {
           name: '',
           type: 'BANK',
           class: defaultAccountClass('BANK'),
-          currency: accountCurrencyCodes.includes(workspace.baseCurrency)
-            ? workspace.baseCurrency
-            : 'IRR',
+          currency: currencyCodes.includes(workspace.baseCurrency) ? workspace.baseCurrency : 'IRR',
           openingBalance: '',
         },
   );
@@ -135,7 +133,6 @@ export function AccountForm({ account }: { account?: Account }) {
     if (found.name) return nameRef.current?.focus();
     if (openingBalance === null) return balanceRef.current?.focus();
 
-    const done = () => void navigate('/accounts');
     const fields = { name, type: draft.type, class: draft.class, openingBalance };
     if (account) {
       // Only real changes, so the audit log names them.
@@ -147,6 +144,10 @@ export function AccountForm({ account }: { account?: Account }) {
       if (Object.keys(changes).length === 0) return done();
       update.mutate(changes, { onSuccess: done });
     } else create.mutate({ ...fields, currency: currency.code }, { onSuccess: done });
+  }
+
+  function done() {
+    void navigate('/accounts');
   }
 
   const title = account ? 'accounts.form.editTitle' : 'accounts.form.newTitle';
@@ -234,7 +235,7 @@ export function AccountForm({ account }: { account?: Account }) {
             aria-describedby={account ? ids.currencyHint : undefined}
             className={inputClass}
           >
-            {accountCurrencyCodes.map((code) => {
+            {currencyCodes.map((code) => {
               const name = CURRENCY_NAMES[code];
               return (
                 <option key={code} value={code}>
@@ -295,12 +296,7 @@ export function AccountForm({ account }: { account?: Account }) {
           <button
             type="button"
             disabled={update.isPending}
-            onClick={() =>
-              update.mutate(
-                { archived: !account.archived },
-                { onSuccess: () => void navigate('/accounts') },
-              )
-            }
+            onClick={() => update.mutate({ archived: !account.archived }, { onSuccess: done })}
             aria-describedby={ids.archiveHint}
             className="w-fit rounded-md border border-border px-4 py-2 font-medium disabled:opacity-60"
           >

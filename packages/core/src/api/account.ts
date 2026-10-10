@@ -1,9 +1,7 @@
 import { z } from 'zod';
 import { accountClasses, accountTypes } from '../accounts';
-import { amountSchema, currencies } from '../money';
-import { notEmpty } from './partial';
-
-export const accountCurrencyCodes = currencies.map((c) => c.code);
+import { amountSchema } from '../money';
+import { currencyCodeSchema, notEmpty } from './shared';
 
 const nameSchema = z.string().trim().min(1).max(100);
 
@@ -30,9 +28,7 @@ export const createAccountInputSchema = z.object({
   name: nameSchema,
   type: z.enum(accountTypes),
   class: z.enum(accountClasses),
-  currency: z
-    .string()
-    .refine((code) => accountCurrencyCodes.includes(code), { message: 'Unsupported currency' }),
+  currency: currencyCodeSchema,
   openingBalance: amountSchema,
 });
 export type CreateAccountInput = z.infer<typeof createAccountInputSchema>;

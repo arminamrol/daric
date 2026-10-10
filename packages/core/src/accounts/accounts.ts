@@ -2,7 +2,7 @@ import { money, sum } from '../money';
 import type { Currency, Money } from '../money';
 
 /** What kind of place an Account is; it only suggests a class and an icon. */
-export const accountTypes = ['CASH', 'BANK', 'CARD', 'WALLET', 'LOAN', 'ASSET'] as const;
+export const accountTypes = ['CASH', 'BANK', 'CARD', 'WALLET', 'LOAN', 'OTHER_ASSET'] as const;
 export type AccountType = (typeof accountTypes)[number];
 
 /**

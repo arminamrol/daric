@@ -896,7 +896,7 @@
         "CARD",
         "WALLET",
         "LOAN",
-        "ASSET"
+        "OTHER_ASSET"
       ]
     }
   },

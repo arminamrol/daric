@@ -3,6 +3,7 @@ import { accountBalance, amountToWire } from '@daric/core';
 import type { AccountWire, CreateAccountInput, UpdateAccountInput } from '@daric/core';
 import { eq, isNull, sql, type SQL } from 'drizzle-orm';
 import { isUuid, type Membership } from '../../common/request';
+import { one } from '../../db/client';
 import { accounts, currencies, workspaces } from '../../db/schema';
 import { scopedTx } from '../../db/scope';
 import { AuditService } from '../audit/audit.service';
@@ -81,11 +82,12 @@ export class AccountsService {
       .from(workspaces)
       .where(eq(workspaces.id, workspaceId));
     if (!visible) throw new NotFoundException();
-    const [created] = await tx
-      .insert(accounts)
-      .values({ ...input, workspaceId })
-      .returning({ id: accounts.id });
-    if (!created) throw new NotFoundException();
+    const created = one(
+      await tx
+        .insert(accounts)
+        .values({ ...input, workspaceId })
+        .returning({ id: accounts.id }),
+    );
     await this.audit.record(tx, {
       action: 'account.create',
       actorUserId: userId,

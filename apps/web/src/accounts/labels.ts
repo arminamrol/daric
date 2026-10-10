@@ -7,7 +7,7 @@ export const ACCOUNT_TYPE_LABELS: Record<AccountType, PlainMessageKey> = {
   CARD: 'accounts.type.CARD',
   WALLET: 'accounts.type.WALLET',
   LOAN: 'accounts.type.LOAN',
-  ASSET: 'accounts.type.ASSET',
+  OTHER_ASSET: 'accounts.type.OTHER_ASSET',
 };
 
 export const ACCOUNT_CLASS_LABELS: Record<AccountClass, PlainMessageKey> = {

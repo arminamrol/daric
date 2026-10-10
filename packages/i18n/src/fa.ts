@@ -60,7 +60,7 @@ export const fa = {
   'accounts.type.CARD': 'کارت',
   'accounts.type.WALLET': 'کیف پول',
   'accounts.type.LOAN': 'وام',
-  'accounts.type.ASSET': 'دارایی دیگر',
+  'accounts.type.OTHER_ASSET': 'دارایی دیگر',
   'accounts.class.ASSET': 'دارایی',
   'accounts.class.LIABILITY': 'بدهی',
   'accounts.group.ASSET': 'دارایی‌ها',

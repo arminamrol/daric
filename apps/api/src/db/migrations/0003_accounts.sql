@@ -1,5 +1,5 @@
 CREATE TYPE "public"."account_class" AS ENUM('ASSET', 'LIABILITY');--> statement-breakpoint
-CREATE TYPE "public"."account_type" AS ENUM('CASH', 'BANK', 'CARD', 'WALLET', 'LOAN', 'ASSET');--> statement-breakpoint
+CREATE TYPE "public"."account_type" AS ENUM('CASH', 'BANK', 'CARD', 'WALLET', 'LOAN', 'OTHER_ASSET');--> statement-breakpoint
 CREATE TABLE "accounts" (
 	"id" uuid PRIMARY KEY NOT NULL,
 	"workspace_id" uuid NOT NULL,
