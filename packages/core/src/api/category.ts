@@ -1,8 +1,6 @@
 import { z } from 'zod';
 import { categoryColors, categoryIcons, categoryKinds } from '../categories';
-import { notEmpty } from './shared';
-
-const nameSchema = z.string().trim().min(1).max(100);
+import { nameSchema, notEmpty } from './shared';
 
 /** A Category as the API returns it. Lists come ordered by `position` within each parent. */
 export const categorySchema = z.object({

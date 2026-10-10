@@ -64,7 +64,8 @@ const siblingsOf = (kind: CategoryKind, parentId: string | null) =>
 
 // Queries filter by id only: WorkspaceGuard and row-level security keep them
 // inside the caller's Workspace (ADR-0001). One level deep, same kind as the
-// parent, and no active Category under an archived parent.
+// parent, and no active Category under an archived parent; writes lock the
+// rows those rules read, so concurrent writes cannot break them together.
 @Injectable()
 export class CategoriesService {
   constructor(@Inject(AuditService) private readonly audit: AuditService) {}
@@ -91,9 +92,37 @@ export class CategoriesService {
     return category;
   }
 
-  /** The parent a Category of `kind` may have, or a 400 saying why not. */
-  private async parent(kind: CategoryKind, parentId: string): Promise<Category> {
-    const [parent] = await this.select(eq(categories.id, parentId));
+  /**
+   * Reads and locks the Categories a write's rules depend on, in id order so
+   * two writes never wait on each other. A concurrent move or archive of the
+   * same rows then waits, and the checks after this see its result.
+   */
+  private async lock(ids: readonly string[]): Promise<Map<string, Category>> {
+    const rows = await scopedTx()
+      .select(columns)
+      .from(categories)
+      .where(inArray(categories.id, [...new Set(ids)]))
+      .orderBy(categories.id)
+      .for('update');
+    return new Map(rows.map((row) => [row.id, toWire(row)]));
+  }
+
+  private async hasChild(categoryId: string, { activeOnly }: { activeOnly: boolean }) {
+    const [child] = await scopedTx()
+      .select({ id: categories.id })
+      .from(categories)
+      .where(
+        and(
+          eq(categories.parentId, categoryId),
+          activeOnly ? isNull(categories.archivedAt) : undefined,
+        ),
+      )
+      .limit(1);
+    return child !== undefined;
+  }
+
+  /** Throws a 400 unless `parent` may hold a Category of `kind`. */
+  private assertParent(kind: CategoryKind, parent: Category | undefined): asserts parent {
     if (!parent) throw new BadRequestException('Parent Category not found');
     if (parent.parentId !== null) {
       throw new BadRequestException('A parent Category must be top-level');
@@ -101,9 +130,14 @@ export class CategoriesService {
     if (parent.kind !== kind) {
       throw new BadRequestException('A parent Category must be of the same kind');
     }
-    return parent;
   }
 
+  private assertNotArchived(parent: Category | undefined) {
+    if (parent?.archived) throw new ConflictException('The parent Category is archived');
+  }
+
+  // Positions are not locked: two Categories created at once may share one,
+  // and `createdAt` then orders them until the next reorder.
   private async nextPosition(kind: CategoryKind, parentId: string | null): Promise<number> {
     const [row] = await scopedTx()
       .select({ last: max(categories.position) })
@@ -128,8 +162,9 @@ export class CategoriesService {
     if (!visible) throw new NotFoundException();
     const parentId = input.parentId ?? null;
     if (parentId !== null) {
-      const parent = await this.parent(input.kind, parentId);
-      if (parent.archived) throw new ConflictException('The parent Category is archived');
+      const parent = (await this.lock([parentId])).get(parentId);
+      this.assertParent(input.kind, parent);
+      this.assertNotArchived(parent);
     }
     const created = one(
       await tx
@@ -157,9 +192,18 @@ export class CategoriesService {
     categoryId: string,
     input: UpdateCategoryInput,
   ): Promise<Category> {
-    const current = await this.get(categoryId);
+    const seen = await this.get(categoryId);
     const tx = scopedTx();
     const { archived, parentId, ...fields } = input;
+    const locked = await this.lock(
+      [categoryId, seen.parentId, parentId].filter((id) => typeof id === 'string'),
+    );
+    const current = locked.get(categoryId);
+    if (!current) throw new NotFoundException();
+    // Moved by someone else between the read and the lock: its new parent is not locked.
+    if (current.parentId !== seen.parentId) {
+      throw new ConflictException('The Category changed meanwhile; try again');
+    }
     const moving = parentId !== undefined && parentId !== current.parentId;
     const nextParentId = moving ? parentId : current.parentId;
     const willBeArchived = archived ?? current.archived;
@@ -168,26 +212,17 @@ export class CategoriesService {
       if (parentId === categoryId) {
         throw new BadRequestException('A Category cannot be its own parent');
       }
-      await this.parent(current.kind, parentId);
-      const [child] = await tx
-        .select({ id: categories.id })
-        .from(categories)
-        .where(eq(categories.parentId, categoryId))
-        .limit(1);
-      if (child) throw new BadRequestException('A Category with children cannot have a parent');
+      this.assertParent(current.kind, locked.get(parentId));
+      if (await this.hasChild(categoryId, { activeOnly: false })) {
+        throw new BadRequestException('A Category with children cannot have a parent');
+      }
     }
     if (willBeArchived && !current.archived) {
-      const [activeChild] = await tx
-        .select({ id: categories.id })
-        .from(categories)
-        .where(and(eq(categories.parentId, categoryId), isNull(categories.archivedAt)))
-        .limit(1);
-      if (activeChild) throw new ConflictException('Archive the children first');
+      if (await this.hasChild(categoryId, { activeOnly: true })) {
+        throw new ConflictException('Archive the children first');
+      }
     }
-    if (!willBeArchived && nextParentId !== null) {
-      const [parent] = await this.select(eq(categories.id, nextParentId));
-      if (parent?.archived) throw new ConflictException('The parent Category is archived');
-    }
+    if (!willBeArchived && nextParentId !== null) this.assertNotArchived(locked.get(nextParentId));
 
     await tx
       .update(categories)

@@ -1,5 +1,6 @@
 import { screen, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
+import { isolate } from '@daric/i18n';
 import { describe, expect, it } from 'vitest';
 import { fakeApi } from '../test/fake-api';
 import { renderApp } from '../test/render';
@@ -77,19 +78,25 @@ describe('Categories', () => {
     fake.addCategory({ name: 'مسکن' });
     fake.addCategory({ name: 'قدیمی', archived: true });
     renderApp({ path: '/categories', api: fake.api });
-    await userEvent.click(await screen.findByRole('button', { name: 'بالا بردن مسکن' }));
+    await userEvent.click(
+      await screen.findByRole('button', { name: `بالا بردن ${isolate('مسکن')}` }),
+    );
 
     const names = async () =>
       within(await categoryList())
         .getAllByRole('link')
         .map((link) => link.textContent);
-    await screen.findByRole('button', { name: 'بالا بردن خوراک' });
+    expect(await screen.findByText(`${isolate('مسکن')} یک جا بالاتر رفت.`)).toBeTruthy();
     expect(await names()).toEqual(['مسکن', 'خوراک']);
     expect(fake.categories().map((c) => c.name)).toEqual(['مسکن', 'خوراک', 'قدیمی']);
-    expect(screen.getByRole('button', { name: 'بالا بردن مسکن' }).matches(':disabled')).toBe(true);
-    expect(screen.getByRole('button', { name: 'پایین بردن خوراک' }).matches(':disabled')).toBe(
-      true,
-    );
+
+    // The edges stay focusable, but do nothing.
+    const top = screen.getByRole('button', { name: `بالا بردن ${isolate('مسکن')}` });
+    expect(top.getAttribute('aria-disabled')).toBe('true');
+    await userEvent.click(top);
+    expect(fake.categories().map((c) => c.name)).toEqual(['مسکن', 'خوراک', 'قدیمی']);
+    const bottom = screen.getByRole('button', { name: `پایین بردن ${isolate('خوراک')}` });
+    expect(bottom.getAttribute('aria-disabled')).toBe('true');
   });
 
   it('edits a Category, keeping its kind, and moves it to the top level', async () => {
@@ -97,7 +104,7 @@ describe('Categories', () => {
     const food = fake.addCategory({ name: 'خوراک' });
     fake.addCategory({ name: 'کافه', parentId: food.id });
     renderApp({ path: '/categories', api: fake.api });
-    await userEvent.click(await screen.findByRole('link', { name: 'ویرایش کافه' }));
+    await userEvent.click(await screen.findByRole('link', { name: `ویرایش ${isolate('کافه')}` }));
     const form = within(await screen.findByRole('form', { name: 'ویرایش دسته' }));
     expect(form.queryByRole('radio', { name: 'درآمد' })).toBeNull();
     expect(form.getByText('نوع دسته پس از ساخت عوض نمی‌شود.')).toBeTruthy();
@@ -107,7 +114,7 @@ describe('Categories', () => {
     );
     await userEvent.click(form.getByRole('button', { name: 'ذخیره' }));
 
-    await screen.findByRole('link', { name: 'ویرایش خوراک' });
+    await screen.findByRole('link', { name: `ویرایش ${isolate('خوراک')}` });
     expect(fake.categories()[1]).toMatchObject({ name: 'کافه', parentId: null, color: 'red' });
   });
 
@@ -127,16 +134,16 @@ describe('Categories', () => {
     fake.addCategory({ name: 'کافه', parentId: food.id });
     renderApp({ path: '/categories', api: fake.api });
 
-    await userEvent.click(await screen.findByRole('link', { name: 'ویرایش خوراک' }));
+    await userEvent.click(await screen.findByRole('link', { name: `ویرایش ${isolate('خوراک')}` }));
     await userEvent.click(await screen.findByRole('button', { name: 'بایگانی دسته' }));
     expect((await screen.findByRole('alert')).textContent).toBe(
       'اول زیردسته‌های این دسته را بایگانی کنید.',
     );
 
     await userEvent.click(screen.getByRole('link', { name: 'بازگشت به دسته‌ها' }));
-    await userEvent.click(await screen.findByRole('link', { name: 'ویرایش کافه' }));
+    await userEvent.click(await screen.findByRole('link', { name: `ویرایش ${isolate('کافه')}` }));
     await userEvent.click(await screen.findByRole('button', { name: 'بایگانی دسته' }));
-    await screen.findByRole('link', { name: 'ویرایش خوراک' });
+    await screen.findByRole('link', { name: `ویرایش ${isolate('خوراک')}` });
     expect(screen.queryByText('کافه')).toBeNull();
 
     await userEvent.click(screen.getByRole('checkbox', { name: 'نمایش دسته‌های بایگانی‌شده' }));
@@ -154,7 +161,7 @@ describe('Categories', () => {
       screen.getByText('فقط مالک و مدیر فضای کاری می‌توانند دسته‌ها را بسازند یا تغییر دهند.'),
     ).toBeTruthy();
     expect(screen.queryByRole('link', { name: 'دسته تازه' })).toBeNull();
-    expect(screen.queryByRole('link', { name: 'ویرایش خوراک' })).toBeNull();
-    expect(screen.queryByRole('button', { name: 'بالا بردن مسکن' })).toBeNull();
+    expect(screen.queryByRole('link', { name: `ویرایش ${isolate('خوراک')}` })).toBeNull();
+    expect(screen.queryByRole('button', { name: `بالا بردن ${isolate('مسکن')}` })).toBeNull();
   });
 });

@@ -190,6 +190,31 @@ describe('Categories', () => {
       expect((await storedCategory(parent.id))?.parentId).toBeNull();
     });
 
+    it('even when two moves race', async () => {
+      const a = await emptyWorkspace();
+      for (let round = 0; round < 5; round++) {
+        const [x, y, z] = await Promise.all(
+          ['A', 'B', 'C'].map(
+            async (name) => (await create(a.token, a.workspaceId, { ...food, name })).body.id,
+          ),
+        );
+        // x under y and y under z cannot both happen.
+        const results = await Promise.all([
+          update(a.token, a.workspaceId, x, { parentId: y }),
+          update(a.token, a.workspaceId, y, { parentId: z }),
+        ]);
+        expect(results.filter((r) => r.status === 200)).toHaveLength(1);
+        const rows = await db
+          .select()
+          .from(categories)
+          .where(eq(categories.workspaceId, a.workspaceId));
+        const byId = new Map(rows.map((r) => [r.id, r]));
+        for (const row of rows) {
+          if (row.parentId) expect(byId.get(row.parentId)?.parentId).toBeNull();
+        }
+      }
+    });
+
     it('refusing a Category as its own parent', async () => {
       const a = await emptyWorkspace();
       const { body: parent } = await create(a.token, a.workspaceId);

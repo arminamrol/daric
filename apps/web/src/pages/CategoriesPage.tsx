@@ -1,7 +1,8 @@
 import { categoryTree, hasRole } from '@daric/core';
 import type { Category, CategoryKind } from '@daric/core';
 import { ChevronDown, ChevronUp } from 'lucide-react';
-import { useId } from 'react';
+import { isolate } from '@daric/i18n';
+import { useId, useState } from 'react';
 import { Link, useSearchParams } from 'react-router';
 import { useSignedIn } from '../auth/session';
 import { CategoryBadge } from '../categories/CategoryBadge';
@@ -16,8 +17,9 @@ import { CATEGORY_KIND_LABELS } from '../categories/labels';
 import { useI18n } from '../i18n/locale';
 import { ChoiceGroup } from '../ui/ChoiceGroup';
 
+// aria-disabled, not disabled: a button that becomes unusable keeps the focus.
 const moveButtonClass =
-  'rounded-md p-1 text-foreground-muted hover:bg-surface-muted hover:text-foreground disabled:cursor-not-allowed disabled:opacity-30';
+  'rounded-md p-1 text-foreground-muted hover:bg-surface-muted hover:text-foreground aria-disabled:cursor-not-allowed aria-disabled:opacity-30';
 
 function CategoryRow({
   category,
@@ -25,16 +27,34 @@ function CategoryRow({
   onMove,
   first,
   last,
-  disabled,
+  busy,
 }: {
   category: Category;
   canManage: boolean;
   onMove: (direction: -1 | 1) => void;
   first: boolean;
   last: boolean;
-  disabled: boolean;
+  busy: boolean;
 }) {
   const { t } = useI18n();
+  const name = isolate(category.name);
+  const moveButton = (direction: -1 | 1, edge: boolean) => (
+    <button
+      type="button"
+      aria-label={t(direction < 0 ? 'categories.moveUp' : 'categories.moveDown', { name })}
+      aria-disabled={edge || busy}
+      onClick={() => {
+        if (!edge && !busy) onMove(direction);
+      }}
+      className={moveButtonClass}
+    >
+      {direction < 0 ? (
+        <ChevronUp aria-hidden="true" className="size-5" />
+      ) : (
+        <ChevronDown aria-hidden="true" className="size-5" />
+      )}
+    </button>
+  );
   return (
     <div className="flex items-center gap-3 py-2">
       <CategoryBadge icon={category.icon} color={category.color} />
@@ -42,7 +62,7 @@ function CategoryRow({
         {canManage ? (
           <Link
             to={`/categories/${category.id}`}
-            aria-label={t('categories.edit', { name: category.name })}
+            aria-label={t('categories.edit', { name })}
             className="font-medium underline-offset-4 hover:underline"
           >
             {category.name}
@@ -56,24 +76,8 @@ function CategoryRow({
       </div>
       {canManage && (
         <div className="flex gap-1">
-          <button
-            type="button"
-            aria-label={t('categories.moveUp', { name: category.name })}
-            disabled={first || disabled}
-            onClick={() => onMove(-1)}
-            className={moveButtonClass}
-          >
-            <ChevronUp aria-hidden="true" className="size-5" />
-          </button>
-          <button
-            type="button"
-            aria-label={t('categories.moveDown', { name: category.name })}
-            disabled={last || disabled}
-            onClick={() => onMove(1)}
-            className={moveButtonClass}
-          >
-            <ChevronDown aria-hidden="true" className="size-5" />
-          </button>
+          {moveButton(-1, first)}
+          {moveButton(1, last)}
         </div>
       )}
     </div>
@@ -91,6 +95,8 @@ export function CategoriesPage() {
   const canManage = hasRole(workspace.role, 'ADMIN');
   const toggleId = useId();
   const listLabelId = useId();
+  // Read out after a move, since the moved row's buttons stay where they were.
+  const [announcement, setAnnouncement] = useState('');
 
   function setParam(name: string, value: string | null) {
     const next = new URLSearchParams(params);
@@ -105,7 +111,17 @@ export function CategoriesPage() {
 
   function move(category: Category, direction: -1 | 1) {
     const ids = swapWithNeighbour(all, visible, category, direction);
-    if (ids) reorder.mutate({ ids });
+    if (!ids) return;
+    const name = isolate(category.name);
+    reorder.mutate(
+      { ids },
+      {
+        onSuccess: () =>
+          setAnnouncement(
+            t(direction < 0 ? 'categories.movedUp' : 'categories.movedDown', { name }),
+          ),
+      },
+    );
   }
 
   const row = (category: Category, index: number, siblings: readonly Category[]) => (
@@ -115,7 +131,7 @@ export function CategoriesPage() {
       onMove={(direction) => move(category, direction)}
       first={index === 0}
       last={index === siblings.length - 1}
-      disabled={reorder.isPending}
+      busy={reorder.isPending}
     />
   );
 
@@ -153,6 +169,9 @@ export function CategoriesPage() {
           <label htmlFor={toggleId}>{t('categories.showArchived')}</label>
         </div>
       </div>
+      <p role="status" className="sr-only">
+        {announcement}
+      </p>
       {reorder.isError && (
         <p role="alert" className="text-danger">
           {t('categories.reorderFailed')}

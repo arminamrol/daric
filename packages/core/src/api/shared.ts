@@ -13,3 +13,6 @@ export const notEmpty = [
   (input: object) => Object.keys(input).length > 0,
   { message: 'Nothing to update' },
 ] as const;
+
+/** A name a person gives something (an Account, a Category). */
+export const nameSchema = z.string().trim().min(1).max(100);

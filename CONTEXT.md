@@ -71,7 +71,7 @@ _Avoid_: Entry, record, payment
 A Transaction moving money between two Accounts of the same Workspace; it is neither Income nor Expense. Between different currencies the user enters both Amounts; nothing is converted automatically.
 
 **Category**:
-User-editable classification of Income or Expense, at most one level deep (parent → child). Totals of a parent include its children.
+User-editable classification of Income or Expense, at most one level deep (parent → child). Totals of a parent include its children. Its kind is fixed once created; a child has its parent's kind. Archived, never deleted; an active Category never sits under an archived parent.
 
 **Label**:
 A free tag attached to many Transactions, independent of Category.
