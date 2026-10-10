@@ -1,6 +1,14 @@
 import { ApiError, type ApiClient } from '@daric/api-client';
-import { hasRole } from '@daric/core';
-import type { Account, Me, Session, UserPreferences, Workspace, WorkspaceRole } from '@daric/core';
+import { categoryKinds, categoryTree, hasRole } from '@daric/core';
+import type {
+  Account,
+  Category,
+  Me,
+  Session,
+  UserPreferences,
+  Workspace,
+  WorkspaceRole,
+} from '@daric/core';
 
 export const testPassword = 'correct horse battery';
 
@@ -36,6 +44,8 @@ export function fakeApi({
 
   let accounts: Account[] = [];
   let nextAccountId = 1;
+  let categories: Category[] = [];
+  let nextCategoryId = 1;
 
   function signedIn(): FakeUser {
     if (!current) throw new ApiError(401, { message: 'Unauthorized' });
@@ -87,6 +97,46 @@ export function fakeApi({
     return account;
   }
 
+  const siblings = (kind: Category['kind'], parentId: string | null) =>
+    categories
+      .filter((c) => c.kind === kind && c.parentId === parentId)
+      .sort((a, b) => a.position - b.position);
+
+  /** Puts a Category straight into the Workspace, last among its siblings. */
+  function addCategory(fields: Partial<Category> & Pick<Category, 'name'>): Category {
+    const kind = fields.kind ?? 'EXPENSE';
+    const parentId = fields.parentId ?? null;
+    const category: Category = {
+      id: `01900000-0000-7000-b000-${String(nextCategoryId++).padStart(12, '0')}`,
+      kind,
+      parentId,
+      icon: 'shopping-bag',
+      color: 'blue',
+      position: siblings(kind, parentId).length,
+      archived: false,
+      ...fields,
+    };
+    categories.push(category);
+    return category;
+  }
+
+  function findCategory(categoryId: string): Category {
+    const category = categories.find((c) => c.id === categoryId);
+    if (!category) throw new ApiError(404, { message: 'Not Found' });
+    return category;
+  }
+
+  /** The same order the API lists in: each kind's tops, each followed by its children. */
+  function inTreeOrder(list: Category[]): Category[] {
+    const sorted = [...list].sort((a, b) => a.position - b.position);
+    return categoryKinds.flatMap((kind) =>
+      categoryTree(sorted.filter((c) => c.kind === kind)).flatMap(({ children, ...top }) => [
+        top,
+        ...children,
+      ]),
+    );
+  }
+
   const api: ApiClient = {
     async register({ email, password }) {
       if (users.has(email)) throw new ApiError(409, { message: 'Email is already registered' });
@@ -131,6 +181,53 @@ export function fakeApi({
       accounts = accounts.map((a) => (a.id === accountId ? updated : a));
       return { ...updated };
     },
+    async listCategories(workspaceId, { includeArchived = false } = {}) {
+      inWorkspace(workspaceId);
+      return inTreeOrder(categories.filter((c) => includeArchived || !c.archived)).map((c) => ({
+        ...c,
+      }));
+    },
+    async createCategory(workspaceId, { parentId = null, ...input }) {
+      inWorkspace(workspaceId, 'ADMIN');
+      if (parentId) {
+        const parent = findCategory(parentId);
+        if (parent.parentId || parent.kind !== input.kind) {
+          throw new ApiError(400, { message: 'Bad parent' });
+        }
+        if (parent.archived) throw new ApiError(409, { message: 'Parent archived' });
+      }
+      return { ...addCategory({ ...input, parentId }) };
+    },
+    async updateCategory(workspaceId, categoryId, input) {
+      inWorkspace(workspaceId, 'ADMIN');
+      const current = findCategory(categoryId);
+      const updated = { ...current, ...input };
+      if (input.parentId !== undefined && input.parentId !== current.parentId) {
+        updated.position = siblings(current.kind, input.parentId).length;
+      }
+      const hasActiveChild = categories.some((c) => c.parentId === categoryId && !c.archived);
+      if (updated.archived && !current.archived && hasActiveChild) {
+        throw new ApiError(409, { message: 'Archive the children first' });
+      }
+      const parent = updated.parentId ? findCategory(updated.parentId) : undefined;
+      if (!updated.archived && parent?.archived) {
+        throw new ApiError(409, { message: 'The parent Category is archived' });
+      }
+      categories = categories.map((c) => (c.id === categoryId ? updated : c));
+      return { ...updated };
+    },
+    async reorderCategories(workspaceId, { ids }) {
+      inWorkspace(workspaceId, 'ADMIN');
+      const first = findCategory(ids[0] ?? '');
+      const group = siblings(first.kind, first.parentId);
+      if (group.length !== ids.length || !group.every((c) => ids.includes(c.id))) {
+        throw new ApiError(400, { message: 'Name every sibling' });
+      }
+      categories = categories.map((c) =>
+        ids.includes(c.id) ? { ...c, position: ids.indexOf(c.id) } : c,
+      );
+      return siblings(first.kind, first.parentId).map((c) => ({ ...c }));
+    },
     async updatePreferences(input) {
       const user = signedIn();
       user.preferences = { ...user.preferences, ...input };
@@ -143,6 +240,9 @@ export function fakeApi({
     addUser,
     addAccount,
     accounts: () => accounts,
+    addCategory,
+    /** In the API's list order, archived ones included. */
+    categories: () => inTreeOrder(categories),
     signedInUser: () => current?.email,
     workspace: () => workspace,
     preferences: () => signedIn().preferences,

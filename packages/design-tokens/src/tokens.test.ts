@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { themes } from './index';
+import { categoryPalette, themes } from './index';
 import type { SemanticColor } from './index';
 
 /** WCAG 2.x contrast ratio of two `#rrggbb` colors. */
@@ -53,4 +53,13 @@ describe.each(['light', 'dark'] as const)('%s theme', (name) => {
   it.each(ui)('%s on %s is a visible UI part (3:1)', (fg, bg) => {
     expect(contrast(colors[fg], colors[bg])).toBeGreaterThanOrEqual(3);
   });
+});
+
+describe('category palette', () => {
+  it.each(Object.entries(categoryPalette))(
+    'keeps a white icon readable on %s (4.5:1)',
+    (_, hex) => {
+      expect(contrast('#ffffff', hex)).toBeGreaterThanOrEqual(4.5);
+    },
+  );
 });

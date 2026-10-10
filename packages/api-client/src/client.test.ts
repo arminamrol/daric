@@ -215,6 +215,45 @@ describe('api-client', () => {
     });
   });
 
+  describe('Categories', () => {
+    const category = {
+      id: '01900000-0000-7000-8000-0000000000c1',
+      kind: 'EXPENSE',
+      parentId: null,
+      name: 'خوراک',
+      icon: 'utensils',
+      color: 'orange',
+      position: 0,
+      archived: false,
+    } as const;
+    const base = `/v1/workspaces/${workspace.id}/categories`;
+
+    it('lists, creates, updates and reorders them', async () => {
+      const { client, sent } = fakeServer(
+        {
+          [`GET ${base}`]: () => ({ status: 200, body: [category] }),
+          [`POST ${base}`]: () => ({ status: 201, body: category }),
+          [`PATCH ${base}/${category.id}`]: () => ({ status: 200, body: category }),
+          [`PUT ${base}/order`]: () => ({ status: 200, body: [category] }),
+        },
+        { '__Host-daric_csrf': 'csrf-1' },
+      );
+      expect(await client.listCategories(workspace.id)).toEqual([category]);
+      await client.listCategories(workspace.id, { includeArchived: true });
+      const { id, kind, name, icon, color } = category;
+      await client.createCategory(workspace.id, { kind, name, icon, color });
+      await client.updateCategory(workspace.id, id, { archived: true });
+      await client.reorderCategories(workspace.id, { ids: [id] });
+      expect(sent.map((r) => [r.method, r.url, r.body])).toEqual([
+        ['GET', base, undefined],
+        ['GET', `${base}?includeArchived=true`, undefined],
+        ['POST', base, { kind, name, icon, color }],
+        ['PATCH', `${base}/${id}`, { archived: true }],
+        ['PUT', `${base}/order`, { ids: [id] }],
+      ]);
+    });
+  });
+
   it('prefixes paths with the base URL', async () => {
     const sent: string[] = [];
     const client = createApiClient({
