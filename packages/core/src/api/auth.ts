@@ -45,3 +45,9 @@ export const authResultSchema = sessionSchema.extend({
   refreshToken: z.string(),
 });
 export type AuthResult = z.infer<typeof authResultSchema>;
+
+/** The mobile app sends its refresh token in the body; the web app's travels in a cookie. */
+export const refreshInputSchema = z.object({
+  refreshToken: z.string().min(1).max(256),
+});
+export type RefreshInput = z.infer<typeof refreshInputSchema>;

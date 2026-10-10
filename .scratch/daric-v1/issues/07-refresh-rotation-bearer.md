@@ -4,7 +4,7 @@
 
 **Blocked by:** 05
 
-**Status:** ready-for-agent
+**Status:** in-progress
 
 - [ ] Refresh endpoint rotates the token; the old one becomes invalid
 - [ ] Reusing a rotated token revokes the entire token family
