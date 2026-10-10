@@ -25,9 +25,9 @@ function signedIn(user: User, tokens: IssuedTokens): SignedIn {
 }
 
 /**
- * Registration and login. These run before any Workspace scope exists, so
- * they use the owner connection directly; they only touch the new or
- * authenticated User's own rows.
+ * Registration, login, refresh and logout. These run before any Workspace
+ * scope exists, so they use the owner connection directly; they only touch the
+ * new or authenticated User's own rows.
  */
 @Injectable()
 export class AuthService {
@@ -36,6 +36,39 @@ export class AuthService {
     @Inject(TokenService) private readonly tokens: TokenService,
     @Inject(AuditService) private readonly audit: AuditService,
   ) {}
+
+  /** Rotates a refresh token (see TokenService.rotate); a replayed token is audited and refused. */
+  async refresh(refreshToken: string, client: ClientInfo): Promise<SignedIn> {
+    const rotation = await this.db.transaction(async (tx) => {
+      const result = await this.tokens.rotate(tx, refreshToken);
+      if (result.outcome === 'reused') {
+        await this.audit.record(tx, {
+          action: 'auth.refresh_reuse',
+          actorUserId: result.userId,
+          client,
+        });
+      }
+      return result;
+    });
+    // Outside the transaction, so a reuse still commits its revocation.
+    if (rotation.outcome !== 'rotated') throw new UnauthorizedException();
+    const user = one(
+      await this.db
+        .select({ id: users.id, email: users.email })
+        .from(users)
+        .where(eq(users.id, rotation.userId)),
+    );
+    return signedIn(user, rotation.tokens);
+  }
+
+  /** Ends the Signed-in Device the refresh token belongs to. Unknown tokens are ignored. */
+  async logout(refreshToken: string, client: ClientInfo): Promise<void> {
+    await this.db.transaction(async (tx) => {
+      const userId = await this.tokens.revoke(tx, refreshToken);
+      if (userId)
+        await this.audit.record(tx, { action: 'auth.logout', actorUserId: userId, client });
+    });
+  }
 
   /** Creates the User, their Personal Workspace and Owner membership in one transaction. */
   async register(input: RegisterInput, client: ClientInfo): Promise<SignedIn> {

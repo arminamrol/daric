@@ -3,7 +3,13 @@ import type { ClientInfo } from '../../common/request';
 import type { Executor } from '../../db/client';
 import { auditLogs } from '../../db/schema';
 
-export type AuditAction = 'auth.register' | 'auth.login' | 'auth.login_failed' | 'workspace.update';
+export type AuditAction =
+  | 'auth.register'
+  | 'auth.login'
+  | 'auth.login_failed'
+  | 'auth.logout'
+  | 'auth.refresh_reuse'
+  | 'workspace.update';
 
 export interface AuditEntry {
   action: AuditAction;

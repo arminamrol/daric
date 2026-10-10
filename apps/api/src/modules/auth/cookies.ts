@@ -5,10 +5,11 @@ import type { IssuedTokens } from './token.service';
 
 // ADR-0006: on the web both tokens live only in httpOnly cookies the server sets.
 // `__Host-` pins a cookie to this host and Path=/; the refresh cookie needs a
-// narrower Path, so it can only take the weaker `__Secure-` prefix.
+// narrower Path, so it can only take the weaker `__Secure-` prefix. Its Path
+// covers the auth routes so that both refresh and logout receive it.
 export const ACCESS_COOKIE = '__Host-daric_access';
 export const REFRESH_COOKIE = '__Secure-daric_refresh';
-export const REFRESH_PATH = '/v1/auth/refresh';
+export const REFRESH_PATH = '/v1/auth';
 const base: CookieOptions = { secure: true, sameSite: 'lax' };
 
 export function isMobileClient(req: Request): boolean {
@@ -33,6 +34,11 @@ export function setSessionCookies(res: Response, tokens: IssuedTokens): void {
     path: REFRESH_PATH,
     expires: tokens.refreshTokenExpiresAt,
   });
+}
+
+export function clearSessionCookies(res: Response): void {
+  res.clearCookie(ACCESS_COOKIE, { ...base, httpOnly: true, path: '/' });
+  res.clearCookie(REFRESH_COOKIE, { ...base, httpOnly: true, path: REFRESH_PATH });
 }
 
 /** Sets a fresh CSRF token. It lives as long as the browser session. */

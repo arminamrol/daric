@@ -41,7 +41,7 @@ describe('web sign-up', () => {
     expect(refresh).toMatch(/; HttpOnly/i);
     expect(refresh).toMatch(/; Secure/i);
     expect(refresh).toMatch(/; SameSite=Lax/i);
-    expect(refresh).toMatch(/; Path=\/v1\/auth\/refresh(;|$)/);
+    expect(refresh).toMatch(/; Path=\/v1\/auth(;|$)/);
 
     const me = await web.call('GET', '/v1/me');
     expect(me.status).toBe(200);
