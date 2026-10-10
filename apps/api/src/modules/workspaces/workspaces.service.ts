@@ -15,6 +15,7 @@ const columns = {
   baseCurrency: workspaces.baseCurrency,
   calendar: workspaces.calendar,
   timezone: workspaces.timezone,
+  moneyDisplay: workspaces.moneyDisplay,
 };
 
 @Injectable()
@@ -57,7 +58,7 @@ export class WorkspacesService {
     const tx = scopedTx();
     const updated = await tx
       .update(workspaces)
-      .set({ name: input.name, version: sql`${workspaces.version} + 1` })
+      .set({ ...input, version: sql`${workspaces.version} + 1` })
       .where(eq(workspaces.id, workspaceId))
       .returning({ id: workspaces.id });
     if (updated.length === 0) throw new NotFoundException();

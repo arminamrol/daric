@@ -3,6 +3,7 @@ import { screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { describe, expect, it } from 'vitest';
 import html from '../../index.html?raw';
+import { fakeApi } from '../test/fake-api';
 import { renderApp } from '../test/render';
 
 const theme = () => document.documentElement.dataset['theme'];
@@ -15,14 +16,40 @@ describe('theme', () => {
     expect(theme()).toBeUndefined();
   });
 
-  it('applies and remembers a chosen theme', async () => {
-    const view = renderApp();
+  it("applies a signed-in User's choice and keeps it with them", async () => {
+    const { api } = fakeApi({ signedInAs: 'sara@example.com' });
+    const view = renderApp({ api });
+    await screen.findByRole('heading', { name: 'به دریک خوش آمدید' });
     await userEvent.click(await option('تیره'));
     expect(theme()).toBe('dark');
 
     view.unmount();
     document.documentElement.removeAttribute('data-theme');
-    renderApp();
+    renderApp({ api });
+    await screen.findByRole('heading', { name: 'به دریک خوش آمدید' });
+    expect((await option('تیره')).checked).toBe(true);
+    expect(theme()).toBe('dark');
+  });
+
+  it("lets the User's saved choice win over this device's", async () => {
+    localStorage.setItem('daric.theme', 'light');
+    const fake = fakeApi({ signedInAs: 'sara@example.com' });
+    await fake.api.updatePreferences({ theme: 'dark' });
+    renderApp({ api: fake.api });
+    await screen.findByRole('heading', { name: 'به دریک خوش آمدید' });
+    expect(theme()).toBe('dark');
+    expect(localStorage.getItem('daric.theme')).toBe('dark');
+  });
+
+  it("remembers a guest's choice on this device", async () => {
+    const view = renderApp({ path: '/login', api: fakeApi().api });
+    await screen.findByRole('heading', { name: 'ورود به دریک' });
+    await userEvent.click(await option('تیره'));
+    expect(theme()).toBe('dark');
+
+    view.unmount();
+    document.documentElement.removeAttribute('data-theme');
+    renderApp({ path: '/login', api: fakeApi().api });
     expect((await option('تیره')).checked).toBe(true);
     expect(theme()).toBe('dark');
   });

@@ -7,6 +7,12 @@ import {
   type RegisterInput,
   type Session,
   sessionSchema,
+  type UpdateUserPreferencesInput,
+  type UpdateWorkspaceInput,
+  type UserPreferences,
+  userPreferencesSchema,
+  type Workspace,
+  workspaceSchema,
 } from '@daric/core';
 
 /** A non-2xx answer from the API. */
@@ -32,6 +38,9 @@ export interface ApiClient {
   register(input: RegisterInput): Promise<Session>;
   login(input: LoginInput): Promise<Session>;
   me(): Promise<Me>;
+  /** Owner or Admin only. */
+  updateWorkspace(workspaceId: string, input: UpdateWorkspaceInput): Promise<Workspace>;
+  updatePreferences(input: UpdateUserPreferencesInput): Promise<UserPreferences>;
 }
 
 function documentCookie(name: string): string | undefined {
@@ -87,6 +96,10 @@ export function createApiClient(options: ApiClientOptions = {}): ApiClient {
     register: (input) => request('POST', '/v1/auth/register', sessionSchema, input),
     login: (input) => request('POST', '/v1/auth/login', sessionSchema, input),
     me: () => request('GET', '/v1/me', meSchema),
+    updateWorkspace: (workspaceId, input) =>
+      request('PATCH', `/v1/workspaces/${encodeURIComponent(workspaceId)}`, workspaceSchema, input),
+    updatePreferences: (input) =>
+      request('PATCH', '/v1/me/preferences', userPreferencesSchema, input),
   };
 }
 

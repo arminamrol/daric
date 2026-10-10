@@ -1,11 +1,12 @@
 import { jsonb, pgEnum, pgTable, text, uniqueIndex, uuid, index } from 'drizzle-orm/pg-core';
-import { calendarSystems, workspaceRoles, workspaceTypes } from '@daric/core';
+import { calendarSystems, moneyDisplays, workspaceRoles, workspaceTypes } from '@daric/core';
 import { id, timestamps, version } from './columns';
 import { users } from './identity';
 
 export const workspaceType = pgEnum('workspace_type', workspaceTypes);
 export const workspaceCalendar = pgEnum('workspace_calendar', calendarSystems);
 export const workspaceRole = pgEnum('workspace_role', workspaceRoles);
+export const moneyDisplay = pgEnum('money_display', moneyDisplays);
 
 export const workspaces = pgTable('workspaces', {
   id: id(),
@@ -14,6 +15,7 @@ export const workspaces = pgTable('workspaces', {
   baseCurrency: text('base_currency').notNull().default('IRR'),
   calendar: workspaceCalendar('calendar').notNull().default('jalali'),
   timezone: text('timezone').notNull().default('Asia/Tehran'),
+  moneyDisplay: moneyDisplay('money_display').notNull().default('rial'),
   settings: jsonb('settings').notNull().default({}),
   ...timestamps(),
   version: version(),

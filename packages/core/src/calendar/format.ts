@@ -2,6 +2,7 @@ import { toPersianDigits } from '../locale';
 import type { Digits, Locale } from '../locale';
 import { fromEpochDay } from './calendar';
 import type { CalendarSystem } from './calendar';
+import type { Period } from './period';
 import { instantMs, localEpochDay } from './zone';
 
 export interface FormatDateOptions {
@@ -86,5 +87,22 @@ export function formatDate(instant: Date, options: FormatDateOptions): string {
     style === 'long'
       ? `${day} ${MONTH_NAMES[calendar][locale][month - 1]} ${year}`
       : `${year}/${String(month).padStart(2, '0')}/${String(day).padStart(2, '0')}`;
+  return digits === 'persian' ? toPersianDigits(text) : text;
+}
+
+export interface FormatPeriodOptions {
+  /** The Workspace Calendar the Period belongs to; a Period has no other calendar. */
+  readonly calendar: CalendarSystem;
+  readonly locale: Locale;
+  readonly digits: Digits;
+}
+
+/** Names a Period: a month with its year (Mehr 1405), or a year alone (1405). */
+export function formatPeriod(period: Period, options: FormatPeriodOptions): string {
+  const { calendar, locale, digits } = options;
+  const text =
+    period.kind === 'month'
+      ? `${MONTH_NAMES[calendar][locale][period.month - 1]} ${period.year}`
+      : String(period.year);
   return digits === 'persian' ? toPersianDigits(text) : text;
 }

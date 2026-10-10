@@ -1,8 +1,8 @@
+import type { ThemePreference } from '@daric/core';
 import type { PlainMessageKey } from '@daric/i18n';
-import { useId } from 'react';
 import { useI18n } from '../i18n/locale';
+import { ChoiceGroup } from '../ui/ChoiceGroup';
 import { useThemePreference } from './theme';
-import type { ThemePreference } from './theme';
 
 const OPTIONS: readonly { value: ThemePreference; message: PlainMessageKey }[] = [
   { value: 'system', message: 'theme.system' },
@@ -10,31 +10,18 @@ const OPTIONS: readonly { value: ThemePreference; message: PlainMessageKey }[] =
   { value: 'dark', message: 'theme.dark' },
 ];
 
-/** A segmented radio group: native radios keep arrow-key navigation and screen-reader roles. */
-export function ThemeToggle() {
+/** The theme choice; for a signed-in User it is one of their preferences, kept on every device. */
+export function ThemeToggle({ hideLegend = true }: { hideLegend?: boolean }) {
   const { t } = useI18n();
   const [preference, setPreference] = useThemePreference();
-  const name = useId();
 
   return (
-    <fieldset className="flex rounded-lg bg-surface-muted p-1 text-sm">
-      <legend className="sr-only">{t('theme.title')}</legend>
-      {OPTIONS.map(({ value, message }) => (
-        <label
-          key={value}
-          className="cursor-pointer rounded-md px-3 py-1 text-foreground-muted transition-colors select-none hover:text-foreground has-checked:bg-primary has-checked:font-medium has-checked:text-on-primary has-focus-visible:outline-2 has-focus-visible:outline-offset-2 has-focus-visible:outline-focus"
-        >
-          <input
-            type="radio"
-            name={name}
-            value={value}
-            checked={preference === value}
-            onChange={() => setPreference(value)}
-            className="sr-only"
-          />
-          {t(message)}
-        </label>
-      ))}
-    </fieldset>
+    <ChoiceGroup
+      legend={t('theme.title')}
+      hideLegend={hideLegend}
+      choices={OPTIONS.map(({ value, message }) => ({ value, label: t(message) }))}
+      value={preference}
+      onChange={setPreference}
+    />
   );
 }
