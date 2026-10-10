@@ -1,5 +1,5 @@
 import { IRR, parseAmount, parseDisplayDay, transactionTypes } from '@daric/core';
-import type { Account, Category, ParseAmountError, TransactionType } from '@daric/core';
+import type { Account, Category, Label, ParseAmountError, TransactionType } from '@daric/core';
 import type { PlainMessageKey } from '@daric/i18n';
 import { useEffect, useId, useMemo, useRef, useState } from 'react';
 import type { FormEvent } from 'react';
@@ -40,15 +40,18 @@ interface FieldErrors {
 /**
  * Fast entry of an Income or Expense: the amount comes first and Enter records
  * it. The Account and Categories last used on this device are kept, and after
- * each entry the amount is cleared and focused for the next one.
+ * each entry the amount and Labels are cleared and the amount focused for the next one.
  */
 export function TransactionForm({
   accounts,
   categories,
+  labels,
 }: {
   /** Active Accounts only; at least one. */
   accounts: readonly Account[];
   categories: readonly Category[];
+  /** Archived ones are left out of the picker. */
+  labels: readonly Label[];
 }) {
   const { t } = useI18n();
   const format = useFormatters();
@@ -67,6 +70,7 @@ export function TransactionForm({
     dayHint: `${id}-day-hint`,
     dayError: `${id}-day-error`,
     note: `${id}-note`,
+    labels: `${id}-labels`,
   };
   const amountRef = useRef<HTMLInputElement>(null);
   const dayRef = useRef<HTMLInputElement>(null);
@@ -94,6 +98,7 @@ export function TransactionForm({
   const [pickedCategories, setPickedCategories] = useState(last.categoryIds ?? {});
   const [day, setDay] = useState(() => format.day(format.today(new Date())));
   const [note, setNote] = useState('');
+  const [labelIds, setLabelIds] = useState<readonly string[]>([]);
   const [errors, setErrors] = useState<FieldErrors>({});
   const [saved, setSaved] = useState(false);
   // One id per draft: sending the same draft again (a retry) cannot record it twice.
@@ -104,6 +109,7 @@ export function TransactionForm({
     amountRef.current?.focus();
   }, []);
 
+  const activeLabels = labels.filter((l) => !l.archived);
   const account = accounts.find((a) => a.id === accountId) ?? accounts[0];
   const picked = pickedCategories[type];
   const categoryId = choices[type].some((c) => c.id === picked) ? picked : choices[type][0]?.id;
@@ -147,6 +153,8 @@ export function TransactionForm({
         amount: parsed.money.amount,
         occurredOn,
         note: note.trim() || null,
+        // A Label archived since it was ticked is left off.
+        labelIds: labelIds.filter((labelId) => activeLabels.some((l) => l.id === labelId)),
       },
       {
         onSuccess: () => {
@@ -157,6 +165,7 @@ export function TransactionForm({
           draftId.current = null;
           setAmount('');
           setNote('');
+          setLabelIds([]);
           setSaved(true);
           amountRef.current?.focus();
         },
@@ -316,6 +325,30 @@ export function TransactionForm({
             />
           </div>
         </div>
+        {activeLabels.length > 0 && (
+          <fieldset className="flex flex-col gap-2">
+            <legend className="mb-1 font-medium">{t('transactions.form.labels')}</legend>
+            <div className="flex flex-wrap gap-x-4 gap-y-2">
+              {activeLabels.map((label) => (
+                <label key={label.id} className="flex items-center gap-2">
+                  <input
+                    type="checkbox"
+                    checked={labelIds.includes(label.id)}
+                    onChange={(e) => {
+                      changed();
+                      const checked = e.target.checked;
+                      setLabelIds((current) =>
+                        checked ? [...current, label.id] : current.filter((x) => x !== label.id),
+                      );
+                    }}
+                    className="size-4"
+                  />
+                  {label.name}
+                </label>
+              ))}
+            </div>
+          </fieldset>
+        )}
         {record.isError && (
           <p role="alert" className="rounded-md bg-surface-muted px-3 py-2 text-sm text-danger">
             {t('transactions.form.failed')}

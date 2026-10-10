@@ -14,5 +14,5 @@ export const notEmpty = [
   { message: 'Nothing to update' },
 ] as const;
 
-/** A name a person gives something (an Account, a Category). */
+/** A name a person gives something (an Account, a Category, a Label). */
 export const nameSchema = z.string().trim().min(1).max(100);

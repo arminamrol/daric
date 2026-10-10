@@ -74,7 +74,7 @@ A Transaction moving money between two Accounts of the same Workspace; it is nei
 User-editable classification of Income or Expense, at most one level deep (parent → child). Totals of a parent include its children. Its kind is fixed once created; a child has its parent's kind. Archived, never deleted; an active Category never sits under an archived parent.
 
 **Label**:
-A free tag attached to many Transactions, independent of Category.
+A free tag attached to many Transactions, independent of Category. A Transaction may carry several. Its name is unique in the Workspace, ignoring case. Archived, never deleted; an archived Label stays on old Transactions but cannot be attached to more.
 _Avoid_: Tag
 
 **Controllable Label**:

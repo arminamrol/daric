@@ -254,6 +254,37 @@ describe('api-client', () => {
     });
   });
 
+  describe('Labels', () => {
+    const label = {
+      id: '01900000-0000-7000-8000-0000000000e1',
+      name: 'سفر',
+      controllable: true,
+      archived: false,
+    } as const;
+    const base = `/v1/workspaces/${workspace.id}/labels`;
+
+    it('lists, creates and updates them', async () => {
+      const { client, sent } = fakeServer(
+        {
+          [`GET ${base}`]: () => ({ status: 200, body: [label] }),
+          [`POST ${base}`]: () => ({ status: 201, body: label }),
+          [`PATCH ${base}/${label.id}`]: () => ({ status: 200, body: label }),
+        },
+        { '__Host-daric_csrf': 'csrf-1' },
+      );
+      expect(await client.listLabels(workspace.id)).toEqual([label]);
+      await client.listLabels(workspace.id, { includeArchived: true });
+      await client.createLabel(workspace.id, { name: 'سفر', controllable: true });
+      await client.updateLabel(workspace.id, label.id, { archived: true });
+      expect(sent.map((r) => [r.method, r.url, r.body])).toEqual([
+        ['GET', base, undefined],
+        ['GET', `${base}?includeArchived=true`, undefined],
+        ['POST', base, { name: 'سفر', controllable: true }],
+        ['PATCH', `${base}/${label.id}`, { archived: true }],
+      ]);
+    });
+  });
+
   describe('Transactions', () => {
     const transaction = {
       id: '0199d0f0-0000-7000-8000-000000000001',
@@ -264,9 +295,11 @@ describe('api-client', () => {
       occurredOn: '2026-10-10',
       note: null,
       createdBy: user.id,
+      labelIds: ['01900000-0000-7000-8000-0000000000e1'],
       version: 1,
     } as const;
     const base = `/v1/workspaces/${workspace.id}/transactions`;
+    const labelId = transaction.labelIds[0];
 
     it('lists them with filters, Amounts as bigints', async () => {
       const { client, sent } = fakeServer({
@@ -278,10 +311,32 @@ describe('api-client', () => {
         period: { kind: 'month', year: 1405, month: 7 },
         accountId: transaction.accountId,
         categoryId: transaction.categoryId,
+        labelId,
       });
       expect(sent.map((r) => r.url)).toEqual([
         base,
-        `${base}?period=1405-07&accountId=${transaction.accountId}&categoryId=${transaction.categoryId}`,
+        `${base}?period=1405-07&accountId=${transaction.accountId}&categoryId=${transaction.categoryId}&labelId=${labelId}`,
+      ]);
+    });
+
+    it('attaches and detaches a Label', async () => {
+      const path = `${base}/${transaction.id}/labels/${labelId}`;
+      const { client, sent } = fakeServer(
+        {
+          [`PUT ${path}`]: () => ({ status: 200, body: transaction }),
+          [`DELETE ${path}`]: () => ({ status: 200, body: { ...transaction, labelIds: [] } }),
+        },
+        { '__Host-daric_csrf': 'csrf-1' },
+      );
+      expect((await client.attachLabel(workspace.id, transaction.id, labelId)).labelIds).toEqual([
+        labelId,
+      ]);
+      expect((await client.detachLabel(workspace.id, transaction.id, labelId)).labelIds).toEqual(
+        [],
+      );
+      expect(sent.map((r) => [r.method, r.url])).toEqual([
+        ['PUT', path],
+        ['DELETE', path],
       ]);
     });
 
@@ -295,6 +350,7 @@ describe('api-client', () => {
       void version;
       const recorded = await client.createTransaction(workspace.id, {
         ...input,
+        labelIds: [...input.labelIds],
         amount: 9007199254740993n,
       });
       expect(recorded.id).toBe(transaction.id);

@@ -7,9 +7,13 @@ import {
   categorySchema,
   type CreateAccountInput,
   type CreateCategoryInput,
+  type CreateLabelInput,
   type CreateTransactionInput,
   CSRF_COOKIE,
   CSRF_HEADER,
+  type Label,
+  labelListSchema,
+  labelSchema,
   type ListTransactionsQuery,
   type LoginInput,
   type Me,
@@ -24,6 +28,7 @@ import {
   transactionSchema,
   type UpdateAccountInput,
   type UpdateCategoryInput,
+  type UpdateLabelInput,
   type UpdateUserPreferencesInput,
   type UpdateWorkspaceInput,
   type UserPreferences,
@@ -80,6 +85,12 @@ export interface ApiClient {
   ): Promise<Category>;
   /** Owner or Admin only: every sibling under one parent, in the new order. */
   reorderCategories(workspaceId: string, input: ReorderCategoriesInput): Promise<Category[]>;
+  /** By name. Archived Labels are left out unless `includeArchived`. */
+  listLabels(workspaceId: string, options?: { includeArchived?: boolean }): Promise<Label[]>;
+  /** Owner or Admin only. */
+  createLabel(workspaceId: string, input: CreateLabelInput): Promise<Label>;
+  /** Owner or Admin only; also flags, archives and unarchives. */
+  updateLabel(workspaceId: string, labelId: string, input: UpdateLabelInput): Promise<Label>;
   /** Newest first. A Period is of the Workspace Calendar; a parent Category includes its children. */
   listTransactions(workspaceId: string, filters?: ListTransactionsQuery): Promise<Transaction[]>;
   /**
@@ -87,6 +98,10 @@ export interface ApiClient {
    * already recorded instead of recording it twice.
    */
   createTransaction(workspaceId: string, input: CreateTransactionInput): Promise<Transaction>;
+  /** Member or above; an active Label. Attaching one it already carries changes nothing. */
+  attachLabel(workspaceId: string, transactionId: string, labelId: string): Promise<Transaction>;
+  /** Member or above. Detaching one it does not carry changes nothing. */
+  detachLabel(workspaceId: string, transactionId: string, labelId: string): Promise<Transaction>;
 }
 
 /** Amounts are bigints in code and decimal strings on the wire (ADR-0004). */
@@ -190,12 +205,44 @@ export function createApiClient(options: ApiClientOptions = {}): ApiClient {
       if (filters.period) query.set('period', periodParam(filters.period));
       if (filters.accountId) query.set('accountId', filters.accountId);
       if (filters.categoryId) query.set('categoryId', filters.categoryId);
+      if (filters.labelId) query.set('labelId', filters.labelId);
       const search = query.size > 0 ? `?${query}` : '';
       return request('GET', `${transactionsPath(workspaceId)}${search}`, transactionListSchema);
     },
     createTransaction: (workspaceId, input) =>
       request('POST', transactionsPath(workspaceId), transactionSchema, input),
+    attachLabel: (workspaceId, transactionId, labelId) =>
+      request('PUT', transactionLabelPath(workspaceId, transactionId, labelId), transactionSchema),
+    detachLabel: (workspaceId, transactionId, labelId) =>
+      request(
+        'DELETE',
+        transactionLabelPath(workspaceId, transactionId, labelId),
+        transactionSchema,
+      ),
+    listLabels: (workspaceId, { includeArchived = false } = {}) =>
+      request(
+        'GET',
+        `${labelsPath(workspaceId)}${includeArchived ? '?includeArchived=true' : ''}`,
+        labelListSchema,
+      ),
+    createLabel: (workspaceId, input) =>
+      request('POST', labelsPath(workspaceId), labelSchema, input),
+    updateLabel: (workspaceId, labelId, input) =>
+      request(
+        'PATCH',
+        `${labelsPath(workspaceId)}/${encodeURIComponent(labelId)}`,
+        labelSchema,
+        input,
+      ),
   };
+}
+
+function transactionLabelPath(workspaceId: string, transactionId: string, labelId: string) {
+  return `${transactionsPath(workspaceId)}/${encodeURIComponent(transactionId)}/labels/${encodeURIComponent(labelId)}`;
+}
+
+function labelsPath(workspaceId: string): string {
+  return `/v1/workspaces/${encodeURIComponent(workspaceId)}/labels`;
 }
 
 function transactionsPath(workspaceId: string): string {

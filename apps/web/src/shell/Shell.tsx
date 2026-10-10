@@ -40,6 +40,9 @@ export function Shell() {
               <NavLink to="/categories" className={navLinkClass}>
                 {t('nav.categories')}
               </NavLink>
+              <NavLink to="/labels" className={navLinkClass}>
+                {t('nav.labels')}
+              </NavLink>
               <NavLink to="/settings" className={navLinkClass}>
                 {t('nav.settings')}
               </NavLink>

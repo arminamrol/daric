@@ -5,11 +5,18 @@ import {
   Injectable,
   NotFoundException,
 } from '@nestjs/common';
-import { amountToWire, periodDays } from '@daric/core';
+import { amountToWire, MAX_LABELS_PER_TRANSACTION, periodDays } from '@daric/core';
 import type { CreateTransactionInput, ListTransactionsQuery, TransactionWire } from '@daric/core';
-import { and, desc, eq, gte, inArray, isNull, lt, or, type SQL } from 'drizzle-orm';
+import { and, desc, eq, gte, inArray, isNull, lt, or, sql, type SQL } from 'drizzle-orm';
 import { isUuid, type Membership } from '../../common/request';
-import { accounts, categories, transactions, workspaces } from '../../db/schema';
+import {
+  accounts,
+  categories,
+  labels,
+  transactionLabels,
+  transactions,
+  workspaces,
+} from '../../db/schema';
 import { scopedTx } from '../../db/scope';
 import { AuditService } from '../audit/audit.service';
 
@@ -22,10 +29,17 @@ const columns = {
   occurredOn: transactions.occurredOn,
   note: transactions.note,
   createdBy: transactions.createdBy,
+  // Ordered by id, so the same Labels always come in the same order.
+  labelIds: sql<string[]>`(
+    SELECT coalesce(array_agg(${transactionLabels.labelId} ORDER BY ${transactionLabels.labelId}), '{}')::text[]
+    FROM ${transactionLabels} WHERE ${transactionLabels.transactionId} = ${transactions.id}
+  )`,
   version: transactions.version,
 };
 
-type Row = Pick<typeof transactions.$inferSelect, keyof typeof columns>;
+type Row = Pick<typeof transactions.$inferSelect, Exclude<keyof typeof columns, 'labelIds'>> & {
+  labelIds: string[];
+};
 
 const ID_TAKEN = 'This id is already used by another Transaction';
 
@@ -45,7 +59,8 @@ function sameTransaction(row: Row, input: CreateTransactionInput): boolean {
     row.categoryId === input.categoryId &&
     row.amount === input.amount &&
     row.occurredOn === input.occurredOn &&
-    row.note === input.note
+    row.note === input.note &&
+    row.labelIds.join() === [...input.labelIds].sort().join()
   );
 }
 
@@ -89,6 +104,13 @@ export class TransactionsService {
         ),
       );
     }
+    if (query.labelId) {
+      const labelled = scopedTx()
+        .select({ id: transactionLabels.transactionId })
+        .from(transactionLabels)
+        .where(eq(transactionLabels.labelId, query.labelId));
+      filters.push(inArray(transactions.id, labelled));
+    }
     const rows = await this.select(and(...filters));
     return rows.map(toWire);
   }
@@ -125,9 +147,10 @@ export class TransactionsService {
     }
     await this.assertUsable(input);
 
+    const { labelIds, ...fields } = input;
     const [inserted] = await tx
       .insert(transactions)
-      .values({ ...input, workspaceId, createdBy: userId })
+      .values({ ...fields, workspaceId, createdBy: userId })
       .onConflictDoNothing({ target: transactions.id })
       .returning({ id: transactions.id });
     if (!inserted) {
@@ -135,6 +158,11 @@ export class TransactionsService {
       const replayed = input.id && (await this.replayed(input.id, input));
       if (replayed) return { created: false, transaction: replayed };
       throw new ConflictException(ID_TAKEN);
+    }
+    if (labelIds.length > 0) {
+      await tx
+        .insert(transactionLabels)
+        .values(labelIds.map((labelId) => ({ transactionId: inserted.id, labelId, workspaceId })));
     }
     await this.audit.record(tx, {
       action: 'transaction.create',
@@ -161,7 +189,10 @@ export class TransactionsService {
     return toWire(row);
   }
 
-  /** Throws a 400 unless the Account and Category exist, are active, and the Category fits the type. */
+  /**
+   * Throws a 400 unless the Account, Category and Labels exist and are active,
+   * and the Category fits the type.
+   */
   private async assertUsable(input: CreateTransactionInput) {
     const [account] = await scopedTx()
       .select({ archivedAt: accounts.archivedAt })
@@ -179,5 +210,113 @@ export class TransactionsService {
     if (category.kind !== input.type) {
       throw new BadRequestException(`An ${input.type} needs an ${input.type} Category`);
     }
+
+    if (input.labelIds.length > 0) {
+      const found = await scopedTx()
+        .select({ archivedAt: labels.archivedAt })
+        .from(labels)
+        .where(inArray(labels.id, input.labelIds));
+      if (found.length !== input.labelIds.length) throw new BadRequestException('Label not found');
+      if (found.some((label) => label.archivedAt)) {
+        throw new BadRequestException('A Label is archived');
+      }
+    }
+  }
+
+  /**
+   * Attaches an active Label to a Transaction. Attaching one it already
+   * carries changes nothing, so a repeated request is harmless.
+   */
+  async attachLabel(
+    membership: Membership,
+    userId: string,
+    transactionId: string,
+    labelId: string,
+  ): Promise<TransactionWire> {
+    const tx = scopedTx();
+    if (!isUuid(labelId)) throw new NotFoundException();
+    await this.lockTransaction(transactionId);
+    const [label] = await tx
+      .select({ archivedAt: labels.archivedAt })
+      .from(labels)
+      .where(eq(labels.id, labelId));
+    if (!label) throw new NotFoundException();
+    const carried = await tx
+      .select({ labelId: transactionLabels.labelId })
+      .from(transactionLabels)
+      .where(eq(transactionLabels.transactionId, transactionId));
+    if (carried.some((row) => row.labelId === labelId)) return this.get(transactionId);
+    if (label.archivedAt) throw new BadRequestException('The Label is archived');
+    if (carried.length >= MAX_LABELS_PER_TRANSACTION) {
+      throw new BadRequestException(
+        `A Transaction carries at most ${MAX_LABELS_PER_TRANSACTION} Labels`,
+      );
+    }
+    await tx
+      .insert(transactionLabels)
+      .values({ transactionId, labelId, workspaceId: membership.workspaceId });
+    await this.changed(transactionId);
+    await this.audit.record(tx, {
+      action: 'transaction.label_attach',
+      actorUserId: userId,
+      workspaceId: membership.workspaceId,
+      metadata: { transactionId, labelId },
+    });
+    return this.get(transactionId);
+  }
+
+  /** Detaches a Label, archived or not; detaching one it does not carry changes nothing. */
+  async detachLabel(
+    membership: Membership,
+    userId: string,
+    transactionId: string,
+    labelId: string,
+  ): Promise<TransactionWire> {
+    const tx = scopedTx();
+    if (!isUuid(labelId)) throw new NotFoundException();
+    await this.lockTransaction(transactionId);
+    const [label] = await tx.select({ id: labels.id }).from(labels).where(eq(labels.id, labelId));
+    if (!label) throw new NotFoundException();
+    const [detached] = await tx
+      .delete(transactionLabels)
+      .where(
+        and(
+          eq(transactionLabels.transactionId, transactionId),
+          eq(transactionLabels.labelId, labelId),
+        ),
+      )
+      .returning({ labelId: transactionLabels.labelId });
+    if (detached) {
+      await this.changed(transactionId);
+      await this.audit.record(tx, {
+        action: 'transaction.label_detach',
+        actorUserId: userId,
+        workspaceId: membership.workspaceId,
+        metadata: { transactionId, labelId },
+      });
+    }
+    return this.get(transactionId);
+  }
+
+  /**
+   * Locks a Transaction that is not deleted, so concurrent changes to its
+   * Labels take turns (the Label count stays within the limit). 404 otherwise.
+   */
+  private async lockTransaction(transactionId: string): Promise<void> {
+    if (!isUuid(transactionId)) throw new NotFoundException();
+    const [row] = await scopedTx()
+      .select({ id: transactions.id })
+      .from(transactions)
+      .where(and(eq(transactions.id, transactionId), isNull(transactions.deletedAt)))
+      .for('update');
+    if (!row) throw new NotFoundException();
+  }
+
+  /** Bumps a Transaction's version after its Labels changed. */
+  private async changed(transactionId: string): Promise<void> {
+    await scopedTx()
+      .update(transactions)
+      .set({ version: sql`${transactions.version} + 1` })
+      .where(eq(transactions.id, transactionId));
   }
 }

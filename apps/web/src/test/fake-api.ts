@@ -3,6 +3,7 @@ import { balanceEffect, categoryKinds, categoryTree, hasRole, periodDays } from 
 import type {
   Account,
   Category,
+  Label,
   Me,
   Session,
   Transaction,
@@ -48,7 +49,9 @@ export function fakeApi({
   let nextAccountId = 1;
   let categories: Category[] = [];
   let nextCategoryId = 1;
-  const transactions: Transaction[] = [];
+  let transactions: Transaction[] = [];
+  let labels: Label[] = [];
+  let nextLabelId = 1;
 
   function signedIn(): FakeUser {
     if (!current) throw new ApiError(401, { message: 'Unauthorized' });
@@ -117,6 +120,7 @@ export function fakeApi({
       id: uuidv7(),
       note: null,
       createdBy: current?.id ?? null,
+      labelIds: [],
       version: 1,
       ...fields,
     };
@@ -136,6 +140,42 @@ export function fakeApi({
             : -1,
       )
       .map(({ t }) => ({ ...t }));
+
+  /** Puts a Label straight into the Workspace, as if created earlier. */
+  function addLabel(fields: Partial<Label> & Pick<Label, 'name'>): Label {
+    const label: Label = {
+      id: `01900000-0000-7000-8c00-${String(nextLabelId++).padStart(12, '0')}`,
+      controllable: false,
+      archived: false,
+      ...fields,
+    };
+    labels.push(label);
+    return label;
+  }
+
+  /** By name, like the API. */
+  const byName = (list: Label[]) =>
+    [...list].sort((a, b) => a.name.localeCompare(b.name)).map((l) => ({ ...l }));
+
+  function assertNameFree(name: string, labelId?: string) {
+    const taken = labels.some(
+      (l) => l.id !== labelId && l.name.toLowerCase() === name.toLowerCase(),
+    );
+    if (taken) throw new ApiError(409, { message: 'Another Label already has this name' });
+  }
+
+  /** Changes a Transaction's Labels, as attaching or detaching does. */
+  function relabel(transactionId: string, change: (labelIds: string[]) => string[]) {
+    const transaction = transactions.find((t) => t.id === transactionId);
+    if (!transaction) throw new ApiError(404, { message: 'Not Found' });
+    const labelIds = change(transaction.labelIds);
+    const updated =
+      labelIds.length === transaction.labelIds.length
+        ? transaction
+        : { ...transaction, labelIds, version: transaction.version + 1 };
+    transactions = transactions.map((t) => (t.id === transactionId ? updated : t));
+    return { ...updated };
+  }
 
   const siblings = (kind: Category['kind'], parentId: string | null) =>
     categories
@@ -267,7 +307,39 @@ export function fakeApi({
       );
       return siblings(first.kind, first.parentId).map((c) => ({ ...c }));
     },
-    async listTransactions(workspaceId, { period, accountId, categoryId } = {}) {
+    async listLabels(workspaceId, { includeArchived = false } = {}) {
+      inWorkspace(workspaceId);
+      return byName(labels.filter((l) => includeArchived || !l.archived));
+    },
+    async createLabel(workspaceId, input) {
+      inWorkspace(workspaceId, 'ADMIN');
+      assertNameFree(input.name);
+      return { ...addLabel({ name: input.name, controllable: input.controllable ?? false }) };
+    },
+    async updateLabel(workspaceId, labelId, input) {
+      inWorkspace(workspaceId, 'ADMIN');
+      const current = labels.find((l) => l.id === labelId);
+      if (!current) throw new ApiError(404, { message: 'Not Found' });
+      if (input.name !== undefined) assertNameFree(input.name, labelId);
+      const updated = { ...current, ...input };
+      labels = labels.map((l) => (l.id === labelId ? updated : l));
+      return { ...updated };
+    },
+    async attachLabel(workspaceId, transactionId, labelId) {
+      inWorkspace(workspaceId, 'MEMBER');
+      const label = labels.find((l) => l.id === labelId);
+      if (!label) throw new ApiError(404, { message: 'Not Found' });
+      return relabel(transactionId, (ids) => {
+        if (ids.includes(labelId)) return ids;
+        if (label.archived) throw new ApiError(400, { message: 'The Label is archived' });
+        return [...ids, labelId].sort();
+      });
+    },
+    async detachLabel(workspaceId, transactionId, labelId) {
+      inWorkspace(workspaceId, 'MEMBER');
+      return relabel(transactionId, (ids) => ids.filter((id) => id !== labelId));
+    },
+    async listTransactions(workspaceId, { period, accountId, categoryId, labelId } = {}) {
       inWorkspace(workspaceId);
       const days = period && periodDays(period, workspace.calendar);
       const childIds = categories.filter((c) => c.parentId === categoryId).map((c) => c.id);
@@ -276,7 +348,8 @@ export function fakeApi({
           (t) =>
             (!days || (t.occurredOn >= days.from && t.occurredOn < days.until)) &&
             (!accountId || t.accountId === accountId) &&
-            (!categoryId || t.categoryId === categoryId || childIds.includes(t.categoryId)),
+            (!categoryId || t.categoryId === categoryId || childIds.includes(t.categoryId)) &&
+            (!labelId || t.labelIds.includes(labelId)),
         ),
       );
     },
@@ -289,7 +362,12 @@ export function fakeApi({
       if (!account || category?.kind !== input.type) {
         throw new ApiError(400, { message: 'Bad Account or Category' });
       }
-      return { ...addTransaction({ ...input, ...(id && { id }) }) };
+      const active = new Set(labels.filter((l) => !l.archived).map((l) => l.id));
+      if (!input.labelIds.every((labelId) => active.has(labelId))) {
+        throw new ApiError(400, { message: 'Bad Label' });
+      }
+      const labelIds = [...input.labelIds].sort();
+      return { ...addTransaction({ ...input, labelIds, ...(id && { id }) }) };
     },
     async updatePreferences(input) {
       const user = signedIn();
@@ -305,6 +383,9 @@ export function fakeApi({
     accounts: () => accounts,
     addCategory,
     addTransaction,
+    addLabel,
+    /** As stored, archived ones included. */
+    labels: () => labels,
     /** In the order recorded. */
     transactions: () => transactions,
     /** In the API's list order, archived ones included. */

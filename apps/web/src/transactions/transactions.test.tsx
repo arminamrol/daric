@@ -115,6 +115,39 @@ describe('Recording a Transaction', () => {
     expect(fake.transactions()[0]?.categoryId).toBe(bread.id);
   });
 
+  it('tags it with Labels, offering only active ones, and starts the next one untagged', async () => {
+    const { fake } = setUp();
+    const travel = fake.addLabel({ name: 'سفر' });
+    const eatingOut = fake.addLabel({ name: 'بیرون‌غذا', controllable: true });
+    fake.addLabel({ name: 'قدیمی', archived: true });
+    renderApp({ path: '/transactions', api: fake.api });
+    const form = await entryForm();
+    const picker = within(form.getByRole('group', { name: 'برچسب‌ها' }));
+    expect(picker.getAllByRole('checkbox').map((c) => c.closest('label')?.textContent)).toEqual([
+      'بیرون‌غذا',
+      'سفر',
+    ]);
+    await userEvent.click(picker.getByRole('checkbox', { name: 'سفر' }));
+    await userEvent.click(picker.getByRole('checkbox', { name: 'بیرون‌غذا' }));
+    await userEvent.type(amountField(form), '90000{Enter}');
+
+    const row = (await screen.findByText('−۹۰٬۰۰۰ ریال')).closest('li') as HTMLElement;
+    const shown = within(within(row).getByRole('list', { name: 'برچسب‌ها' }));
+    expect(shown.getAllByRole('listitem').map((li) => li.textContent)).toEqual([
+      'بیرون‌غذا',
+      'سفر',
+    ]);
+    expect(new Set(fake.transactions()[0]?.labelIds)).toEqual(new Set([travel.id, eatingOut.id]));
+    expect(picker.getByRole('checkbox', { name: 'سفر' })).toHaveProperty('checked', false);
+  });
+
+  it('offers no Label picker when there are no Labels', async () => {
+    const { fake } = setUp();
+    renderApp({ path: '/transactions', api: fake.api });
+    const form = await entryForm();
+    expect(form.queryByRole('group', { name: 'برچسب‌ها' })).toBeNull();
+  });
+
   it('remembers the last Account and Category on this device', async () => {
     const { fake, bread } = setUp();
     const cash = fake.addAccount({ name: 'نقد', type: 'CASH' });
@@ -298,6 +331,35 @@ describe('The Transaction list', () => {
     expect(await screen.findByText('−۱۰۰ ریال')).toBeTruthy();
     expect(screen.getByText('−۲۰۰ ریال')).toBeTruthy();
     expect(screen.queryByText('+۳۰۰ ریال')).toBeNull();
+  });
+
+  it('filters by Label', async () => {
+    const { fake, melli, food } = setUp();
+    const travel = fake.addLabel({ name: 'سفر' });
+    const old = fake.addLabel({ name: 'قدیمی', archived: true });
+    const add = (amount: bigint, labelIds: string[]) =>
+      fake.addTransaction({
+        type: 'EXPENSE',
+        accountId: melli.id,
+        categoryId: food.id,
+        amount,
+        occurredOn: '2026-10-01',
+        labelIds,
+      });
+    add(100n, [travel.id]);
+    add(200n, []);
+    add(300n, [old.id]);
+    renderApp({ path: '/transactions', api: fake.api });
+    await screen.findByText('−۲۰۰ ریال');
+
+    const filter = screen.getByRole('combobox', { name: 'فیلتر برچسب' });
+    // Archived Labels still filter old Transactions.
+    await userEvent.selectOptions(filter, old.id);
+    await vi.waitFor(() => expect(screen.queryByText('−۲۰۰ ریال')).toBeNull());
+    expect(screen.getByText('−۳۰۰ ریال')).toBeTruthy();
+    await userEvent.selectOptions(filter, travel.id);
+    expect(await screen.findByText('−۱۰۰ ریال')).toBeTruthy();
+    expect(screen.queryByText('−۳۰۰ ریال')).toBeNull();
   });
 
   it('says when a year has no Transactions', async () => {
