@@ -118,7 +118,7 @@ export const transactions = pgTable(
 );
 
 /**
- * A free tag for Transactions, independent of Category; a controllable one
+ * A free classification of Transactions, independent of Category; a controllable one
  * marks spending the user could reduce. Names are unique in a Workspace,
  * ignoring case. Never deleted, only archived.
  */

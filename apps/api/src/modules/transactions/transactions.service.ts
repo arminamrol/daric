@@ -51,7 +51,11 @@ function toWire(row: Row): TransactionWire {
   return { ...row, type: row.type, categoryId: row.categoryId, amount: amountToWire(row.amount) };
 }
 
-/** Whether a stored Transaction is the one `input` describes (a replayed create). */
+/**
+ * Whether a stored Transaction is the one `input` describes (a replayed create).
+ * Labels count only while it is unchanged: once Labels were attached or
+ * detached, a client still replaying its queued create gets the current copy.
+ */
 function sameTransaction(row: Row, input: CreateTransactionInput): boolean {
   return (
     row.type === input.type &&
@@ -60,7 +64,7 @@ function sameTransaction(row: Row, input: CreateTransactionInput): boolean {
     row.amount === input.amount &&
     row.occurredOn === input.occurredOn &&
     row.note === input.note &&
-    row.labelIds.join() === [...input.labelIds].sort().join()
+    (row.version > 1 || row.labelIds.join() === [...input.labelIds].sort().join())
   );
 }
 
@@ -234,13 +238,7 @@ export class TransactionsService {
     labelId: string,
   ): Promise<TransactionWire> {
     const tx = scopedTx();
-    if (!isUuid(labelId)) throw new NotFoundException();
-    await this.lockTransaction(transactionId);
-    const [label] = await tx
-      .select({ archivedAt: labels.archivedAt })
-      .from(labels)
-      .where(eq(labels.id, labelId));
-    if (!label) throw new NotFoundException();
+    const label = await this.lockForLabel(transactionId, labelId);
     const carried = await tx
       .select({ labelId: transactionLabels.labelId })
       .from(transactionLabels)
@@ -255,7 +253,7 @@ export class TransactionsService {
     await tx
       .insert(transactionLabels)
       .values({ transactionId, labelId, workspaceId: membership.workspaceId });
-    await this.changed(transactionId);
+    await this.bumpVersion(transactionId);
     await this.audit.record(tx, {
       action: 'transaction.label_attach',
       actorUserId: userId,
@@ -273,10 +271,7 @@ export class TransactionsService {
     labelId: string,
   ): Promise<TransactionWire> {
     const tx = scopedTx();
-    if (!isUuid(labelId)) throw new NotFoundException();
-    await this.lockTransaction(transactionId);
-    const [label] = await tx.select({ id: labels.id }).from(labels).where(eq(labels.id, labelId));
-    if (!label) throw new NotFoundException();
+    await this.lockForLabel(transactionId, labelId);
     const [detached] = await tx
       .delete(transactionLabels)
       .where(
@@ -287,7 +282,7 @@ export class TransactionsService {
       )
       .returning({ labelId: transactionLabels.labelId });
     if (detached) {
-      await this.changed(transactionId);
+      await this.bumpVersion(transactionId);
       await this.audit.record(tx, {
         action: 'transaction.label_detach',
         actorUserId: userId,
@@ -300,20 +295,28 @@ export class TransactionsService {
 
   /**
    * Locks a Transaction that is not deleted, so concurrent changes to its
-   * Labels take turns (the Label count stays within the limit). 404 otherwise.
+   * Labels take turns (the Label count stays within the limit), and reads the
+   * Label. 404 unless both exist in the Workspace.
    */
-  private async lockTransaction(transactionId: string): Promise<void> {
-    if (!isUuid(transactionId)) throw new NotFoundException();
-    const [row] = await scopedTx()
+  private async lockForLabel(transactionId: string, labelId: string) {
+    if (!isUuid(transactionId) || !isUuid(labelId)) throw new NotFoundException();
+    const tx = scopedTx();
+    const [row] = await tx
       .select({ id: transactions.id })
       .from(transactions)
       .where(and(eq(transactions.id, transactionId), isNull(transactions.deletedAt)))
       .for('update');
     if (!row) throw new NotFoundException();
+    const [label] = await tx
+      .select({ archivedAt: labels.archivedAt })
+      .from(labels)
+      .where(eq(labels.id, labelId));
+    if (!label) throw new NotFoundException();
+    return label;
   }
 
   /** Bumps a Transaction's version after its Labels changed. */
-  private async changed(transactionId: string): Promise<void> {
+  private async bumpVersion(transactionId: string): Promise<void> {
     await scopedTx()
       .update(transactions)
       .set({ version: sql`${transactions.version} + 1` })

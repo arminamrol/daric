@@ -58,7 +58,8 @@ export const createTransactionInputSchema = z.strictObject({
     .transform((note) => note || null),
   /** Active Labels of the same Workspace, each once. */
   labelIds: z
-    .array(z.uuid())
+    // Lowercase, as the database writes them, so ids compare as text.
+    .array(z.uuid().transform((id) => id.toLowerCase()))
     .max(MAX_LABELS_PER_TRANSACTION)
     .refine((ids) => new Set(ids).size === ids.length, { message: 'Label ids must be distinct' })
     .default([]),

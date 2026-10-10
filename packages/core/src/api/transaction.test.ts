@@ -57,6 +57,7 @@ describe('createTransactionInputSchema', () => {
     ['an unknown field', { currency: 'USD' }],
     ['a Label id that is not a uuid', { labelIds: ['travel'] }],
     ['the same Label twice', { labelIds: [labelId, labelId] }],
+    ['the same Label twice in different case', { labelIds: [labelId, labelId.toUpperCase()] }],
     [
       'more than 20 Labels',
       {

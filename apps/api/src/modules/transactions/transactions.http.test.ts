@@ -435,6 +435,30 @@ describe('Labels on Transactions', () => {
     expect(await storedLabelIds(id)).toEqual([travel.id, eatingOut.id].sort());
   });
 
+  it('answer a replay with the stored Transaction after its Labels changed', async () => {
+    const { api, travel, eatingOut, expense } = await setUp();
+    const id = uuidv7();
+    await api.record(expense({ id, labelIds: [travel.id] }));
+    await api.attach(id, eatingOut.id);
+    // An offline client still sends the create it queued.
+    const again = await api.record(expense({ id, labelIds: [travel.id] }));
+    expect(again.status).toBe(200);
+    expect(again.body.labelIds).toEqual([travel.id, eatingOut.id].sort());
+    expect((await api.record(expense({ id, amount: '1', labelIds: [travel.id] }))).status).toBe(
+      409,
+    );
+  });
+
+  it('read Label ids in any case', async () => {
+    const { api, travel, expense } = await setUp();
+    const id = uuidv7();
+    const first = await api.record(expense({ id, labelIds: [travel.id.toUpperCase()] }));
+    expect(first.body.labelIds).toEqual([travel.id]);
+    expect((await api.record(expense({ id, labelIds: [travel.id] }))).status).toBe(200);
+    const twice = [travel.id, travel.id.toUpperCase()];
+    expect((await api.record(expense({ labelIds: twice }))).status).toBe(400);
+  });
+
   it("reject a Label that is archived, missing or another Workspace's", async () => {
     const a = await setUp();
     const b = await setUp();

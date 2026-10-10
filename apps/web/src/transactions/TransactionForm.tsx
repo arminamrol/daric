@@ -40,7 +40,7 @@ interface FieldErrors {
 /**
  * Fast entry of an Income or Expense: the amount comes first and Enter records
  * it. The Account and Categories last used on this device are kept, and after
- * each entry the amount and Labels are cleared and the amount focused for the next one.
+ * each one is recorded the amount and Labels are cleared and the amount focused for the next.
  */
 export function TransactionForm({
   accounts,

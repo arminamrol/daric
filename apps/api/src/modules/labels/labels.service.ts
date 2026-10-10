@@ -1,6 +1,7 @@
 import { ConflictException, Inject, Injectable, NotFoundException } from '@nestjs/common';
 import type { CreateLabelInput, Label, UpdateLabelInput } from '@daric/core';
 import { asc, eq, isNull, sql, type SQL } from 'drizzle-orm';
+import { isUniqueViolation } from '../../common/db-errors';
 import { isUuid, type Membership } from '../../common/request';
 import { one } from '../../db/client';
 import { labels, workspaces } from '../../db/schema';
@@ -18,14 +19,7 @@ function toWire({ archivedAt, ...label }: Omit<Label, 'archived'> & { archivedAt
   return { ...label, archived: archivedAt !== null };
 }
 
-const NAME_TAKEN = 'Another Label already has this name';
-
-/** Whether `error` is Postgres refusing a second Label with the same name. */
-function isNameTaken(error: unknown): boolean {
-  const cause = error instanceof Error && 'cause' in error ? error.cause : error;
-  const { code, constraint } = (cause ?? {}) as { code?: string; constraint?: string };
-  return code === '23505' && constraint === 'labels_workspace_id_name_key';
-}
+export const NAME_TAKEN = 'Another Label in the Workspace has this name, ignoring case';
 
 // Queries filter by id only: WorkspaceGuard and row-level security keep them
 // inside the caller's Workspace (ADR-0001). A unique index keeps names unique
@@ -116,7 +110,8 @@ export class LabelsService {
     try {
       return await query();
     } catch (error) {
-      if (isNameTaken(error)) throw new ConflictException(NAME_TAKEN);
+      if (isUniqueViolation(error, 'labels_workspace_id_name_key'))
+        throw new ConflictException(NAME_TAKEN);
       throw error;
     }
   }

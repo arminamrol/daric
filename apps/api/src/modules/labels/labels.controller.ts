@@ -14,13 +14,11 @@ import { CurrentMembership, CurrentUserId, type Membership } from '../../common/
 import { MinRole } from '../../common/workspace.guard';
 import { WorkspaceController } from '../../common/workspace-route';
 import { ZodBody } from '../../common/zod';
-import { LabelsService } from './labels.service';
+import { LabelsService, NAME_TAKEN } from './labels.service';
 
 class LabelDto extends createZodDto(labelSchema) {}
 class CreateLabelDto extends createZodDto(createLabelInputSchema) {}
 class UpdateLabelDto extends createZodDto(updateLabelInputSchema) {}
-
-const nameTaken = 'Another Label in the Workspace has this name, ignoring case';
 
 @ApiTags('labels')
 @ApiNotFoundResponse({ description: 'No such Workspace or Label, or the caller is not a Member' })
@@ -45,7 +43,7 @@ export class LabelsController {
   @MinRole('ADMIN')
   @ApiCreatedResponse({ type: LabelDto })
   @ApiBadRequestResponse({ description: 'Invalid input' })
-  @ApiConflictResponse({ description: nameTaken })
+  @ApiConflictResponse({ description: NAME_TAKEN })
   create(
     @CurrentMembership() membership: Membership,
     @CurrentUserId() userId: string,
@@ -58,7 +56,7 @@ export class LabelsController {
   @MinRole('ADMIN')
   @ApiOkResponse({ type: LabelDto })
   @ApiBadRequestResponse({ description: 'Invalid input' })
-  @ApiConflictResponse({ description: nameTaken })
+  @ApiConflictResponse({ description: NAME_TAKEN })
   update(
     @CurrentMembership() membership: Membership,
     @CurrentUserId() userId: string,
