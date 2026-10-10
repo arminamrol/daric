@@ -4,7 +4,7 @@
 
 **Blocked by:** 01
 
-**Status:** ready-for-agent
+**Status:** in-progress
 
 - [ ] NestJS app with Drizzle + drizzle-kit migrations; users, auth_identities, refresh_tokens, workspaces, workspace_members, audit_logs tables
 - [ ] Register and login endpoints; argon2id hashing; zod validation; OpenAPI generated from schemas

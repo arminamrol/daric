@@ -1,2 +1,6 @@
-// Placeholder: NestJS API arrives in ticket 05.
-export {};
+import { createApp } from './app';
+import { loadConfig } from './config';
+
+const config = loadConfig();
+const app = await createApp(config);
+await app.listen(config.PORT);
