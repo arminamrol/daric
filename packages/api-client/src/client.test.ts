@@ -172,6 +172,49 @@ describe('api-client', () => {
     expect(sent[0]?.headers.get('x-csrf-token')).toBe('csrf-1');
   });
 
+  describe('Accounts', () => {
+    const account = {
+      id: '01900000-0000-7000-8000-0000000000a1',
+      name: 'Melli',
+      type: 'BANK',
+      class: 'ASSET',
+      currency: 'IRR',
+      openingBalance: '9007199254740993',
+      balance: '9007199254740993',
+      archived: false,
+    } as const;
+    const base = `/v1/workspaces/${workspace.id}/accounts`;
+
+    it('lists them with Amounts as bigints, archived ones only when asked', async () => {
+      const { client, sent } = fakeServer({
+        [`GET ${base}`]: () => ({ status: 200, body: [account] }),
+      });
+      const [listed] = await client.listAccounts(workspace.id);
+      expect(listed?.balance).toBe(9007199254740993n);
+      await client.listAccounts(workspace.id, { includeArchived: true });
+      expect(sent.map((r) => r.url)).toEqual([base, `${base}?includeArchived=true`]);
+    });
+
+    it('sends bigint Amounts as decimal strings', async () => {
+      const { client, sent } = fakeServer(
+        {
+          [`POST ${base}`]: () => ({ status: 201, body: account }),
+          [`PATCH ${base}/${account.id}`]: () => ({ status: 200, body: account }),
+        },
+        { '__Host-daric_csrf': 'csrf-1' },
+      );
+      const { id, balance, archived, ...input } = account;
+      void balance;
+      void archived;
+      await client.createAccount(workspace.id, { ...input, openingBalance: 9007199254740993n });
+      await client.updateAccount(workspace.id, id, { openingBalance: -5n, archived: true });
+      expect(sent.map((r) => r.body)).toEqual([
+        { ...input, openingBalance: '9007199254740993' },
+        { openingBalance: '-5', archived: true },
+      ]);
+    });
+  });
+
   it('prefixes paths with the base URL', async () => {
     const sent: string[] = [];
     const client = createApiClient({

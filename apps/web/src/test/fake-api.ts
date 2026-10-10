@@ -1,6 +1,6 @@
 import { ApiError, type ApiClient } from '@daric/api-client';
 import { hasRole } from '@daric/core';
-import type { Me, Session, UserPreferences, Workspace, WorkspaceRole } from '@daric/core';
+import type { Account, Me, Session, UserPreferences, Workspace, WorkspaceRole } from '@daric/core';
 
 export const testPassword = 'correct horse battery';
 
@@ -34,6 +34,9 @@ export function fakeApi({
     role,
   };
 
+  let accounts: Account[] = [];
+  let nextAccountId = 1;
+
   function signedIn(): FakeUser {
     if (!current) throw new ApiError(401, { message: 'Unauthorized' });
     return current;
@@ -62,6 +65,28 @@ export function fakeApi({
 
   if (signedInAs) current = addUser(signedInAs);
 
+  function inWorkspace(workspaceId: string, minimum: WorkspaceRole = 'VIEWER') {
+    signedIn();
+    if (workspaceId !== workspace.id) throw new ApiError(404, { message: 'Not Found' });
+    if (!hasRole(workspace.role, minimum)) throw new ApiError(403, { message: 'Forbidden' });
+  }
+
+  /** Puts an Account straight into the Workspace, as if created earlier. */
+  function addAccount(fields: Partial<Account> & Pick<Account, 'name'>): Account {
+    const account: Account = {
+      id: `01900000-0000-7000-a000-${String(nextAccountId++).padStart(12, '0')}`,
+      type: 'BANK',
+      class: 'ASSET',
+      currency: 'IRR',
+      openingBalance: 0n,
+      archived: false,
+      ...fields,
+      balance: fields.openingBalance ?? 0n,
+    };
+    accounts.push(account);
+    return account;
+  }
+
   const api: ApiClient = {
     async register({ email, password }) {
       if (users.has(email)) throw new ApiError(409, { message: 'Email is already registered' });
@@ -89,6 +114,23 @@ export function fakeApi({
       workspace = { ...workspace, ...input };
       return { ...workspace };
     },
+    async listAccounts(workspaceId, { includeArchived = false } = {}) {
+      inWorkspace(workspaceId);
+      return accounts.filter((a) => includeArchived || !a.archived).map((a) => ({ ...a }));
+    },
+    async createAccount(workspaceId, input) {
+      inWorkspace(workspaceId, 'ADMIN');
+      return { ...addAccount(input) };
+    },
+    async updateAccount(workspaceId, accountId, input) {
+      inWorkspace(workspaceId, 'ADMIN');
+      const account = accounts.find((a) => a.id === accountId);
+      if (!account) throw new ApiError(404, { message: 'Not Found' });
+      const updated = { ...account, ...input };
+      updated.balance = updated.openingBalance;
+      accounts = accounts.map((a) => (a.id === accountId ? updated : a));
+      return { ...updated };
+    },
     async updatePreferences(input) {
       const user = signedIn();
       user.preferences = { ...user.preferences, ...input };
@@ -99,6 +141,8 @@ export function fakeApi({
   return {
     api,
     addUser,
+    addAccount,
+    accounts: () => accounts,
     signedInUser: () => current?.email,
     workspace: () => workspace,
     preferences: () => signedIn().preferences,

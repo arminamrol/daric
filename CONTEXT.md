@@ -39,7 +39,7 @@ _Avoid_: Cycle, interval
 ### Money
 
 **Account**:
-A place money is held or owed (cash, bank, card, wallet, loan, other asset). Has a currency and is either an Asset or a Liability.
+A place money is held or owed (cash, bank, card, wallet, loan, other asset). Has a currency, fixed once created, and is either an Asset or a Liability. A Liability's balance is what is owed: positive means money is owed. Archived, never deleted.
 _Avoid_: Wallet (as a generic term), user account
 
 **Valuation**:

@@ -9,6 +9,7 @@ import { loggerOptions } from './common/logger';
 import { CONFIG } from './common/di-tokens';
 import type { Config } from './config';
 import { DatabaseModule } from './db/database.module';
+import { AccountsModule } from './modules/accounts/accounts.module';
 import { AuditModule } from './modules/audit/audit.module';
 import { AuthController } from './modules/auth/auth.controller';
 import { AuthModule } from './modules/auth/auth.module';
@@ -62,6 +63,7 @@ export class AppModule {
         AuthModule,
         WorkspacesModule,
         MeModule,
+        AccountsModule,
       ],
       providers: [
         // Order matters: rate limiting, then CSRF, then authentication.

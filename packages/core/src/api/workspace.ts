@@ -1,8 +1,9 @@
 import { z } from 'zod';
 import { calendarSystems, canonicalTimeZone } from '../calendar';
 import { digitSystems } from '../locale';
-import { currencies, moneyDisplays } from '../money';
+import { moneyDisplays } from '../money';
 import { userSchema } from './auth';
+import { currencyCodeSchema, currencyCodes, notEmpty } from './shared';
 
 export const workspaceTypes = ['PERSONAL', 'BUSINESS'] as const;
 export const workspaceTypeSchema = z.enum(workspaceTypes);
@@ -32,13 +33,8 @@ export const workspaceSchema = z.object({
 });
 export type Workspace = z.infer<typeof workspaceSchema>;
 
-export const baseCurrencyCodes = currencies.map((c) => c.code);
-
-/** A partial update must change something. */
-const notEmpty = [
-  (input: object) => Object.keys(input).length > 0,
-  { message: 'Nothing to update' },
-] as const;
+/** Any currency Daric knows can be a Base Currency. */
+export const baseCurrencyCodes = currencyCodes;
 
 /** An IANA timezone name, stored in its canonical spelling. */
 const timeZoneSchema = z
@@ -55,10 +51,7 @@ const timeZoneSchema = z
 export const updateWorkspaceInputSchema = z
   .object({
     name: z.string().trim().min(1).max(100).exactOptional(),
-    baseCurrency: z
-      .string()
-      .refine((code) => baseCurrencyCodes.includes(code), { message: 'Unsupported currency' })
-      .exactOptional(),
+    baseCurrency: currencyCodeSchema.exactOptional(),
     calendar: z.enum(calendarSystems).exactOptional(),
     timezone: timeZoneSchema.exactOptional(),
     moneyDisplay: z.enum(moneyDisplays).exactOptional(),

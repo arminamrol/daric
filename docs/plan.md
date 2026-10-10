@@ -19,12 +19,12 @@ docker/            compose: postgres, mailpit, api
 
 ## Schema
 
-Common columns on domain tables: `id uuid (v7, client-generatable)`, `workspace_id`, `created_at`, `updated_at`, `version`; financial tables add `deleted_at`. RLS on every domain table (ADR-0001). Money = `bigint` minor units (ADR-0004).
+Common columns on domain tables: `id uuid (v7, client-generatable)`, `workspace_id`, `created_at`, `updated_at`, `version`; financial tables add `deleted_at` (Accounts are archived instead: `archived_at`, never deleted). RLS on every domain table (ADR-0001). Money = `bigint` minor units (ADR-0004).
 
 - Identity: `users`, `auth_identities` (password now, phone OTP later), `refresh_tokens` (family rotation + reuse detection), `email_tokens` (verify/reset)
 - Tenancy: `workspaces` (type, base_currency, calendar, timezone, money_display, settings), `workspace_members` (role), `invitations`
 - Governance: `user_consents`, `audit_logs` (append-only, no amounts/notes), `feature_flags`, `offline_devices`
-- Money: `currencies` (code, minor_units), `exchange_rates`, `accounts` (kind, class ASSET|LIABILITY, currency, opening_balance), `account_valuations`, `net_worth_snapshots`
+- Money: `currencies` (code, minor_units), `exchange_rates`, `accounts` (type CASH|BANK|CARD|WALLET|LOAN|OTHER_ASSET, class ASSET|LIABILITY, currency, opening_balance), `account_valuations`, `net_worth_snapshots`
 - Activity: `categories` (one level parent), `labels` (controllable), `transactions` (INCOME|EXPENSE|TRANSFER; transfer has `to_account_id` + `to_amount`), `transaction_labels`, `recurring_rules` (auto_post, default confirm)
 - Planning: `budgets` (category, label?, MONTHLY|YEARLY), `projection_settings`, `planned_items` (FIXED_MONTHLY requires category | ONE_OFF)
 - AI: `ai_analyses` (payload_sent), `ai_suggestions` (fact ids, status, rating), `ai_usage`

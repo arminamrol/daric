@@ -5,14 +5,8 @@ import { useId, useState } from 'react';
 import type { FormEvent } from 'react';
 import { useI18n } from '../i18n/locale';
 import { ChoiceGroup } from '../ui/ChoiceGroup';
-import { CALENDAR_LABELS } from './labels';
+import { CALENDAR_LABELS, CURRENCY_NAMES } from './labels';
 import { useUpdateWorkspace } from './settings';
-
-const CURRENCY_NAMES: Readonly<Record<string, PlainMessageKey>> = {
-  IRR: 'currency.IRR',
-  USD: 'currency.USD',
-  EUR: 'currency.EUR',
-};
 
 const MONEY_DISPLAY_LABELS: Record<MoneyDisplay, PlainMessageKey> = {
   rial: 'settings.workspace.moneyDisplay.rial',
