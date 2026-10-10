@@ -59,7 +59,9 @@ export async function call(
   path: string,
   options: { body?: unknown; token?: string; headers?: Record<string, string> } = {},
 ) {
-  const headers: Record<string, string> = { ...options.headers };
+  // Calls here act as the mobile app: tokens in the body, `Authorization: Bearer`, no cookies.
+  // `browser()` below acts as the web app.
+  const headers: Record<string, string> = { 'x-daric-client': 'mobile', ...options.headers };
   if (options.body !== undefined) headers['content-type'] = 'application/json';
   if (options.token) headers['authorization'] = `Bearer ${options.token}`;
   const init: RequestInit = { method, headers };
@@ -85,3 +87,68 @@ export async function registerUser(base: string, email = uniqueEmail()) {
     workspaceId: me.body.workspaces[0].id as string,
   };
 }
+
+interface StoredCookie {
+  value: string;
+  path: string;
+}
+
+/**
+ * A browser talking to the API like the web app: it keeps the cookies the
+ * server sets (honouring their Path), never sends `Authorization`, and sends
+ * the CSRF cookie back in `X-CSRF-Token` unless told not to.
+ */
+export function browser(base: string) {
+  const jar = new Map<string, StoredCookie>();
+
+  function cookieHeader(path: string): string {
+    return [...jar]
+      .filter(([, c]) => path.startsWith(c.path))
+      .map(([name, c]) => `${name}=${c.value}`)
+      .join('; ');
+  }
+
+  function store(res: Response) {
+    for (const line of res.headers.getSetCookie()) {
+      const [pair = '', ...attrs] = line.split(';').map((p) => p.trim());
+      const eq = pair.indexOf('=');
+      const name = pair.slice(0, eq);
+      const value = pair.slice(eq + 1);
+      const path = attrs.find((a) => a.toLowerCase().startsWith('path='))?.slice(5) ?? '/';
+      const expired = attrs.some(
+        (a) => /^max-age=0$/i.test(a) || /^expires=thu, 01 jan 1970/i.test(a),
+      );
+      if (expired || value === '') jar.delete(name);
+      else jar.set(name, { value, path });
+    }
+  }
+
+  return {
+    cookie: (name: string) => jar.get(name)?.value,
+    async call(
+      method: string,
+      path: string,
+      options: { body?: unknown; csrf?: boolean | string; headers?: Record<string, string> } = {},
+    ) {
+      const headers: Record<string, string> = { ...options.headers };
+      const cookies = cookieHeader(path);
+      if (cookies) headers['cookie'] = cookies;
+      const csrf =
+        typeof options.csrf === 'string'
+          ? options.csrf
+          : options.csrf !== false
+            ? jar.get('__Host-daric_csrf')?.value
+            : undefined;
+      if (csrf) headers['x-csrf-token'] = csrf;
+      if (options.body !== undefined) headers['content-type'] = 'application/json';
+      const init: RequestInit = { method, headers };
+      if (options.body !== undefined) init.body = JSON.stringify(options.body);
+      const res = await fetch(`${base}${path}`, init);
+      store(res);
+      const text = await res.text();
+      const body = text ? (JSON.parse(text) as Record<string, unknown>) : undefined;
+      return { status: res.status, headers: res.headers, body: body as any }; // eslint-disable-line @typescript-eslint/no-explicit-any
+    },
+  };
+}
+export type Browser = ReturnType<typeof browser>;

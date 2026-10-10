@@ -1,5 +1,5 @@
 import { ConflictException, Inject, Injectable, UnauthorizedException } from '@nestjs/common';
-import type { AuthResult, LoginInput, RegisterInput } from '@daric/core';
+import type { LoginInput, RegisterInput, User } from '@daric/core';
 import { and, eq } from 'drizzle-orm';
 import type { ClientInfo } from '../../common/request';
 import { DATABASE } from '../../common/di-tokens';
@@ -14,14 +14,14 @@ function isUniqueViolation(error: unknown): boolean {
   return (cause as { code?: string }).code === '23505';
 }
 
-function toResult(user: { id: string; email: string }, tokens: IssuedTokens): AuthResult {
-  return {
-    user: { id: user.id, email: user.email },
-    accessToken: tokens.accessToken,
-    accessTokenExpiresAt: tokens.accessTokenExpiresAt.toISOString(),
-    refreshToken: tokens.refreshToken,
-    refreshTokenExpiresAt: tokens.refreshTokenExpiresAt.toISOString(),
-  };
+/** A signed-in User and their new tokens; the controller decides how the tokens travel. */
+export interface SignedIn {
+  user: User;
+  tokens: IssuedTokens;
+}
+
+function signedIn(user: User, tokens: IssuedTokens): SignedIn {
+  return { user: { id: user.id, email: user.email }, tokens };
 }
 
 /**
@@ -38,7 +38,7 @@ export class AuthService {
   ) {}
 
   /** Creates the User, their Personal Workspace and Owner membership in one transaction. */
-  async register(input: RegisterInput, client: ClientInfo): Promise<AuthResult> {
+  async register(input: RegisterInput, client: ClientInfo): Promise<SignedIn> {
     const secretHash = await hashPassword(input.password);
     try {
       return await this.db.transaction(async (tx) => {
@@ -64,7 +64,7 @@ export class AuthService {
           workspaceId: workspace.id,
           client,
         });
-        return toResult(user, await this.tokens.issue(tx, user.id));
+        return signedIn(user, await this.tokens.issue(tx, user.id));
       });
     } catch (error) {
       if (isUniqueViolation(error)) throw new ConflictException('Email is already registered');
@@ -72,7 +72,7 @@ export class AuthService {
     }
   }
 
-  async login(input: LoginInput, client: ClientInfo): Promise<AuthResult> {
+  async login(input: LoginInput, client: ClientInfo): Promise<SignedIn> {
     const [found] = await this.db
       .select({ id: users.id, email: users.email, secretHash: authIdentities.secretHash })
       .from(authIdentities)
@@ -95,7 +95,7 @@ export class AuthService {
 
     return this.db.transaction(async (tx) => {
       await this.audit.record(tx, { action: 'auth.login', actorUserId: found.id, client });
-      return toResult(found, await this.tokens.issue(tx, found.id));
+      return signedIn(found, await this.tokens.issue(tx, found.id));
     });
   }
 }

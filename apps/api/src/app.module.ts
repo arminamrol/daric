@@ -4,6 +4,7 @@ import { APP_GUARD } from '@nestjs/core';
 import { ThrottlerGuard, ThrottlerModule } from '@nestjs/throttler';
 import { LoggerModule } from 'nestjs-pino';
 import { AuthGuard } from './modules/auth/auth.guard';
+import { CsrfGuard } from './modules/auth/csrf.guard';
 import { loggerOptions } from './common/logger';
 import { CONFIG } from './common/di-tokens';
 import type { Config } from './config';
@@ -63,8 +64,9 @@ export class AppModule {
         MeModule,
       ],
       providers: [
-        // Order matters: rate limiting runs before authentication.
+        // Order matters: rate limiting, then CSRF, then authentication.
         { provide: APP_GUARD, useClass: ThrottlerGuard },
+        { provide: APP_GUARD, useClass: CsrfGuard },
         { provide: APP_GUARD, useClass: AuthGuard },
       ],
     };
