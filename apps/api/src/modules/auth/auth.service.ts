@@ -6,6 +6,7 @@ import { DATABASE } from '../../common/di-tokens';
 import { type Database, one } from '../../db/client';
 import { authIdentities, users, workspaceMembers, workspaces } from '../../db/schema';
 import { AuditService } from '../audit/audit.service';
+import { seedDefaultCategories } from '../categories/defaults';
 import { hashPassword, verifyAgainstDummy, verifyPassword } from './passwords';
 import { type IssuedTokens, TokenService } from './token.service';
 
@@ -70,7 +71,10 @@ export class AuthService {
     });
   }
 
-  /** Creates the User, their Personal Workspace and Owner membership in one transaction. */
+  /**
+   * Creates the User, their Personal Workspace with its default Categories and
+   * Owner membership in one transaction.
+   */
   async register(input: RegisterInput, client: ClientInfo): Promise<SignedIn> {
     const secretHash = await hashPassword(input.password);
     try {
@@ -91,6 +95,7 @@ export class AuthService {
         await tx
           .insert(workspaceMembers)
           .values({ workspaceId: workspace.id, userId: user.id, role: 'OWNER' });
+        await seedDefaultCategories(tx, workspace.id);
         await this.audit.record(tx, {
           action: 'auth.register',
           actorUserId: user.id,

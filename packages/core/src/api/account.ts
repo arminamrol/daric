@@ -1,9 +1,7 @@
 import { z } from 'zod';
 import { accountClasses, accountTypes } from '../accounts';
 import { amountSchema } from '../money';
-import { currencyCodeSchema, notEmpty } from './shared';
-
-const nameSchema = z.string().trim().min(1).max(100);
+import { currencyCodeSchema, nameSchema, notEmpty } from './shared';
 
 /** An Account as the API returns it; Amounts are in the Account's currency. */
 export const accountSchema = z.object({

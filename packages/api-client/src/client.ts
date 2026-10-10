@@ -2,16 +2,22 @@ import {
   type Account,
   accountListSchema,
   accountSchema,
+  type Category,
+  categoryListSchema,
+  categorySchema,
   type CreateAccountInput,
+  type CreateCategoryInput,
   CSRF_COOKIE,
   CSRF_HEADER,
   type LoginInput,
   type Me,
   meSchema,
   type RegisterInput,
+  type ReorderCategoriesInput,
   type Session,
   sessionSchema,
   type UpdateAccountInput,
+  type UpdateCategoryInput,
   type UpdateUserPreferencesInput,
   type UpdateWorkspaceInput,
   type UserPreferences,
@@ -56,6 +62,18 @@ export interface ApiClient {
     accountId: string,
     input: UpdateAccountInput,
   ): Promise<Account>;
+  /** Each kind's top-level Categories in order, each followed by its children. */
+  listCategories(workspaceId: string, options?: { includeArchived?: boolean }): Promise<Category[]>;
+  /** Owner or Admin only. */
+  createCategory(workspaceId: string, input: CreateCategoryInput): Promise<Category>;
+  /** Owner or Admin only; also moves, archives and unarchives. */
+  updateCategory(
+    workspaceId: string,
+    categoryId: string,
+    input: UpdateCategoryInput,
+  ): Promise<Category>;
+  /** Owner or Admin only: every sibling under one parent, in the new order. */
+  reorderCategories(workspaceId: string, input: ReorderCategoriesInput): Promise<Category[]>;
 }
 
 /** Amounts are bigints in code and decimal strings on the wire (ADR-0004). */
@@ -137,7 +155,28 @@ export function createApiClient(options: ApiClientOptions = {}): ApiClient {
         accountSchema,
         input,
       ),
+    listCategories: (workspaceId, { includeArchived = false } = {}) =>
+      request(
+        'GET',
+        `${categoriesPath(workspaceId)}${includeArchived ? '?includeArchived=true' : ''}`,
+        categoryListSchema,
+      ),
+    createCategory: (workspaceId, input) =>
+      request('POST', categoriesPath(workspaceId), categorySchema, input),
+    updateCategory: (workspaceId, categoryId, input) =>
+      request(
+        'PATCH',
+        `${categoriesPath(workspaceId)}/${encodeURIComponent(categoryId)}`,
+        categorySchema,
+        input,
+      ),
+    reorderCategories: (workspaceId, input) =>
+      request('PUT', `${categoriesPath(workspaceId)}/order`, categoryListSchema, input),
   };
+}
+
+function categoriesPath(workspaceId: string): string {
+  return `/v1/workspaces/${encodeURIComponent(workspaceId)}/categories`;
 }
 
 function accountsPath(workspaceId: string): string {

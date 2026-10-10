@@ -2,6 +2,8 @@ import type { RouteObject } from 'react-router';
 import { GuestOnly, RequireSession } from '../auth/session';
 import { AccountFormPage } from '../pages/AccountFormPage';
 import { AccountsPage } from '../pages/AccountsPage';
+import { CategoriesPage } from '../pages/CategoriesPage';
+import { CategoryFormPage } from '../pages/CategoryFormPage';
 import { HomePage } from '../pages/HomePage';
 import { LoginPage } from '../pages/LoginPage';
 import { NotFoundPage } from '../pages/NotFoundPage';
@@ -20,6 +22,9 @@ export const routes: RouteObject[] = [
           { path: 'accounts', element: <AccountsPage /> },
           { path: 'accounts/new', element: <AccountFormPage /> },
           { path: 'accounts/:accountId', element: <AccountFormPage /> },
+          { path: 'categories', element: <CategoriesPage /> },
+          { path: 'categories/new', element: <CategoryFormPage /> },
+          { path: 'categories/:categoryId', element: <CategoryFormPage /> },
           { path: 'settings', element: <SettingsPage /> },
         ],
       },

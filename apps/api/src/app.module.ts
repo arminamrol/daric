@@ -13,6 +13,7 @@ import { AccountsModule } from './modules/accounts/accounts.module';
 import { AuditModule } from './modules/audit/audit.module';
 import { AuthController } from './modules/auth/auth.controller';
 import { AuthModule } from './modules/auth/auth.module';
+import { CategoriesModule } from './modules/categories/categories.module';
 import { MeModule } from './modules/me/me.module';
 import { WorkspacesModule } from './modules/workspaces/workspaces.module';
 
@@ -64,6 +65,7 @@ export class AppModule {
         WorkspacesModule,
         MeModule,
         AccountsModule,
+        CategoriesModule,
       ],
       providers: [
         // Order matters: rate limiting, then CSRF, then authentication.

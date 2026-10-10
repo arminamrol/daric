@@ -11,7 +11,10 @@ export type AuditAction =
   | 'auth.refresh_reuse'
   | 'workspace.update'
   | 'account.create'
-  | 'account.update';
+  | 'account.update'
+  | 'category.create'
+  | 'category.update'
+  | 'category.reorder';
 
 export interface AuditEntry {
   action: AuditAction;

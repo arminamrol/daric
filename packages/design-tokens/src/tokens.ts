@@ -30,6 +30,25 @@ export const palette = {
   },
 } as const;
 
+/**
+ * Category colors, the same in both themes: a Category's icon is drawn in white
+ * on its color, so each must keep white readable (see tokens.test.ts).
+ */
+export const categoryPalette = {
+  red: '#b91c1c',
+  orange: '#c2410c',
+  amber: '#b45309',
+  green: '#15803d',
+  teal: '#0f766e',
+  sky: '#0369a1',
+  blue: '#1d4ed8',
+  indigo: '#4338ca',
+  violet: '#6d28d9',
+  pink: '#be185d',
+  brown: '#8a5a2b',
+  slate: '#475569',
+} as const;
+
 export type ThemeName = 'light' | 'dark';
 
 export type SemanticColor =
