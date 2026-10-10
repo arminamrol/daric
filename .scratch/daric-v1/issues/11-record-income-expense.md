@@ -4,7 +4,7 @@
 
 **Blocked by:** 09, 10, 03
 
-**Status:** in-progress
+**Status:** done
 
 - [x] Transactions table with soft delete, version, UUIDv7 id accepted from client (idempotent create)
 - [x] Create and list API, filters by Period, Account, Category
