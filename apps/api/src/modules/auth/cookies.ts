@@ -1,4 +1,5 @@
 import { randomBytes, timingSafeEqual } from 'node:crypto';
+import { CLIENT_HEADER, CSRF_COOKIE, CSRF_HEADER } from '@daric/core';
 import type { CookieOptions, Request, Response } from 'express';
 import type { IssuedTokens } from './token.service';
 
@@ -8,13 +9,6 @@ import type { IssuedTokens } from './token.service';
 export const ACCESS_COOKIE = '__Host-daric_access';
 export const REFRESH_COOKIE = '__Secure-daric_refresh';
 export const REFRESH_PATH = '/v1/auth/refresh';
-/** Double-submit CSRF token: readable by the web app, echoed back in `X-CSRF-Token`. */
-export const CSRF_COOKIE = '__Host-daric_csrf';
-export const CSRF_HEADER = 'x-csrf-token';
-
-/** Header the mobile app sends to get tokens in the body instead of cookies. */
-export const CLIENT_HEADER = 'x-daric-client';
-
 const base: CookieOptions = { secure: true, sameSite: 'lax' };
 
 export function isMobileClient(req: Request): boolean {

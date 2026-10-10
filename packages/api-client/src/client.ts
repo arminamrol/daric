@@ -1,4 +1,6 @@
 import {
+  CSRF_COOKIE,
+  CSRF_HEADER,
   type LoginInput,
   type Me,
   meSchema,
@@ -6,10 +8,6 @@ import {
   type Session,
   sessionSchema,
 } from '@daric/core';
-
-// Must match the API (apps/api/src/modules/auth/cookies.ts).
-const CSRF_COOKIE = '__Host-daric_csrf';
-const CSRF_HEADER = 'X-CSRF-Token';
 
 /** A non-2xx answer from the API. */
 export class ApiError extends Error {

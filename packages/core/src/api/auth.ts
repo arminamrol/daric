@@ -25,6 +25,12 @@ export const userSchema = z.object({
 });
 export type User = z.infer<typeof userSchema>;
 
+/** Header the mobile app sends so the API hands it tokens instead of cookies (ADR-0006). */
+export const CLIENT_HEADER = 'X-Daric-Client';
+/** Double-submit CSRF token: the web app reads this cookie and echoes it in `CSRF_HEADER`. */
+export const CSRF_COOKIE = '__Host-daric_csrf';
+export const CSRF_HEADER = 'X-CSRF-Token';
+
 /** What a web client gets on sign-up or login; the tokens themselves travel only in httpOnly cookies. */
 export const sessionSchema = z.object({
   user: userSchema,

@@ -15,7 +15,8 @@ const SAFE_METHODS = new Set(['GET', 'HEAD', 'OPTIONS']);
  * too, so another site cannot sign a browser into an account of its choosing.
  *
  * Requests that carry `Authorization` or the mobile client header are exempt:
- * a cross-site form cannot set headers, and cookies do not authenticate them.
+ * a cross-site form cannot set headers, and AuthGuard never authenticates
+ * them by cookie.
  */
 @Injectable()
 export class CsrfGuard implements CanActivate {

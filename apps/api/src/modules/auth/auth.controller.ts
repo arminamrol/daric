@@ -13,6 +13,8 @@ import {
 import {
   type AuthResult,
   authResultSchema,
+  CLIENT_HEADER,
+  CSRF_COOKIE,
   loginInputSchema,
   registerInputSchema,
   type Session,
@@ -24,14 +26,7 @@ import { Public } from './auth.guard';
 import { Client, type ClientInfo } from '../../common/request';
 import { ZodBody } from '../../common/zod';
 import { AuthService, type SignedIn } from './auth.service';
-import {
-  CLIENT_HEADER,
-  CSRF_COOKIE,
-  isMobileClient,
-  readCookie,
-  setCsrfCookie,
-  setSessionCookies,
-} from './cookies';
+import { isMobileClient, readCookie, setCsrfCookie, setSessionCookies } from './cookies';
 
 class RegisterDto extends createZodDto(registerInputSchema) {}
 class LoginDto extends createZodDto(loginInputSchema) {}
@@ -62,7 +57,7 @@ export class AuthController {
     @Req() req: Request,
     @Res({ passthrough: true }) res: Response,
   ) {
-    return respond(req, res, await this.auth.register(body, client));
+    return deliverSignIn(req, res, await this.auth.register(body, client));
   }
 
   @Post('login')
@@ -75,7 +70,7 @@ export class AuthController {
     @Req() req: Request,
     @Res({ passthrough: true }) res: Response,
   ) {
-    return respond(req, res, await this.auth.login(body, client));
+    return deliverSignIn(req, res, await this.auth.login(body, client));
   }
 }
 
@@ -95,7 +90,12 @@ export class CsrfController {
   }
 }
 
-function respond(req: Request, res: Response, { user, tokens }: SignedIn): Session | AuthResult {
+/** Hands the new tokens to the client: in the body for mobile, as cookies for the web. */
+function deliverSignIn(
+  req: Request,
+  res: Response,
+  { user, tokens }: SignedIn,
+): Session | AuthResult {
   const session: Session = {
     user,
     accessTokenExpiresAt: tokens.accessTokenExpiresAt.toISOString(),

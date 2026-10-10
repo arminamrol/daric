@@ -156,6 +156,17 @@ describe('CSRF protection', () => {
     expect(res.status).toBe(403);
   });
 
+  it('does not let the mobile client header turn the session cookie into a CSRF-free login', async () => {
+    const { web, workspaceId } = await signedUpBrowser();
+    const res = await web.call('PATCH', `/v1/workspaces/${workspaceId}`, {
+      body: { name: 'forged' },
+      csrf: false,
+      headers: { 'x-daric-client': 'mobile' },
+    });
+    expect(res.status).toBe(401);
+    expect((await web.call('GET', `/v1/workspaces/${workspaceId}`)).body.name).toBe('Personal');
+  });
+
   it('gives the new session a new CSRF token', async () => {
     const web = browser(t.url);
     await web.call('GET', '/v1/auth/csrf');

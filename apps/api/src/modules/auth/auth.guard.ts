@@ -8,7 +8,7 @@ import {
 } from '@nestjs/common';
 import { Reflector } from '@nestjs/core';
 import type { AppRequest } from '../../common/request';
-import { ACCESS_COOKIE, readCookie } from './cookies';
+import { ACCESS_COOKIE, isMobileClient, readCookie } from './cookies';
 import { TokenService } from './token.service';
 
 const IS_PUBLIC = 'daric:public';
@@ -18,7 +18,8 @@ export const Public = () => SetMetadata(IS_PUBLIC, true);
 /**
  * Global guard: every route needs a valid access token unless @Public, from
  * `Authorization: Bearer` (mobile) or the access cookie (web). A request that
- * sends a bearer header is judged by it alone.
+ * sends a bearer header is judged by it alone, and one that says it is the
+ * mobile app never by cookies: CsrfGuard lets such requests through unchecked.
  */
 @Injectable()
 export class AuthGuard implements CanActivate {
@@ -35,7 +36,8 @@ export class AuthGuard implements CanActivate {
     if (isPublic) return true;
 
     const req = context.switchToHttp().getRequest<AppRequest>();
-    const token = bearerToken(req) ?? readCookie(req, ACCESS_COOKIE);
+    const token =
+      bearerToken(req) ?? (isMobileClient(req) ? undefined : readCookie(req, ACCESS_COOKIE));
     if (!token) throw new UnauthorizedException();
     const userId = await this.tokens.verifyAccessToken(token);
     if (!userId) throw new UnauthorizedException();
