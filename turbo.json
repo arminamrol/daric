@@ -4,7 +4,7 @@
   "tasks": {
     "lint": {},
     "typecheck": {},
-    "test": {},
+    "test": { "env": ["DATABASE_URL"] },
     "build": { "outputs": ["dist/**"] },
     "dev": { "cache": false, "persistent": true }
   }
