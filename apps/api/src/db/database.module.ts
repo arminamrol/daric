@@ -7,7 +7,7 @@ import {
   type OnApplicationShutdown,
 } from '@nestjs/common';
 import type { Pool } from 'pg';
-import { DATABASE } from '../common/tokens';
+import { DATABASE } from '../common/di-tokens';
 import { createDatabase } from './client';
 
 const POOL = Symbol('POOL');

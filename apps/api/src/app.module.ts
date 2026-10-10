@@ -3,14 +3,15 @@ import { Global, Module, type DynamicModule } from '@nestjs/common';
 import { APP_GUARD } from '@nestjs/core';
 import { ThrottlerGuard, ThrottlerModule } from '@nestjs/throttler';
 import { LoggerModule } from 'nestjs-pino';
-import { AuthGuard } from './common/auth.guard';
+import { AuthGuard } from './modules/auth/auth.guard';
 import { loggerOptions } from './common/logger';
-import { CONFIG } from './common/tokens';
+import { CONFIG } from './common/di-tokens';
 import type { Config } from './config';
 import { DatabaseModule } from './db/database.module';
 import { AuditModule } from './modules/audit/audit.module';
 import { AuthController } from './modules/auth/auth.controller';
 import { AuthModule } from './modules/auth/auth.module';
+import { MeModule } from './modules/me/me.module';
 import { WorkspacesModule } from './modules/workspaces/workspaces.module';
 
 export interface AppOptions {
@@ -59,6 +60,7 @@ export class AppModule {
         AuditModule,
         AuthModule,
         WorkspacesModule,
+        MeModule,
       ],
       providers: [
         // Order matters: rate limiting runs before authentication.

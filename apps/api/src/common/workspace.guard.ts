@@ -13,7 +13,7 @@ import { and, eq } from 'drizzle-orm';
 import type { Database } from '../db/client';
 import { workspaceMembers } from '../db/schema';
 import { type AppRequest, isUuid } from './request';
-import { DATABASE } from './tokens';
+import { DATABASE } from './di-tokens';
 
 /**
  * Resolves the caller's membership in `:wsId`. A Workspace the caller is not a

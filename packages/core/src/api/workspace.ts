@@ -1,7 +1,9 @@
 import { z } from 'zod';
+import { calendarSystems } from '../calendar';
 import { userSchema } from './auth';
 
-export const workspaceTypeSchema = z.enum(['PERSONAL', 'BUSINESS']);
+export const workspaceTypes = ['PERSONAL', 'BUSINESS'] as const;
+export const workspaceTypeSchema = z.enum(workspaceTypes);
 export type WorkspaceType = z.infer<typeof workspaceTypeSchema>;
 
 /** Highest first; a Role may do everything the Roles after it may do. */
@@ -19,7 +21,7 @@ export const workspaceSchema = z.object({
   type: workspaceTypeSchema,
   name: z.string(),
   baseCurrency: z.string(),
-  calendar: z.enum(['jalali', 'gregorian']),
+  calendar: z.enum(calendarSystems),
   timezone: z.string(),
   role: workspaceRoleSchema,
 });

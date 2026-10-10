@@ -1,10 +1,11 @@
 import { jsonb, pgEnum, pgTable, text, uniqueIndex, uuid, index } from 'drizzle-orm/pg-core';
+import { calendarSystems, workspaceRoles, workspaceTypes } from '@daric/core';
 import { id, timestamps, version } from './columns';
 import { users } from './identity';
 
-export const workspaceType = pgEnum('workspace_type', ['PERSONAL', 'BUSINESS']);
-export const workspaceCalendar = pgEnum('workspace_calendar', ['jalali', 'gregorian']);
-export const workspaceRole = pgEnum('workspace_role', ['OWNER', 'ADMIN', 'MEMBER', 'VIEWER']);
+export const workspaceType = pgEnum('workspace_type', workspaceTypes);
+export const workspaceCalendar = pgEnum('workspace_calendar', calendarSystems);
+export const workspaceRole = pgEnum('workspace_role', workspaceRoles);
 
 export const workspaces = pgTable('workspaces', {
   id: id(),

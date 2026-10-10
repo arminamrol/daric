@@ -23,6 +23,36 @@ export function redact(value: unknown, depth = 0): unknown {
   return out;
 }
 
+interface LoggedError {
+  type: string;
+  message: string;
+  stack?: string;
+  code?: unknown;
+  query?: unknown;
+  cause?: LoggedError;
+}
+
+/**
+ * Errors keep their type, message, stack, code and SQL text, nothing else:
+ * database errors carry query parameters (`params`, and Drizzle's message) and
+ * row values (Postgres' `detail`), which may be Amounts, notes or token hashes.
+ */
+export function serializeError(err: unknown, depth = 0): LoggedError | undefined {
+  if (!(err instanceof Error))
+    return err === undefined ? undefined : { type: typeof err, message: CENSOR };
+  const message = err.message.split('\nparams:')[0] ?? '';
+  const out: LoggedError = { type: err.constructor.name, message };
+  if (err.stack) out.stack = err.stack.replace(err.message, message);
+  const extra = err as Error & { code?: unknown; query?: unknown };
+  if (extra.code !== undefined) out.code = extra.code;
+  if (typeof extra.query === 'string') out.query = extra.query;
+  if (err.cause !== undefined && depth < 3) {
+    const cause = serializeError(err.cause, depth + 1);
+    if (cause) out.cause = cause;
+  }
+  return out;
+}
+
 interface LoggedRequest {
   id?: unknown;
   method?: string;
@@ -45,6 +75,7 @@ export function loggerOptions(level: string): LoggerOptions {
         path: req.url?.split('?')[0],
       }),
       res: (res: { statusCode?: number }) => ({ statusCode: res.statusCode }),
+      err: serializeError,
     },
   };
 }

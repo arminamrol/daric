@@ -1,16 +1,10 @@
-import { Writable } from 'node:stream';
 import { pino } from 'pino';
 import { describe, expect, it } from 'vitest';
+import { logCapture } from '../test/log-capture';
 import { loggerOptions } from './logger';
 
 function capture() {
-  const lines: string[] = [];
-  const stream = new Writable({
-    write(chunk, _encoding, done) {
-      lines.push(String(chunk));
-      done();
-    },
-  });
+  const { lines, stream } = logCapture();
   return { lines, logger: pino(loggerOptions('info'), stream) };
 }
 
@@ -60,5 +54,30 @@ describe('logger', () => {
     expect(out).toContain('/v1/auth/verify');
     expect(out).not.toContain('verify-secret');
     expect(out).not.toContain('eyJh');
+  });
+
+  it('keeps query parameters and row values out of logged database errors', () => {
+    const { lines, logger } = capture();
+    const cause = Object.assign(new Error('duplicate key value violates unique constraint'), {
+      code: '23505',
+      detail: 'Key (token_hash)=(hash-of-secret) already exists.',
+    });
+    const error = Object.assign(
+      new Error(
+        'Failed query: insert into "refresh_tokens" values ($1, $2)\nparams: hash-of-secret,1299',
+      ),
+      {
+        query: 'insert into "refresh_tokens" values ($1, $2)',
+        params: ['hash-of-secret', '1299'],
+        cause,
+      },
+    );
+    logger.error({ err: error }, 'request failed');
+
+    const out = lines.join('');
+    expect(out).toContain('refresh_tokens');
+    expect(out).toContain('23505');
+    expect(out).not.toContain('hash-of-secret');
+    expect(out).not.toContain('1299');
   });
 });

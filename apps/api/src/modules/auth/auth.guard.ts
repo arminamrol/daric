@@ -7,8 +7,8 @@ import {
   UnauthorizedException,
 } from '@nestjs/common';
 import { Reflector } from '@nestjs/core';
-import { TokenService } from '../modules/auth/token.service';
-import type { AppRequest } from './request';
+import type { AppRequest } from '../../common/request';
+import { TokenService } from './token.service';
 
 const IS_PUBLIC = 'daric:public';
 /** Marks a route as reachable without an access token. */

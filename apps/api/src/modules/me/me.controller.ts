@@ -4,7 +4,7 @@ import { meSchema, type Me } from '@daric/core';
 import { eq } from 'drizzle-orm';
 import { createZodDto } from 'nestjs-zod';
 import { CurrentUserId } from '../../common/request';
-import { DATABASE } from '../../common/tokens';
+import { DATABASE } from '../../common/di-tokens';
 import type { Database } from '../../db/client';
 import { users } from '../../db/schema';
 import { WorkspacesService } from '../workspaces/workspaces.service';

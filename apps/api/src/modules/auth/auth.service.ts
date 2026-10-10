@@ -2,7 +2,7 @@ import { ConflictException, Inject, Injectable, UnauthorizedException } from '@n
 import type { AuthResult, LoginInput, RegisterInput } from '@daric/core';
 import { and, eq } from 'drizzle-orm';
 import type { ClientInfo } from '../../common/request';
-import { DATABASE } from '../../common/tokens';
+import { DATABASE } from '../../common/di-tokens';
 import { type Database, one } from '../../db/client';
 import { authIdentities, users, workspaceMembers, workspaces } from '../../db/schema';
 import { AuditService } from '../audit/audit.service';

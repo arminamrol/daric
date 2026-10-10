@@ -10,7 +10,7 @@ import { from, lastValueFrom, type Observable } from 'rxjs';
 import type { Database } from '../db/client';
 import { runInWorkspace } from '../db/scope';
 import { type AppRequest, isUuid } from './request';
-import { DATABASE } from './tokens';
+import { DATABASE } from './di-tokens';
 
 /**
  * Runs the handler in one transaction scoped by row-level security to the

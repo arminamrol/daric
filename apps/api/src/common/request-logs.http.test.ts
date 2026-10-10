@@ -1,18 +1,12 @@
-import { Writable } from 'node:stream';
 import { afterAll, beforeAll, describe, expect, it, vi } from 'vitest';
 import { call, registerUser, startTestApp, testPassword, type TestApp } from '../test/app';
+import { logCapture } from '../test/log-capture';
 
 // nestjs-pino keeps one root logger per process, so this file boots the only app that logs.
-const lines: string[] = [];
+const { lines, stream } = logCapture();
 let t: TestApp;
 beforeAll(async () => {
-  const logStream = new Writable({
-    write(chunk, _encoding, done) {
-      lines.push(String(chunk));
-      done();
-    },
-  });
-  t = await startTestApp({ env: { LOG_LEVEL: 'info' }, logStream });
+  t = await startTestApp({ env: { LOG_LEVEL: 'info' }, logStream: stream });
 });
 afterAll(() => t.close());
 

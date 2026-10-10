@@ -5,7 +5,7 @@ import { v7 as uuidv7 } from 'uuid';
 import type { Config } from '../../config';
 import type { Executor } from '../../db/client';
 import { refreshTokens } from '../../db/schema';
-import { CONFIG } from '../../common/tokens';
+import { CONFIG } from '../../common/di-tokens';
 
 const ISSUER = 'daric';
 

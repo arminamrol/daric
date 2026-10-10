@@ -2,7 +2,7 @@ import { Inject, Injectable, NotFoundException } from '@nestjs/common';
 import type { UpdateWorkspaceInput, Workspace } from '@daric/core';
 import { and, eq, sql } from 'drizzle-orm';
 import type { Membership } from '../../common/request';
-import { DATABASE } from '../../common/tokens';
+import { DATABASE } from '../../common/di-tokens';
 import type { Database } from '../../db/client';
 import { workspaceMembers, workspaces } from '../../db/schema';
 import { scopedTx } from '../../db/scope';

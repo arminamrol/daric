@@ -8,7 +8,7 @@ import {
 } from '@nestjs/swagger';
 import { authResultSchema, loginInputSchema, registerInputSchema } from '@daric/core';
 import { createZodDto } from 'nestjs-zod';
-import { Public } from '../../common/auth.guard';
+import { Public } from './auth.guard';
 import { Client, type ClientInfo } from '../../common/request';
 import { ZodBody } from '../../common/zod';
 import { AuthService } from './auth.service';
