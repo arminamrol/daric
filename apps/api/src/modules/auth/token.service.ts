@@ -50,30 +50,38 @@ export class TokenService {
    * so two concurrent refreshes with one token cannot both succeed.
    */
   async rotate(tx: Transaction, refreshToken: string, now = new Date()): Promise<Rotation> {
-    const [row] = await tx
-      .select()
-      .from(refreshTokens)
-      .where(eq(refreshTokens.tokenHash, hashRefreshToken(refreshToken)))
-      .for('update');
-    if (!row || row.revokedAt || row.expiresAt <= now) return { outcome: 'invalid' };
+    const row = await this.lockByToken(tx, refreshToken);
+    if (!row || row.revokedAt) return { outcome: 'invalid' };
+    // Reuse is checked before expiry: a replayed token's descendants may still be alive.
     if (row.usedAt) {
       await this.revokeFamily(tx, row.familyId, now);
       return { outcome: 'reused', userId: row.userId };
     }
+    if (row.expiresAt <= now) return { outcome: 'invalid' };
     await tx.update(refreshTokens).set({ usedAt: now }).where(eq(refreshTokens.id, row.id));
     const tokens = await this.issueInFamily(tx, row.userId, row.familyId, now);
     return { outcome: 'rotated', userId: row.userId, tokens };
   }
 
-  /** Revokes the family `refreshToken` belongs to; returns its User, or null for an unknown token. */
-  async revoke(db: Executor, refreshToken: string, now = new Date()): Promise<string | null> {
-    const [row] = await db
-      .select({ userId: refreshTokens.userId, familyId: refreshTokens.familyId })
-      .from(refreshTokens)
-      .where(eq(refreshTokens.tokenHash, hashRefreshToken(refreshToken)));
+  /**
+   * Revokes the family `refreshToken` belongs to; returns its User, or null for
+   * an unknown token. The row lock makes a concurrent rotation of the same token
+   * finish first, so the token it issues is revoked too.
+   */
+  async revoke(tx: Transaction, refreshToken: string, now = new Date()): Promise<string | null> {
+    const row = await this.lockByToken(tx, refreshToken);
     if (!row) return null;
-    await this.revokeFamily(db, row.familyId, now);
+    await this.revokeFamily(tx, row.familyId, now);
     return row.userId;
+  }
+
+  private async lockByToken(tx: Transaction, refreshToken: string) {
+    const [row] = await tx
+      .select()
+      .from(refreshTokens)
+      .where(eq(refreshTokens.tokenHash, hashRefreshToken(refreshToken)))
+      .for('update');
+    return row;
   }
 
   private async revokeFamily(db: Executor, familyId: string, now: Date): Promise<void> {

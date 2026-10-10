@@ -25,9 +25,9 @@ function signedIn(user: User, tokens: IssuedTokens): SignedIn {
 }
 
 /**
- * Registration and login. These run before any Workspace scope exists, so
- * they use the owner connection directly; they only touch the new or
- * authenticated User's own rows.
+ * Registration, login, refresh and logout. These run before any Workspace
+ * scope exists, so they use the owner connection directly; they only touch the
+ * new or authenticated User's own rows.
  */
 @Injectable()
 export class AuthService {

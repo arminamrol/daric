@@ -1,10 +1,12 @@
 import { desc, eq } from 'drizzle-orm';
+import { SignJWT } from 'jose';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { auditLogs, refreshTokens } from '../../db/schema';
 import {
   browser,
   call,
   startTestApp,
+  testConfig,
   testPassword,
   type Browser,
   type TestApp,
@@ -139,6 +141,17 @@ describe('mobile refresh', () => {
     expect((await refresh(s.refreshToken)).status).toBe(401);
   });
 
+  it('still treats a used token as reuse after it expires', async () => {
+    const s = await mobileSession();
+    const rotated = await refresh(s.refreshToken);
+    await db
+      .update(refreshTokens)
+      .set({ expiresAt: new Date(Date.now() - 1000) })
+      .where(eq(refreshTokens.tokenHash, hashRefreshToken(s.refreshToken)));
+    expect((await refresh(s.refreshToken)).status).toBe(401);
+    expect((await refresh(rotated.body.refreshToken)).status).toBe(401);
+  });
+
   it.each([
     ['an unknown token', { refreshToken: 'not-a-real-token' }],
     ['an empty token', { refreshToken: '' }],
@@ -210,6 +223,20 @@ describe('web refresh', () => {
     expect((await web.call('POST', '/v1/auth/refresh', { csrf: false })).status).toBe(403);
   });
 
+  it.each(['refresh', 'logout'])(
+    'does not let an Authorization header skip the CSRF check on %s',
+    async (route) => {
+      const { web } = await webSession();
+      const before = web.cookie('__Secure-daric_refresh');
+      await web.call('POST', `/v1/auth/${route}`, {
+        csrf: false,
+        headers: { authorization: 'Bearer anything' },
+      });
+      expect(web.cookie('__Secure-daric_refresh')).toBe(before);
+      expect((await web.call('POST', '/v1/auth/refresh')).status).toBe(200);
+    },
+  );
+
   it('ignores a refresh token in the body', async () => {
     const s = await mobileSession();
     const web = browser(t.url);
@@ -277,5 +304,19 @@ describe('token lifetimes', () => {
     } finally {
       await custom.close();
     }
+  });
+});
+
+describe('access tokens', () => {
+  it('rejects an expired access token', async () => {
+    const s = await mobileSession();
+    const expired = await new SignJWT({})
+      .setProtectedHeader({ alg: 'HS256' })
+      .setSubject(s.userId)
+      .setIssuer('daric')
+      .setIssuedAt(Math.floor(Date.now() / 1000) - 120)
+      .setExpirationTime(Math.floor(Date.now() / 1000) - 60)
+      .sign(new TextEncoder().encode(testConfig().JWT_SECRET));
+    expect((await call(t.url, 'GET', '/v1/me', { token: expired })).status).toBe(401);
   });
 });

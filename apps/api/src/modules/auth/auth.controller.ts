@@ -110,7 +110,7 @@ const refreshBody = {
 @ApiHeader({ name: CLIENT_HEADER, required: false, enum: ['mobile'] })
 @Public()
 @Controller('v1/auth')
-export class SessionController {
+export class SignedInDeviceController {
   constructor(@Inject(AuthService) private readonly auth: AuthService) {}
 
   @Post('refresh')
@@ -143,16 +143,22 @@ export class SessionController {
   ): Promise<void> {
     const token = presentedRefreshToken(req, body);
     if (token) await this.auth.logout(token, client);
-    if (!isMobileClient(req)) clearSessionCookies(res);
+    if (usesCookies(req)) clearSessionCookies(res);
   }
 }
 
 /**
- * The refresh token from the body for the mobile app, from the cookie for the
- * web app; never the other way round, as with access tokens in AuthGuard.
+ * Whether the request is judged by its cookies. As in AuthGuard, one carrying
+ * `Authorization` or the mobile client header never is, since CsrfGuard lets
+ * it through unchecked.
  */
+function usesCookies(req: Request): boolean {
+  return !isMobileClient(req) && req.get('authorization') === undefined;
+}
+
+/** The refresh token from the cookie for the web app, from the body for the mobile app. */
 function presentedRefreshToken(req: Request, body: unknown): string | undefined {
-  if (!isMobileClient(req)) return readCookie(req, REFRESH_COOKIE);
+  if (usesCookies(req)) return readCookie(req, REFRESH_COOKIE);
   const parsed = refreshInputSchema.safeParse(body);
   return parsed.success ? parsed.data.refreshToken : undefined;
 }
@@ -190,7 +196,7 @@ function deliverSignIn(
   }
   setSessionCookies(res, tokens);
   // A new session gets a new CSRF token, so one planted before login is useless after it.
-  // A refresh continues the session, and other open tabs still hold the current token.
+  // A refresh keeps the Signed-in Device going, and other open tabs still hold the current token.
   if (rotateCsrf) setCsrfCookie(res);
   return session;
 }
