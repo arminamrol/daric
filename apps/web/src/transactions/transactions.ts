@@ -32,29 +32,29 @@ export function useRecordTransaction() {
   });
 }
 
-/** The Account and Categories last used on this device, so the next entry starts from them. */
-export interface LastEntry {
+/** The Account and Categories last used on this device, so the next Transaction starts from them. */
+export interface LastPicks {
   accountId?: string;
   categoryIds?: Partial<Record<TransactionType, string>>;
 }
 
-const lastEntryKey = (workspaceId: string) => `daric.lastEntry.${workspaceId}`;
+const lastPicksKey = (workspaceId: string) => `daric.lastPicks.${workspaceId}`;
 
 // Storage may be unavailable (private windows, blocked site data): then nothing is remembered.
-export function readLastEntry(workspaceId: string): LastEntry {
+export function readLastPicks(workspaceId: string): LastPicks {
   try {
-    const stored = localStorage.getItem(lastEntryKey(workspaceId));
+    const stored = localStorage.getItem(lastPicksKey(workspaceId));
     const parsed: unknown = stored ? JSON.parse(stored) : null;
-    return parsed && typeof parsed === 'object' ? (parsed as LastEntry) : {};
+    return parsed && typeof parsed === 'object' ? (parsed as LastPicks) : {};
   } catch {
     return {};
   }
 }
 
-export function writeLastEntry(workspaceId: string, entry: LastEntry): void {
+export function writeLastPicks(workspaceId: string, picks: LastPicks): void {
   try {
-    localStorage.setItem(lastEntryKey(workspaceId), JSON.stringify(entry));
+    localStorage.setItem(lastPicksKey(workspaceId), JSON.stringify(picks));
   } catch {
-    // Not remembered; the next entry starts from the defaults.
+    // Not remembered; the next Transaction starts from the defaults.
   }
 }

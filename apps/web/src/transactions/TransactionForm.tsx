@@ -11,7 +11,7 @@ import { CALENDAR_LABELS, CURRENCY_NAMES } from '../settings/labels';
 import { useFormatters } from '../settings/settings';
 import { ChoiceGroup } from '../ui/ChoiceGroup';
 import { categoryChoices } from './choices';
-import { readLastEntry, useRecordTransaction, writeLastEntry } from './transactions';
+import { readLastPicks, useRecordTransaction, writeLastPicks } from './transactions';
 
 const inputClass =
   'w-full rounded-md border border-border bg-background px-3 py-2 text-foreground aria-invalid:border-danger';
@@ -23,7 +23,7 @@ const AMOUNT_ERRORS: Record<ParseAmountError, PlainMessageKey> = {
   out_of_range: 'accounts.error.amountTooLarge',
 };
 
-export const TRANSACTION_TYPE_LABELS: Record<TransactionType, PlainMessageKey> = {
+const TRANSACTION_TYPE_LABELS: Record<TransactionType, PlainMessageKey> = {
   EXPENSE: 'transactions.type.EXPENSE',
   INCOME: 'transactions.type.INCOME',
 };
@@ -85,7 +85,7 @@ export function TransactionForm({
     ) as Record<TransactionType, ReturnType<typeof categoryChoices>>;
   }, [categories, t]);
 
-  const [last] = useState(() => readLastEntry(workspace.id));
+  const [last] = useState(() => readLastPicks(workspace.id));
   const [type, setType] = useState<TransactionType>('EXPENSE');
   const [amount, setAmount] = useState('');
   const [accountId, setAccountId] = useState(() =>
@@ -118,7 +118,8 @@ export function TransactionForm({
   function changed() {
     draftId.current = null;
     setSaved(false);
-    record.reset();
+    // A save in flight must still finish: its success clears the form for the next one.
+    if (!record.isPending) record.reset();
   }
 
   function onSubmit(event: FormEvent<HTMLFormElement>) {
@@ -149,7 +150,7 @@ export function TransactionForm({
       },
       {
         onSuccess: () => {
-          writeLastEntry(workspace.id, {
+          writeLastPicks(workspace.id, {
             accountId: account.id,
             categoryIds: { ...pickedCategories, [type]: categoryId },
           });

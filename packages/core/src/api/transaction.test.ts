@@ -78,9 +78,12 @@ describe('listTransactionsQuerySchema', () => {
     });
   });
 
-  it.each([['1405-13'], ['1405-7'], ['14'], ['July']])('rejects the period %j', (period) => {
-    expect(listTransactionsQuerySchema.safeParse({ period }).success).toBe(false);
-  });
+  it.each([['1405-13'], ['1405-7'], ['14'], ['July'], ['0000'], ['0000-01']])(
+    'rejects the period %j',
+    (period) => {
+      expect(listTransactionsQuerySchema.safeParse({ period }).success).toBe(false);
+    },
+  );
 
   it('writes a Period back as the same parameter', () => {
     expect(periodParam({ kind: 'month', year: 1405, month: 7 })).toBe('1405-07');

@@ -1,6 +1,11 @@
 import { Inject, Injectable, NotFoundException } from '@nestjs/common';
 import { accountBalance, amountToWire, balanceEffect, money } from '@daric/core';
-import type { AccountWire, CreateAccountInput, UpdateAccountInput } from '@daric/core';
+import type {
+  AccountWire,
+  CreateAccountInput,
+  TransactionType,
+  UpdateAccountInput,
+} from '@daric/core';
 import { eq, isNull, sql, type SQL } from 'drizzle-orm';
 import { isUuid, type Membership } from '../../common/request';
 import { one } from '../../db/client';
@@ -22,7 +27,7 @@ const columns = {
 /** Each Account's Income and Expense totals, deleted Transactions left out. */
 function totalsByAccount() {
   // `sum` of a bigint is a numeric, which arrives as a string.
-  const total = (type: 'INCOME' | 'EXPENSE') =>
+  const total = (type: TransactionType) =>
     sql<string>`coalesce(sum(${transactions.amount}) FILTER (WHERE ${transactions.type} = ${type}), 0)`;
   return scopedTx()
     .select({

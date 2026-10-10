@@ -1,5 +1,5 @@
 import { groupByMonth, IRR, money } from '@daric/core';
-import type { Account, Category, Transaction } from '@daric/core';
+import type { Account, Category, MonthGroup, Transaction } from '@daric/core';
 import { isolate } from '@daric/i18n';
 import { useId, useMemo } from 'react';
 import { currencyOf } from '../accounts/accounts';
@@ -9,15 +9,13 @@ import { useI18n } from '../i18n/locale';
 import { useFormatters } from '../settings/settings';
 import { categoryChoices } from './choices';
 
-type MonthGroup = ReturnType<typeof groupByMonth<Transaction>>[number];
-
 function Month({
   group,
   accounts,
   categories,
   categoryLabels,
 }: {
-  group: MonthGroup;
+  group: MonthGroup<Transaction>;
   accounts: ReadonlyMap<string, Account>;
   categories: ReadonlyMap<string, Category>;
   categoryLabels: ReadonlyMap<string, string>;
@@ -63,7 +61,7 @@ function Month({
                   {categoryLabels.get(transaction.categoryId) ?? category?.name}
                 </span>
                 <span className="text-sm text-foreground-muted">
-                  {account?.name}
+                  {account && isolate(account.name)}
                   {' · '}
                   {format.day(transaction.occurredOn)}
                 </span>

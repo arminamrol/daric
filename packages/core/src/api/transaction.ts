@@ -54,7 +54,8 @@ export const createTransactionInputSchema = z.strictObject({
 });
 export type CreateTransactionInput = z.infer<typeof createTransactionInputSchema>;
 
-const PERIOD_PARAM = /^(\d{4})(?:-(0[1-9]|1[0-2]))?$/;
+// Year 0 does not exist on either calendar.
+const PERIOD_PARAM = /^(?!0000)(\d{4})(?:-(0[1-9]|1[0-2]))?$/;
 
 /** A Period as a query parameter: `1405-07` for a month, `1405` for a year. */
 export function periodParam(period: Period): string {

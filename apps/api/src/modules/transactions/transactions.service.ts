@@ -27,6 +27,8 @@ const columns = {
 
 type Row = Pick<typeof transactions.$inferSelect, keyof typeof columns>;
 
+const ID_TAKEN = 'This id is already used by another Transaction';
+
 function toWire(row: Row): TransactionWire {
   // Only Income and Expense are ever written here, each with a Category.
   if (row.type === 'TRANSFER' || row.categoryId === null) {
@@ -132,7 +134,7 @@ export class TransactionsService {
       // The same id was recorded meanwhile, by a concurrent replay or in another Workspace.
       const replayed = input.id && (await this.replayed(input.id, input));
       if (replayed) return { created: false, transaction: replayed };
-      throw new ConflictException('This id is already used by another Transaction');
+      throw new ConflictException(ID_TAKEN);
     }
     await this.audit.record(tx, {
       action: 'transaction.create',
@@ -154,7 +156,7 @@ export class TransactionsService {
       .where(eq(transactions.id, id));
     if (!row) return undefined;
     if (!sameTransaction(row, input)) {
-      throw new ConflictException('This id is already used by another Transaction');
+      throw new ConflictException(ID_TAKEN);
     }
     return toWire(row);
   }
