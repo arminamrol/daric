@@ -1,5 +1,7 @@
 import type { RouteObject } from 'react-router';
 import { GuestOnly, RequireSession } from '../auth/session';
+import { AccountFormPage } from '../pages/AccountFormPage';
+import { AccountsPage } from '../pages/AccountsPage';
 import { HomePage } from '../pages/HomePage';
 import { LoginPage } from '../pages/LoginPage';
 import { NotFoundPage } from '../pages/NotFoundPage';
@@ -15,6 +17,9 @@ export const routes: RouteObject[] = [
         element: <RequireSession />,
         children: [
           { index: true, element: <HomePage /> },
+          { path: 'accounts', element: <AccountsPage /> },
+          { path: 'accounts/new', element: <AccountFormPage /> },
+          { path: 'accounts/:accountId', element: <AccountFormPage /> },
           { path: 'settings', element: <SettingsPage /> },
         ],
       },

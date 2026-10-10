@@ -1,4 +1,8 @@
 import {
+  type Account,
+  accountListSchema,
+  accountSchema,
+  type CreateAccountInput,
   CSRF_COOKIE,
   CSRF_HEADER,
   type LoginInput,
@@ -7,6 +11,7 @@ import {
   type RegisterInput,
   type Session,
   sessionSchema,
+  type UpdateAccountInput,
   type UpdateUserPreferencesInput,
   type UpdateWorkspaceInput,
   type UserPreferences,
@@ -41,6 +46,23 @@ export interface ApiClient {
   /** Owner or Admin only. */
   updateWorkspace(workspaceId: string, input: UpdateWorkspaceInput): Promise<Workspace>;
   updatePreferences(input: UpdateUserPreferencesInput): Promise<UserPreferences>;
+  /** Archived Accounts are left out unless `includeArchived`. */
+  listAccounts(workspaceId: string, options?: { includeArchived?: boolean }): Promise<Account[]>;
+  /** Owner or Admin only. */
+  createAccount(workspaceId: string, input: CreateAccountInput): Promise<Account>;
+  /** Owner or Admin only. */
+  updateAccount(
+    workspaceId: string,
+    accountId: string,
+    input: UpdateAccountInput,
+  ): Promise<Account>;
+}
+
+/** Amounts are bigints in code and decimal strings on the wire (ADR-0004). */
+function toJson(body: unknown): string {
+  return JSON.stringify(body, (_, value: unknown) =>
+    typeof value === 'bigint' ? value.toString() : value,
+  );
 }
 
 function documentCookie(name: string): string | undefined {
@@ -84,7 +106,7 @@ export function createApiClient(options: ApiClientOptions = {}): ApiClient {
     const init: RequestInit = { method, headers, credentials: 'include' };
     if (body !== undefined) {
       headers['Content-Type'] = 'application/json';
-      init.body = JSON.stringify(body);
+      init.body = toJson(body);
     }
     const res = await doFetch(`${baseUrl}${path}`, init);
     const parsed = await readBody(res);
@@ -100,7 +122,26 @@ export function createApiClient(options: ApiClientOptions = {}): ApiClient {
       request('PATCH', `/v1/workspaces/${encodeURIComponent(workspaceId)}`, workspaceSchema, input),
     updatePreferences: (input) =>
       request('PATCH', '/v1/me/preferences', userPreferencesSchema, input),
+    listAccounts: (workspaceId, { includeArchived = false } = {}) =>
+      request(
+        'GET',
+        `${accountsPath(workspaceId)}${includeArchived ? '?includeArchived=true' : ''}`,
+        accountListSchema,
+      ),
+    createAccount: (workspaceId, input) =>
+      request('POST', accountsPath(workspaceId), accountSchema, input),
+    updateAccount: (workspaceId, accountId, input) =>
+      request(
+        'PATCH',
+        `${accountsPath(workspaceId)}/${encodeURIComponent(accountId)}`,
+        accountSchema,
+        input,
+      ),
   };
+}
+
+function accountsPath(workspaceId: string): string {
+  return `/v1/workspaces/${encodeURIComponent(workspaceId)}/accounts`;
 }
 
 async function readBody(res: Response): Promise<unknown> {

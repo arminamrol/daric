@@ -9,7 +9,9 @@ export type AuditAction =
   | 'auth.login_failed'
   | 'auth.logout'
   | 'auth.refresh_reuse'
-  | 'workspace.update';
+  | 'workspace.update'
+  | 'account.create'
+  | 'account.update';
 
 export interface AuditEntry {
   action: AuditAction;

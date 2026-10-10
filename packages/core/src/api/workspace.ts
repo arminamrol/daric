@@ -3,6 +3,7 @@ import { calendarSystems, canonicalTimeZone } from '../calendar';
 import { digitSystems } from '../locale';
 import { currencies, moneyDisplays } from '../money';
 import { userSchema } from './auth';
+import { notEmpty } from './partial';
 
 export const workspaceTypes = ['PERSONAL', 'BUSINESS'] as const;
 export const workspaceTypeSchema = z.enum(workspaceTypes);
@@ -33,12 +34,6 @@ export const workspaceSchema = z.object({
 export type Workspace = z.infer<typeof workspaceSchema>;
 
 export const baseCurrencyCodes = currencies.map((c) => c.code);
-
-/** A partial update must change something. */
-const notEmpty = [
-  (input: object) => Object.keys(input).length > 0,
-  { message: 'Nothing to update' },
-] as const;
 
 /** An IANA timezone name, stored in its canonical spelling. */
 const timeZoneSchema = z

@@ -31,6 +31,9 @@ export function Shell() {
               <NavLink to="/" end className={navLinkClass}>
                 {t('nav.home')}
               </NavLink>
+              <NavLink to="/accounts" className={navLinkClass}>
+                {t('nav.accounts')}
+              </NavLink>
               <NavLink to="/settings" className={navLinkClass}>
                 {t('nav.settings')}
               </NavLink>
