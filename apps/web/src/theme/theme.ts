@@ -1,9 +1,9 @@
+import type { ThemePreference } from '@daric/core';
 import { themes } from '@daric/design-tokens';
 import type { ThemeName } from '@daric/design-tokens';
 import { useCallback, useEffect, useState } from 'react';
-
-/** `system` follows the operating system; the others pin a theme on this device. */
-export type ThemePreference = 'system' | ThemeName;
+import { useMe } from '../auth/session';
+import { useUpdatePreferences } from '../settings/settings';
 
 /** Also read by the inline script in index.html, which applies the theme before first paint. */
 export const THEME_STORAGE_KEY = 'daric.theme';
@@ -42,16 +42,33 @@ function applyPreference(preference: ThemePreference): void {
   }
 }
 
-/** The device's theme preference, remembered across visits. */
+/**
+ * The theme: `system` follows the operating system, the others pin one. A
+ * signed-in User's choice is one of their preferences and follows them to
+ * every device; this device also remembers the last one, so the inline script
+ * can paint it before the User is known.
+ */
 export function useThemePreference(): [ThemePreference, (preference: ThemePreference) => void] {
-  const [preference, setPreference] = useState(readPreference);
+  const me = useMe().data;
+  const { mutate: updatePreferences } = useUpdatePreferences();
+  const [local, setLocal] = useState(readPreference);
+  const signedIn = Boolean(me);
+  const preference = me ? me.preferences.theme : local;
+  // Keep the User's theme as this device's own, so it stays after they sign out.
+  if (me && local !== preference) setLocal(preference);
 
-  useEffect(() => applyPreference(preference), [preference]);
+  useEffect(() => {
+    applyPreference(preference);
+    savePreference(preference);
+  }, [preference]);
 
-  const choose = useCallback((next: ThemePreference) => {
-    savePreference(next);
-    setPreference(next);
-  }, []);
+  const choose = useCallback(
+    (next: ThemePreference) => {
+      setLocal(next);
+      if (signedIn) updatePreferences({ theme: next });
+    },
+    [signedIn, updatePreferences],
+  );
 
   return [preference, choose];
 }

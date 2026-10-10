@@ -2,6 +2,17 @@ import { describe, expect, it } from 'vitest';
 import { ApiError, createApiClient } from './index';
 
 const user = { id: '01900000-0000-7000-8000-000000000000', email: 'sara@example.com' };
+const preferences = { displayCalendar: 'jalali', digits: 'persian', theme: 'system' } as const;
+const workspace = {
+  id: '01900000-0000-7000-9000-000000000001',
+  type: 'PERSONAL',
+  name: 'Personal',
+  baseCurrency: 'IRR',
+  calendar: 'jalali',
+  timezone: 'Asia/Tehran',
+  moneyDisplay: 'rial',
+  role: 'OWNER',
+} as const;
 const session = {
   user,
   accessTokenExpiresAt: '2026-10-10T10:15:00.000Z',
@@ -55,9 +66,9 @@ function fakeServer(
 describe('api-client', () => {
   it('sends credentials so the browser attaches the session cookies', async () => {
     const { client, sent } = fakeServer({
-      'GET /v1/me': () => ({ status: 200, body: { user, workspaces: [] } }),
+      'GET /v1/me': () => ({ status: 200, body: { user, preferences, workspaces: [] } }),
     });
-    expect(await client.me()).toEqual({ user, workspaces: [] });
+    expect(await client.me()).toEqual({ user, preferences, workspaces: [] });
     expect(sent[0]?.credentials).toBe('include');
     expect(sent[0]?.url).toBe('/v1/me');
   });
@@ -93,7 +104,7 @@ describe('api-client', () => {
 
   it('does not send a CSRF header on reads', async () => {
     const { client, sent } = fakeServer(
-      { 'GET /v1/me': () => ({ status: 200, body: { user, workspaces: [] } }) },
+      { 'GET /v1/me': () => ({ status: 200, body: { user, preferences, workspaces: [] } }) },
       { '__Host-daric_csrf': 'csrf-1' },
     );
     await client.me();
@@ -127,13 +138,47 @@ describe('api-client', () => {
     expect(error).toMatchObject({ status: 401 });
   });
 
+  it("updates a Workspace's settings", async () => {
+    const { client, sent } = fakeServer(
+      {
+        [`PATCH /v1/workspaces/${workspace.id}`]: (req) => ({
+          status: 200,
+          body: { ...workspace, ...(req.body as object) },
+        }),
+      },
+      { '__Host-daric_csrf': 'csrf-1' },
+    );
+    const updated = await client.updateWorkspace(workspace.id, { moneyDisplay: 'toman' });
+
+    expect(updated).toEqual({ ...workspace, moneyDisplay: 'toman' });
+    expect(sent[0]?.body).toEqual({ moneyDisplay: 'toman' });
+    expect(sent[0]?.headers.get('x-csrf-token')).toBe('csrf-1');
+  });
+
+  it("updates the User's preferences", async () => {
+    const { client, sent } = fakeServer(
+      {
+        'PATCH /v1/me/preferences': (req) => ({
+          status: 200,
+          body: { ...preferences, ...(req.body as object) },
+        }),
+      },
+      { '__Host-daric_csrf': 'csrf-1' },
+    );
+    const updated = await client.updatePreferences({ digits: 'latin' });
+
+    expect(updated).toEqual({ ...preferences, digits: 'latin' });
+    expect(sent[0]?.body).toEqual({ digits: 'latin' });
+    expect(sent[0]?.headers.get('x-csrf-token')).toBe('csrf-1');
+  });
+
   it('prefixes paths with the base URL', async () => {
     const sent: string[] = [];
     const client = createApiClient({
       baseUrl: 'https://api.daric.test',
       fetch: async (input) => {
         sent.push(String(input));
-        return new Response(JSON.stringify({ user, workspaces: [] }), { status: 200 });
+        return new Response(JSON.stringify({ user, preferences, workspaces: [] }), { status: 200 });
       },
       readCookie: () => undefined,
     });

@@ -1,10 +1,15 @@
-import { Outlet } from 'react-router';
+import { NavLink, Outlet } from 'react-router';
+import { useMe } from '../auth/session';
 import { useI18n } from '../i18n/locale';
 import { ThemeToggle } from '../theme/ThemeToggle';
 import { Logo } from './Logo';
 
+const navLinkClass = ({ isActive }: { isActive: boolean }) =>
+  `rounded-md px-3 py-1 text-sm ${isActive ? 'bg-surface-muted font-medium text-foreground' : 'text-foreground-muted hover:text-foreground'}`;
+
 export function Shell() {
   const { t } = useI18n();
+  const signedIn = Boolean(useMe().data);
 
   return (
     <div className="flex min-h-dvh flex-col">
@@ -21,6 +26,16 @@ export function Shell() {
             <p className="text-lg leading-tight font-bold">{t('app.name')}</p>
             <p className="text-xs text-foreground-muted">{t('app.tagline')}</p>
           </div>
+          {signedIn && (
+            <nav aria-label={t('nav.label')} className="flex gap-1">
+              <NavLink to="/" end className={navLinkClass}>
+                {t('nav.home')}
+              </NavLink>
+              <NavLink to="/settings" className={navLinkClass}>
+                {t('nav.settings')}
+              </NavLink>
+            </nav>
+          )}
           <ThemeToggle />
         </div>
       </header>

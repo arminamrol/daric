@@ -23,6 +23,20 @@ function formatter(timeZone: string): Intl.DateTimeFormat {
   return f;
 }
 
+/**
+ * The canonical IANA name of `timeZone` (e.g. `asia/tehran` -> `Asia/Tehran`),
+ * or undefined when the runtime does not know it. Fixed offsets such as
+ * `+03:30` are refused: they ignore daylight saving and history.
+ */
+export function canonicalTimeZone(timeZone: string): string | undefined {
+  try {
+    const name = new Intl.DateTimeFormat('en-US', { timeZone }).resolvedOptions().timeZone;
+    return /^[A-Za-z][\w+-]*(\/[\w+-]+)*$/.test(name) ? name : undefined;
+  } catch {
+    return undefined;
+  }
+}
+
 /** Milliseconds since the Unix epoch of `instant`; throws for an invalid Date. */
 export function instantMs(instant: Date): number {
   const t = instant.getTime();

@@ -1,5 +1,5 @@
 import { ApiError } from '@daric/api-client';
-import type { Me } from '@daric/core';
+import type { Me, Workspace } from '@daric/core';
 import { useQuery } from '@tanstack/react-query';
 import { Navigate, Outlet } from 'react-router';
 import { useApi } from '../api/api';
@@ -22,6 +22,18 @@ export function useMe() {
     },
     retry: false,
   });
+}
+
+/**
+ * The signed-in User and the Workspace they are looking at. Only for pages
+ * under `RequireSession`, which renders them once `useMe` has a User.
+ */
+export function useSignedIn(): { me: Me; workspace: Workspace } {
+  const { data: me } = useMe();
+  // Every User has at least their Personal Workspace; switching Workspaces comes later.
+  const workspace = me?.workspaces[0];
+  if (!me || !workspace) throw new Error('useSignedIn must be used under <RequireSession>');
+  return { me, workspace };
 }
 
 function Loading() {

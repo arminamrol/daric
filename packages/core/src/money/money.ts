@@ -8,6 +8,13 @@ export const IRR: Currency = { code: 'IRR', minorUnits: 0 };
 export const USD: Currency = { code: 'USD', minorUnits: 2 };
 export const EUR: Currency = { code: 'EUR', minorUnits: 2 };
 
+/** The currencies Daric knows; a Base Currency must be one of these. */
+export const currencies: readonly Currency[] = [IRR, USD, EUR];
+
+export function findCurrency(code: string): Currency | undefined {
+  return currencies.find((c) => c.code === code);
+}
+
 /** An Amount: an integer count of `currency`'s minor unit. */
 export interface Money {
   readonly amount: bigint;
@@ -23,7 +30,8 @@ export function fitsInt64(amount: bigint): boolean {
 }
 
 /** How IRR amounts are shown and typed: as rials, or as tomans (1 toman = 10 rials). */
-export type MoneyDisplay = 'rial' | 'toman';
+export const moneyDisplays = ['rial', 'toman'] as const;
+export type MoneyDisplay = (typeof moneyDisplays)[number];
 
 /**
  * How many decimals `currency` has when shown or typed in `display`.
