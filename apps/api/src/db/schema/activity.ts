@@ -1,6 +1,7 @@
 import { sql } from 'drizzle-orm';
 import {
   bigint,
+  boolean,
   check,
   date,
   foreignKey,
@@ -8,9 +9,11 @@ import {
   integer,
   pgEnum,
   pgTable,
+  primaryKey,
   text,
   timestamp,
   unique,
+  uniqueIndex,
   uuid,
 } from 'drizzle-orm/pg-core';
 import { categoryKinds, transactionTypes } from '@daric/core';
@@ -91,6 +94,7 @@ export const transactions = pgTable(
     version: version(),
   },
   (t) => [
+    unique('transactions_id_workspace_id_key').on(t.id, t.workspaceId),
     foreignKey({
       name: 'transactions_account_fk',
       columns: [t.accountId, t.workspaceId],
@@ -110,5 +114,59 @@ export const transactions = pgTable(
     index('transactions_workspace_id_occurred_on_idx').on(t.workspaceId, t.occurredOn),
     index('transactions_account_id_idx').on(t.accountId),
     index('transactions_category_id_idx').on(t.categoryId),
+  ],
+);
+
+/**
+ * A free classification of Transactions, independent of Category; a controllable one
+ * marks spending the user could reduce. Names are unique in a Workspace,
+ * ignoring case. Never deleted, only archived.
+ */
+export const labels = pgTable(
+  'labels',
+  {
+    id: id(),
+    workspaceId: uuid('workspace_id')
+      .notNull()
+      .references(() => workspaces.id, { onDelete: 'cascade' }),
+    name: text('name').notNull(),
+    controllable: boolean('controllable').notNull().default(false),
+    archivedAt: timestamp('archived_at', { withTimezone: true }),
+    ...timestamps(),
+    version: version(),
+  },
+  (t) => [
+    unique('labels_id_workspace_id_key').on(t.id, t.workspaceId),
+    uniqueIndex('labels_workspace_id_name_key').on(t.workspaceId, sql`lower(${t.name})`),
+  ],
+);
+
+/**
+ * Which Labels a Transaction carries. Composite foreign keys keep both in the
+ * same Workspace; detaching deletes the row.
+ */
+export const transactionLabels = pgTable(
+  'transaction_labels',
+  {
+    transactionId: uuid('transaction_id').notNull(),
+    labelId: uuid('label_id').notNull(),
+    workspaceId: uuid('workspace_id')
+      .notNull()
+      .references(() => workspaces.id, { onDelete: 'cascade' }),
+    createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => [
+    primaryKey({ name: 'transaction_labels_pkey', columns: [t.transactionId, t.labelId] }),
+    foreignKey({
+      name: 'transaction_labels_transaction_fk',
+      columns: [t.transactionId, t.workspaceId],
+      foreignColumns: [transactions.id, transactions.workspaceId],
+    }),
+    foreignKey({
+      name: 'transaction_labels_label_fk',
+      columns: [t.labelId, t.workspaceId],
+      foreignColumns: [labels.id, labels.workspaceId],
+    }),
+    index('transaction_labels_label_id_idx').on(t.labelId),
   ],
 );

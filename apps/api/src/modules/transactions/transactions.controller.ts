@@ -1,4 +1,4 @@
-import { Get, HttpStatus, Inject, Param, Post, Query, Res } from '@nestjs/common';
+import { Delete, Get, HttpStatus, Inject, Param, Post, Put, Query, Res } from '@nestjs/common';
 import {
   ApiBadRequestResponse,
   ApiConflictResponse,
@@ -10,6 +10,7 @@ import {
 } from '@nestjs/swagger';
 import {
   createTransactionInputSchema,
+  MAX_LABELS_PER_TRANSACTION,
   listTransactionsQuerySchema,
   transactionSchema,
 } from '@daric/core';
@@ -46,6 +47,7 @@ export class TransactionsController {
     schema: { format: 'uuid' },
     description: 'A parent Category includes its children',
   })
+  @ApiQuery({ name: 'labelId', required: false, schema: { format: 'uuid' } })
   @ApiOkResponse({ type: [TransactionDto], description: 'Newest first' })
   @ApiBadRequestResponse({ description: 'A malformed filter' })
   list(
@@ -67,7 +69,7 @@ export class TransactionsController {
   @ApiOkResponse({ type: TransactionDto, description: 'Already recorded under this id' })
   @ApiBadRequestResponse({
     description:
-      'Invalid input, or an Account or Category that is missing, archived or of the other kind',
+      'Invalid input, an Account or Category that is missing, archived or of the other kind, or a Label that is missing or archived',
   })
   @ApiConflictResponse({ description: 'The id is already used by a different Transaction' })
   async create(
@@ -79,5 +81,32 @@ export class TransactionsController {
     const { created, transaction } = await this.transactions.create(membership, userId, body);
     if (!created) res.status(HttpStatus.OK);
     return transaction;
+  }
+
+  @Put(':transactionId/labels/:labelId')
+  @MinRole('MEMBER')
+  @ApiOkResponse({ type: TransactionDto, description: 'With the Label, also if it had it already' })
+  @ApiBadRequestResponse({
+    description: `The Label is archived, or the Transaction already carries ${MAX_LABELS_PER_TRANSACTION}`,
+  })
+  attachLabel(
+    @CurrentMembership() membership: Membership,
+    @CurrentUserId() userId: string,
+    @Param('transactionId') transactionId: string,
+    @Param('labelId') labelId: string,
+  ) {
+    return this.transactions.attachLabel(membership, userId, transactionId, labelId);
+  }
+
+  @Delete(':transactionId/labels/:labelId')
+  @MinRole('MEMBER')
+  @ApiOkResponse({ type: TransactionDto, description: 'Without the Label, also if it had not' })
+  detachLabel(
+    @CurrentMembership() membership: Membership,
+    @CurrentUserId() userId: string,
+    @Param('transactionId') transactionId: string,
+    @Param('labelId') labelId: string,
+  ) {
+    return this.transactions.detachLabel(membership, userId, transactionId, labelId);
   }
 }

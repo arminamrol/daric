@@ -1,5 +1,5 @@
 import { groupByMonth, IRR, money } from '@daric/core';
-import type { Account, Category, MonthGroup, Transaction } from '@daric/core';
+import type { Account, Category, Label, MonthGroup, Transaction } from '@daric/core';
 import { isolate } from '@daric/i18n';
 import { useId, useMemo } from 'react';
 import { currencyOf } from '../accounts/accounts';
@@ -14,11 +14,13 @@ function Month({
   accounts,
   categories,
   categoryLabels,
+  labels,
 }: {
   group: MonthGroup<Transaction>;
   accounts: ReadonlyMap<string, Account>;
   categories: ReadonlyMap<string, Category>;
   categoryLabels: ReadonlyMap<string, string>;
+  labels: readonly Label[];
 }) {
   const { t } = useI18n();
   const format = useFormatters();
@@ -53,6 +55,8 @@ function Month({
             money(transaction.amount, account ? currencyOf(account) : IRR),
           );
           const income = transaction.type === 'INCOME';
+          // In name order, as `labels` comes.
+          const carried = labels.filter((l) => transaction.labelIds.includes(l.id));
           return (
             <li key={transaction.id} className="flex items-center gap-3 px-4 py-3">
               {category && <CategoryBadge icon={category.icon} color={category.color} size="sm" />}
@@ -67,6 +71,21 @@ function Month({
                 </span>
                 {transaction.note && (
                   <span className="truncate text-sm text-foreground-muted">{transaction.note}</span>
+                )}
+                {carried.length > 0 && (
+                  <ul
+                    aria-label={t('transactions.list.labels')}
+                    className="mt-1 flex flex-wrap gap-1"
+                  >
+                    {carried.map((label) => (
+                      <li
+                        key={label.id}
+                        className="rounded-full bg-surface-muted px-2 py-0.5 text-xs text-foreground"
+                      >
+                        {label.name}
+                      </li>
+                    ))}
+                  </ul>
                 )}
               </div>
               <span className={`shrink-0 font-medium tabular-nums ${income ? 'text-success' : ''}`}>
@@ -88,11 +107,14 @@ export function TransactionList({
   transactions,
   accounts,
   categories,
+  labels,
 }: {
   transactions: readonly Transaction[];
   /** Archived ones included: old Transactions still name them. */
   accounts: readonly Account[];
   categories: readonly Category[];
+  /** By name, archived ones included. */
+  labels: readonly Label[];
 }) {
   const { t } = useI18n();
   const { workspace } = useSignedIn();
@@ -118,6 +140,7 @@ export function TransactionList({
       accounts={accountsById}
       categories={categoriesById}
       categoryLabels={categoryLabels}
+      labels={labels}
     />
   ));
 }

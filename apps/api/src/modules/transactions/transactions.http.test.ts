@@ -4,7 +4,7 @@ import { v7 as uuidv7 } from 'uuid';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import type { AppRequest } from '../../common/request';
 import { RolesGuard, WorkspaceGuard } from '../../common/workspace.guard';
-import { auditLogs, transactions, workspaceMembers } from '../../db/schema';
+import { auditLogs, transactionLabels, transactions, workspaceMembers } from '../../db/schema';
 import { call, registerUser, startTestApp, type TestApp } from '../../test/app';
 import { testDatabase } from '../../test/db';
 
@@ -34,6 +34,14 @@ async function storedTransactions(workspaceId: string) {
   return db.select().from(transactions).where(eq(transactions.workspaceId, workspaceId));
 }
 
+async function storedLabelIds(transactionId: string) {
+  const rows = await db
+    .select({ labelId: transactionLabels.labelId })
+    .from(transactionLabels)
+    .where(eq(transactionLabels.transactionId, transactionId));
+  return rows.map((r) => r.labelId).sort();
+}
+
 /** Calls against one test app, as `user`, in their own Workspace unless told otherwise. */
 function client(t: TestApp, user: User, workspaceId = user.workspaceId) {
   const base = `/v1/workspaces/${workspaceId}`;
@@ -53,9 +61,18 @@ function client(t: TestApp, user: User, workspaceId = user.workspaceId) {
       expect(res.status).toBe(201);
       return res.body;
     },
+    async label(name: string, fields: Record<string, unknown> = {}): Promise<{ id: string }> {
+      const res = await as('POST', '/labels', { name, ...fields });
+      expect(res.status).toBe(201);
+      return res.body;
+    },
+    attach: (transactionId: string, labelId: string) =>
+      as('PUT', `/transactions/${transactionId}/labels/${labelId}`),
+    detach: (transactionId: string, labelId: string) =>
+      as('DELETE', `/transactions/${transactionId}/labels/${labelId}`),
     balance: async (accountId: string) =>
       (await as('GET', `/accounts/${accountId}`)).body.balance as string,
-    archive: (kind: 'accounts' | 'categories', id: string) =>
+    archive: (kind: 'accounts' | 'categories' | 'labels', id: string) =>
       as('PATCH', `/${kind}/${id}`, { archived: true }),
   };
 }
@@ -99,6 +116,7 @@ describe('Transactions', () => {
       ...expense(),
       note: 'Bread',
       createdBy: user.userId,
+      labelIds: [],
       version: 1,
     });
     expect(await api.balance(account.id)).toBe('750000');
@@ -340,6 +358,244 @@ describe('Transactions', () => {
   });
 });
 
+describe('Labels on Transactions', () => {
+  let t: TestApp;
+  beforeAll(async () => {
+    t = await startTestApp();
+  });
+  afterAll(() => t.close());
+
+  /** A fresh Owner with an Account, a Category and two Labels. */
+  async function setUp() {
+    const user = await registerUser(t.url);
+    const api = client(t, user);
+    const account = await api.account();
+    const category = await api.category();
+    const travel = await api.label('Travel');
+    const eatingOut = await api.label('Eating out', { controllable: true });
+    const expense = (fields: Record<string, unknown> = {}) => ({
+      type: 'EXPENSE',
+      accountId: account.id,
+      categoryId: category.id,
+      amount: '250000',
+      occurredOn: '2026-10-10',
+      ...fields,
+    });
+    const record = async (fields: Record<string, unknown> = {}) => {
+      const res = await api.record(expense(fields));
+      expect(res.status).toBe(201);
+      return res.body as { id: string; labelIds: string[]; version: number };
+    };
+    return { user, api, account, category, travel, eatingOut, expense, record };
+  }
+
+  async function addMember(workspaceId: string, role: 'MEMBER' | 'VIEWER') {
+    const user = await registerUser(t.url);
+    await db.insert(workspaceMembers).values({ workspaceId, userId: user.userId, role });
+    return user;
+  }
+
+  it('record a Transaction with Labels and show them on it', async () => {
+    const { api, travel, eatingOut, record } = await setUp();
+    const both = [travel.id, eatingOut.id].sort();
+    const recorded = await record({ labelIds: [eatingOut.id, travel.id] });
+    expect(recorded.labelIds).toEqual(both);
+    expect(await storedLabelIds(recorded.id)).toEqual(both);
+    expect((await api.get(recorded.id)).body.labelIds).toEqual(both);
+    expect((await api.list()).body[0].labelIds).toEqual(both);
+  });
+
+  it('filter the list by Label, with the other filters', async () => {
+    const { api, category, travel, eatingOut, record } = await setUp();
+    const trip = await record({ labelIds: [travel.id] });
+    const dinner = await record({ labelIds: [travel.id, eatingOut.id], occurredOn: '2026-10-09' });
+    await record();
+    const ids = async (query: string) =>
+      (await api.list(query)).body.map((x: { id: string }) => x.id);
+    expect(await ids(`?labelId=${travel.id}`)).toEqual([trip.id, dinner.id]);
+    expect(await ids(`?labelId=${eatingOut.id}`)).toEqual([dinner.id]);
+    expect(await ids(`?labelId=${eatingOut.id}&categoryId=${category.id}&period=1405-07`)).toEqual([
+      dinner.id,
+    ]);
+    expect((await api.list('?labelId=travel')).status).toBe(400);
+    expect(await ids(`?labelId=${randomUUID()}`)).toEqual([]);
+  });
+
+  it('treat a replay with the same Labels in any order as the same Transaction', async () => {
+    const { user, api, travel, eatingOut, expense } = await setUp();
+    const id = uuidv7();
+    const first = await api.record(expense({ id, labelIds: [travel.id, eatingOut.id] }));
+    expect(first.status).toBe(201);
+    const again = await api.record(expense({ id, labelIds: [eatingOut.id, travel.id] }));
+    expect(again.status).toBe(200);
+    expect(again.body).toEqual(first.body);
+    expect((await api.record(expense({ id, labelIds: [travel.id] }))).status).toBe(409);
+    expect((await api.record(expense({ id }))).status).toBe(409);
+    expect(await storedTransactions(user.workspaceId)).toHaveLength(1);
+    expect(await storedLabelIds(id)).toEqual([travel.id, eatingOut.id].sort());
+  });
+
+  it('answer a replay with the stored Transaction after its Labels changed', async () => {
+    const { api, travel, eatingOut, expense } = await setUp();
+    const id = uuidv7();
+    await api.record(expense({ id, labelIds: [travel.id] }));
+    await api.attach(id, eatingOut.id);
+    // An offline client still sends the create it queued.
+    const again = await api.record(expense({ id, labelIds: [travel.id] }));
+    expect(again.status).toBe(200);
+    expect(again.body.labelIds).toEqual([travel.id, eatingOut.id].sort());
+    expect((await api.record(expense({ id, amount: '1', labelIds: [travel.id] }))).status).toBe(
+      409,
+    );
+  });
+
+  it('read Label ids in any case', async () => {
+    const { api, travel, expense } = await setUp();
+    const id = uuidv7();
+    const first = await api.record(expense({ id, labelIds: [travel.id.toUpperCase()] }));
+    expect(first.body.labelIds).toEqual([travel.id]);
+    expect((await api.record(expense({ id, labelIds: [travel.id] }))).status).toBe(200);
+    const twice = [travel.id, travel.id.toUpperCase()];
+    expect((await api.record(expense({ labelIds: twice }))).status).toBe(400);
+  });
+
+  it("reject a Label that is archived, missing or another Workspace's", async () => {
+    const a = await setUp();
+    const b = await setUp();
+    const old = await a.api.label('Old');
+    await a.api.archive('labels', old.id);
+    for (const labelId of [old.id, randomUUID(), b.travel.id]) {
+      expect((await a.api.record(a.expense({ labelIds: [a.travel.id, labelId] }))).status).toBe(
+        400,
+      );
+    }
+    expect(await storedTransactions(a.user.workspaceId)).toEqual([]);
+  });
+
+  it('attach and detach a Label, each as often as sent', async () => {
+    const { user, api, travel, eatingOut, record } = await setUp();
+    const recorded = await record({ labelIds: [eatingOut.id] });
+
+    const attached = await api.attach(recorded.id, travel.id);
+    expect(attached.status).toBe(200);
+    expect(attached.body.labelIds).toEqual([travel.id, eatingOut.id].sort());
+    expect(attached.body.version).toBe(recorded.version + 1);
+    const again = await api.attach(recorded.id, travel.id);
+    expect(again.status).toBe(200);
+    expect(again.body).toEqual(attached.body);
+
+    const detached = await api.detach(recorded.id, eatingOut.id);
+    expect(detached.status).toBe(200);
+    expect(detached.body.labelIds).toEqual([travel.id]);
+    expect(detached.body.version).toBe(recorded.version + 2);
+    expect((await api.detach(recorded.id, eatingOut.id)).body).toEqual(detached.body);
+
+    expect(await storedLabelIds(recorded.id)).toEqual([travel.id]);
+    expect(await storedTransactions(user.workspaceId)).toHaveLength(1);
+  });
+
+  it('keep an archived Label on its Transactions and let it be detached, not attached', async () => {
+    const { api, travel, eatingOut, record } = await setUp();
+    const recorded = await record({ labelIds: [travel.id] });
+    await api.archive('labels', travel.id);
+    await api.archive('labels', eatingOut.id);
+    expect((await api.get(recorded.id)).body.labelIds).toEqual([travel.id]);
+    expect((await api.list(`?labelId=${travel.id}`)).body).toHaveLength(1);
+    expect((await api.attach(recorded.id, eatingOut.id)).status).toBe(400);
+    expect((await api.detach(recorded.id, travel.id)).body.labelIds).toEqual([]);
+  });
+
+  it('refuse a 21st Label on one Transaction', async () => {
+    const { api, record } = await setUp();
+    const many = [];
+    for (let i = 0; i < 20; i++) many.push((await api.label(`Label ${i}`)).id);
+    const recorded = await record({ labelIds: many });
+    expect(recorded.labelIds).toHaveLength(20);
+    const extra = await api.label('One too many');
+    expect((await api.attach(recorded.id, extra.id)).status).toBe(400);
+    // Attaching one it already has is still fine.
+    expect((await api.attach(recorded.id, many[0] ?? '')).status).toBe(200);
+    expect(await storedLabelIds(recorded.id)).toHaveLength(20);
+  });
+
+  it('answer 404 for a deleted Transaction', async () => {
+    const { api, travel, record } = await setUp();
+    const recorded = await record();
+    await db
+      .update(transactions)
+      .set({ deletedAt: new Date() })
+      .where(eq(transactions.id, recorded.id));
+    expect((await api.attach(recorded.id, travel.id)).status).toBe(404);
+    expect((await api.detach(recorded.id, travel.id)).status).toBe(404);
+    expect(await storedLabelIds(recorded.id)).toEqual([]);
+  });
+
+  it("refuse to attach another Workspace's Label, or to touch its Transactions", async () => {
+    const a = await setUp();
+    const b = await setUp();
+    const aTransaction = await a.record();
+    const bTransaction = await b.record({ labelIds: [b.travel.id] });
+    expect((await a.api.attach(aTransaction.id, b.travel.id)).status).toBe(404);
+    expect((await a.api.attach(bTransaction.id, a.travel.id)).status).toBe(404);
+    expect((await a.api.detach(bTransaction.id, b.travel.id)).status).toBe(404);
+    const aInB = client(t, a.user, b.user.workspaceId);
+    expect((await aInB.attach(bTransaction.id, b.eatingOut.id)).status).toBe(404);
+    expect((await aInB.detach(bTransaction.id, b.travel.id)).status).toBe(404);
+    expect(await storedLabelIds(aTransaction.id)).toEqual([]);
+    expect(await storedLabelIds(bTransaction.id)).toEqual([b.travel.id]);
+  });
+
+  it('answer 404 for Labels or Transactions that do not exist or ids that are not uuids', async () => {
+    const { api, travel, record } = await setUp();
+    const recorded = await record();
+    for (const id of [randomUUID(), 'not-a-uuid']) {
+      expect((await api.attach(recorded.id, id)).status).toBe(404);
+      expect((await api.attach(id, travel.id)).status).toBe(404);
+      expect((await api.detach(id, travel.id)).status).toBe(404);
+    }
+  });
+
+  it('let Members label Transactions and Viewers only see Labels on them', async () => {
+    const { user: owner, travel, eatingOut, record } = await setUp();
+    const recorded = await record({ labelIds: [travel.id] });
+    const asMember = client(t, await addMember(owner.workspaceId, 'MEMBER'), owner.workspaceId);
+    const asViewer = client(t, await addMember(owner.workspaceId, 'VIEWER'), owner.workspaceId);
+    expect((await asMember.attach(recorded.id, eatingOut.id)).status).toBe(200);
+    expect((await asViewer.attach(recorded.id, eatingOut.id)).status).toBe(403);
+    expect((await asViewer.detach(recorded.id, travel.id)).status).toBe(403);
+    expect((await asViewer.get(recorded.id)).body.labelIds).toEqual(
+      [travel.id, eatingOut.id].sort(),
+    );
+  });
+
+  it('write ids to the audit log', async () => {
+    const { user, api, travel, record } = await setUp();
+    const recorded = await record();
+    await api.attach(recorded.id, travel.id);
+    await api.attach(recorded.id, travel.id);
+    await api.detach(recorded.id, travel.id);
+    await api.detach(recorded.id, travel.id);
+    const rows = await db
+      .select()
+      .from(auditLogs)
+      .where(
+        and(eq(auditLogs.workspaceId, user.workspaceId), eq(auditLogs.actorUserId, user.userId)),
+      )
+      .orderBy(desc(auditLogs.createdAt));
+    // Only real changes are logged.
+    expect(rows.filter((r) => r.action.startsWith('transaction.label'))).toMatchObject([
+      {
+        action: 'transaction.label_detach',
+        metadata: { transactionId: recorded.id, labelId: travel.id },
+      },
+      {
+        action: 'transaction.label_attach',
+        metadata: { transactionId: recorded.id, labelId: travel.id },
+      },
+    ]);
+  });
+});
+
 describe('Transactions with the app-layer membership checks removed', () => {
   let t: TestApp;
   beforeAll(async () => {
@@ -383,7 +639,32 @@ describe('Transactions with the app-layer membership checks removed', () => {
     expect((await aInB.record(expense)).status).toBe(404);
     // A's own Workspace, B's Account and Category.
     expect((await client(t, a).record(expense)).status).toBe(400);
+
+    const bLabel = await bApi.label('Secret');
+    expect((await aInB.attach(bTransaction.id, bLabel.id)).status).toBe(404);
+    const aApi = client(t, a);
+    const aTransaction = (
+      await aApi.record({
+        ...expense,
+        accountId: (await aApi.account()).id,
+        categoryId: (await aApi.category()).id,
+      })
+    ).body;
+    // A's own Transaction, B's Label: refused by the lookup and by the foreign key.
+    expect((await aApi.attach(aTransaction.id, bLabel.id)).status).toBe(404);
+    expect(
+      (
+        await aApi.record({
+          ...expense,
+          accountId: aTransaction.accountId,
+          categoryId: aTransaction.categoryId,
+          labelIds: [bLabel.id],
+        })
+      ).status,
+    ).toBe(400);
+    expect(await storedLabelIds(aTransaction.id)).toEqual([]);
+    expect(await storedLabelIds(bTransaction.id)).toEqual([]);
     expect(await storedTransactions(b.workspaceId)).toHaveLength(1);
-    expect(await storedTransactions(a.workspaceId)).toEqual([]);
+    expect(await storedTransactions(a.workspaceId)).toHaveLength(1);
   });
 });

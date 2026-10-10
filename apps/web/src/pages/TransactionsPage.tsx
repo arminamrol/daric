@@ -5,6 +5,7 @@ import { useAccounts } from '../accounts/accounts';
 import { useSignedIn } from '../auth/session';
 import { useCategories } from '../categories/categories';
 import { useI18n } from '../i18n/locale';
+import { useLabels } from '../labels/labels';
 import { useFormatters } from '../settings/settings';
 import { categoryChoices } from '../transactions/choices';
 import { TransactionForm } from '../transactions/TransactionForm';
@@ -17,14 +18,14 @@ const selectClass =
 /**
  * `/transactions`: fast entry on top, then one year of the Workspace Calendar
  * (`?year=`, the current one by default) grouped by month, optionally narrowed
- * to one Account (`?account=`) or Category (`?category=`).
+ * to one Account (`?account=`), Category (`?category=`) or Label (`?label=`).
  */
 export function TransactionsPage() {
   const { t } = useI18n();
   const format = useFormatters();
   const { workspace } = useSignedIn();
   const [params, setParams] = useSearchParams();
-  const ids = { account: useId(), category: useId() };
+  const ids = { account: useId(), category: useId(), label: useId() };
 
   const yearParam = Number(params.get('year'));
   const year =
@@ -33,13 +34,16 @@ export function TransactionsPage() {
       : format.currentPeriod(new Date()).year;
   const accountId = params.get('account') ?? undefined;
   const categoryId = params.get('category') ?? undefined;
+  const labelId = params.get('label') ?? undefined;
 
   const accounts = useAccounts({ includeArchived: true });
   const categories = useCategories();
+  const labels = useLabels();
   const transactions = useTransactions({
     period: { kind: 'year', year },
     ...(accountId && { accountId }),
     ...(categoryId && { categoryId }),
+    ...(labelId && { labelId }),
   });
   const canRecord = hasRole(workspace.role, 'MEMBER');
   const activeAccounts = accounts.data?.filter((a) => !a.archived) ?? [];
@@ -62,11 +66,11 @@ export function TransactionsPage() {
       <h1 className="text-2xl font-bold">{t('transactions.title')}</h1>
       {!canRecord ? (
         <p className="text-sm text-foreground-muted">{t('transactions.readOnly')}</p>
-      ) : accounts.isPending || categories.isPending ? (
+      ) : accounts.isPending || categories.isPending || labels.isPending ? (
         <p role="status" className="text-foreground-muted">
           {t('session.loading')}
         </p>
-      ) : accounts.isError || categories.isError ? (
+      ) : accounts.isError || categories.isError || labels.isError ? (
         <p role="alert" className="text-danger">
           {t('transactions.list.loadFailed')}
         </p>
@@ -85,7 +89,11 @@ export function TransactionsPage() {
           <p>{t('transactions.noAccountAskAdmin')}</p>
         )
       ) : (
-        <TransactionForm accounts={activeAccounts} categories={categories.data} />
+        <TransactionForm
+          accounts={activeAccounts}
+          categories={categories.data}
+          labels={labels.data}
+        />
       )}
 
       <div className="flex flex-col gap-4">
@@ -135,8 +143,31 @@ export function TransactionsPage() {
               </option>
             ))}
           </select>
+          {(labels.data?.length ?? 0) > 0 && (
+            <>
+              <label htmlFor={ids.label} className="sr-only">
+                {t('transactions.filter.label')}
+              </label>
+              <select
+                id={ids.label}
+                value={labelId ?? ''}
+                onChange={(e) => setParam('label', e.target.value)}
+                className={selectClass}
+              >
+                <option value="">{t('transactions.filter.allLabels')}</option>
+                {labels.data?.map((l) => (
+                  <option key={l.id} value={l.id}>
+                    {l.name}
+                  </option>
+                ))}
+              </select>
+            </>
+          )}
         </div>
-        {transactions.isPending || accounts.isPending || categories.isPending ? (
+        {transactions.isPending ||
+        accounts.isPending ||
+        categories.isPending ||
+        labels.isPending ? (
           <p role="status" className="text-foreground-muted">
             {t('session.loading')}
           </p>
@@ -151,6 +182,7 @@ export function TransactionsPage() {
             transactions={transactions.data}
             accounts={accounts.data ?? []}
             categories={categories.data ?? []}
+            labels={labels.data ?? []}
           />
         )}
       </div>

@@ -1,6 +1,7 @@
 import { ConflictException, Inject, Injectable, UnauthorizedException } from '@nestjs/common';
 import type { LoginInput, RegisterInput, User } from '@daric/core';
 import { and, eq } from 'drizzle-orm';
+import { isUniqueViolation } from '../../common/db-errors';
 import type { ClientInfo } from '../../common/request';
 import { DATABASE } from '../../common/di-tokens';
 import { type Database, one } from '../../db/client';
@@ -9,11 +10,6 @@ import { AuditService } from '../audit/audit.service';
 import { seedDefaultCategories } from '../categories/defaults';
 import { hashPassword, verifyAgainstDummy, verifyPassword } from './passwords';
 import { type IssuedTokens, TokenService } from './token.service';
-
-function isUniqueViolation(error: unknown): boolean {
-  const cause = (error as { cause?: { code?: string } }).cause ?? error;
-  return (cause as { code?: string }).code === '23505';
-}
 
 /** A signed-in User and their new tokens; the controller decides how the tokens travel. */
 export interface SignedIn {

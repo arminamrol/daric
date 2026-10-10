@@ -8,6 +8,8 @@ import {
 
 const accountId = '01900000-0000-7000-a000-000000000001';
 const categoryId = '01900000-0000-7000-b000-000000000001';
+const labelId = '01900000-0000-7000-8c00-000000000001';
+const otherLabelId = '01900000-0000-7000-8c00-000000000002';
 const valid = {
   type: 'EXPENSE',
   accountId,
@@ -22,7 +24,14 @@ describe('createTransactionInputSchema', () => {
       ...valid,
       amount: 250000n,
       note: null,
+      labelIds: [],
     });
+  });
+
+  it('takes the Labels to attach', () => {
+    expect(
+      createTransactionInputSchema.parse({ ...valid, labelIds: [labelId, otherLabelId] }).labelIds,
+    ).toEqual([labelId, otherLabelId]);
   });
 
   it('takes a client-made UUIDv7 id and a trimmed note', () => {
@@ -46,6 +55,18 @@ describe('createTransactionInputSchema', () => {
     ['a missing Category', { categoryId: undefined }],
     ['a note over 1000 characters', { note: 'x'.repeat(1001) }],
     ['an unknown field', { currency: 'USD' }],
+    ['a Label id that is not a uuid', { labelIds: ['travel'] }],
+    ['the same Label twice', { labelIds: [labelId, labelId] }],
+    ['the same Label twice in different case', { labelIds: [labelId, labelId.toUpperCase()] }],
+    [
+      'more than 20 Labels',
+      {
+        labelIds: Array.from(
+          { length: 21 },
+          (_, i) => `01900000-0000-7000-8c00-${String(i).padStart(12, '0')}`,
+        ),
+      },
+    ],
   ])('rejects %s', (_, change) => {
     expect(createTransactionInputSchema.safeParse({ ...valid, ...change }).success).toBe(false);
   });
@@ -58,6 +79,7 @@ describe('transactionSchema', () => {
       id: '0199d0f0-0000-7000-8000-000000000001',
       note: null,
       createdBy: '01900000-0000-7000-8000-000000000001',
+      labelIds: [labelId],
       version: 1,
     };
     expect(transactionSchema.parse(wire)).toEqual({ ...wire, amount: 250000n });
@@ -72,9 +94,10 @@ describe('listTransactionsQuerySchema', () => {
     expect(listTransactionsQuerySchema.parse({ period: '1405' })).toEqual({
       period: { kind: 'year', year: 1405 },
     });
-    expect(listTransactionsQuerySchema.parse({ accountId, categoryId })).toEqual({
+    expect(listTransactionsQuerySchema.parse({ accountId, categoryId, labelId })).toEqual({
       accountId,
       categoryId,
+      labelId,
     });
   });
 

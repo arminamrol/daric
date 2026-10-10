@@ -23,12 +23,17 @@ export const transactionSchema = z.object({
   note: z.string().nullable(),
   /** The User who recorded it, or null once their account is gone. */
   createdBy: z.uuid().nullable(),
+  /** The Labels attached to it, archived ones included. */
+  labelIds: z.array(z.uuid()),
   /** Bumped on every change; edits must name the version they started from. */
   version: z.number().int(),
 });
 export type Transaction = z.infer<typeof transactionSchema>;
 export type TransactionWire = z.input<typeof transactionSchema>;
 export const transactionListSchema = z.array(transactionSchema);
+
+/** The most Labels one Transaction may carry. */
+export const MAX_LABELS_PER_TRANSACTION = 20;
 
 const positiveAmountSchema = amountSchema.refine((amount) => amount > 0n, {
   message: 'An Amount must be positive',
@@ -51,6 +56,13 @@ export const createTransactionInputSchema = z.strictObject({
     .max(1000)
     .nullish()
     .transform((note) => note || null),
+  /** Active Labels of the same Workspace, each once. */
+  labelIds: z
+    // Lowercase, as the database writes them, so ids compare as text.
+    .array(z.uuid().transform((id) => id.toLowerCase()))
+    .max(MAX_LABELS_PER_TRANSACTION)
+    .refine((ids) => new Set(ids).size === ids.length, { message: 'Label ids must be distinct' })
+    .default([]),
 });
 export type CreateTransactionInput = z.infer<typeof createTransactionInputSchema>;
 
@@ -76,11 +88,12 @@ const periodParamSchema = z.string().transform((value, ctx): Period => {
 
 /**
  * Filters for listing Transactions. A Period is of the Workspace Calendar; a
- * parent Category includes its children.
+ * parent Category includes its children. All given filters must match.
  */
 export const listTransactionsQuerySchema = z.object({
   period: periodParamSchema.exactOptional(),
   accountId: z.uuid().exactOptional(),
   categoryId: z.uuid().exactOptional(),
+  labelId: z.uuid().exactOptional(),
 });
 export type ListTransactionsQuery = z.infer<typeof listTransactionsQuerySchema>;

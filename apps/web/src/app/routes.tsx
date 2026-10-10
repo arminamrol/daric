@@ -5,6 +5,8 @@ import { AccountsPage } from '../pages/AccountsPage';
 import { CategoriesPage } from '../pages/CategoriesPage';
 import { CategoryFormPage } from '../pages/CategoryFormPage';
 import { HomePage } from '../pages/HomePage';
+import { LabelFormPage } from '../pages/LabelFormPage';
+import { LabelsPage } from '../pages/LabelsPage';
 import { LoginPage } from '../pages/LoginPage';
 import { NotFoundPage } from '../pages/NotFoundPage';
 import { SettingsPage } from '../pages/SettingsPage';
@@ -27,6 +29,9 @@ export const routes: RouteObject[] = [
           { path: 'categories', element: <CategoriesPage /> },
           { path: 'categories/new', element: <CategoryFormPage /> },
           { path: 'categories/:categoryId', element: <CategoryFormPage /> },
+          { path: 'labels', element: <LabelsPage /> },
+          { path: 'labels/new', element: <LabelFormPage /> },
+          { path: 'labels/:labelId', element: <LabelFormPage /> },
           { path: 'settings', element: <SettingsPage /> },
         ],
       },

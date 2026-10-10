@@ -15,7 +15,11 @@ export type AuditAction =
   | 'category.create'
   | 'category.update'
   | 'category.reorder'
-  | 'transaction.create';
+  | 'label.create'
+  | 'label.update'
+  | 'transaction.create'
+  | 'transaction.label_attach'
+  | 'transaction.label_detach';
 
 export interface AuditEntry {
   action: AuditAction;
