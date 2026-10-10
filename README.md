@@ -9,7 +9,7 @@ Personal and household finance: accounts, transactions, budgets, net worth and y
 ## Repository layout
 
 ```
-apps/api               NestJS API (placeholder)
+apps/api               NestJS API (Drizzle + Postgres)
 apps/web               Vite + React web app / PWA
 apps/mobile            Expo app (placeholder)
 packages/core          pure TypeScript domain logic
@@ -34,26 +34,27 @@ pnpm workspaces + Turborepo. Every package has `lint`, `typecheck` and `test` sc
 ```sh
 pnpm install
 cp .env.example .env
-pnpm services:up      # Postgres on :5432, Mailpit SMTP on :1025, inbox at http://localhost:8025
-pnpm check        # lint + typecheck + test across all packages
+pnpm db:up           # Postgres on :5432, Mailpit SMTP on :1025, inbox at http://localhost:8025
+pnpm --filter @daric/api db:migrate
+pnpm check            # lint + typecheck + test across all packages (API tests need Postgres)
 ```
 
-Stop the services with `pnpm services:down` (data persists in the `postgres-data` volume).
+Stop the services with `pnpm db:down` (data persists in the `postgres-data` volume).
 
 ## Scripts
 
-| Command              | What it does                                      |
-| -------------------- | ------------------------------------------------- |
-| `pnpm dev`           | Start the web app at http://localhost:5173        |
-| `pnpm build`         | Production build of the web app (`apps/web/dist`) |
-| `pnpm lint`          | ESLint in every package                           |
-| `pnpm typecheck`     | `tsc --noEmit` in every package                   |
-| `pnpm test`          | Vitest in every package                           |
-| `pnpm check`         | All three of the above                            |
-| `pnpm format`        | Prettier, writing changes                         |
-| `pnpm format:check`  | Prettier, check only (run in CI)                  |
-| `pnpm services:up`   | Start Postgres and Mailpit (`docker/compose.yml`) |
-| `pnpm services:down` | Stop them                                         |
+| Command             | What it does                                         |
+| ------------------- | ---------------------------------------------------- |
+| `pnpm dev`          | Web app at http://localhost:5173, API at :3000       |
+| `pnpm build`        | Production builds (`apps/web/dist`, `apps/api/dist`) |
+| `pnpm lint`         | ESLint in every package                              |
+| `pnpm typecheck`    | `tsc --noEmit` in every package                      |
+| `pnpm test`         | Vitest in every package                              |
+| `pnpm check`        | All three of the above                               |
+| `pnpm format`       | Prettier, writing changes                            |
+| `pnpm format:check` | Prettier, check only (run in CI)                     |
+| `pnpm db:up`        | Start Postgres and Mailpit (`docker/compose.yml`)    |
+| `pnpm db:down`      | Stop them                                            |
 
 Run one package's task with a filter, e.g. `pnpm --filter @daric/core test`.
 
@@ -68,22 +69,42 @@ Persian and right-to-left by default, light and dark themes, installable as a PW
 - After changing `apps/web/public/favicon.svg`, regenerate the PWA icons with `pnpm --filter @daric/web icons`.
 - The service worker only runs in the production build: try it with `pnpm build` then `pnpm --filter @daric/web preview`.
 
+## API
+
+NestJS on Express with Drizzle over Postgres. Routes live under `/v1`; the OpenAPI document is at `/v1/openapi.json` (UI at `/v1/docs`), generated from the zod schemas in `@daric/core`.
+
+- Schema: `apps/api/src/db/schema`. After changing it run `pnpm --filter @daric/api db:generate`, then `db:migrate`. Row-level security, grants and SQL functions go in custom migrations (`drizzle-kit generate --custom`).
+- Workspace scoping (ADR-0001): Workspace routes use `@WorkspaceController()`, which puts them under `/v1/workspaces/:wsId`, checks membership and `@MinRole`, and runs each request in a transaction as the `daric_app` role with `app.user_id` and `app.workspace_id` set. Inside, use `scopedTx()`. Every table with a `workspace_id` needs grants for `daric_app`, RLS enabled and a policy on `workspace_id = (SELECT app_member_workspace_id())`; a test fails otherwise.
+- The API is not compiled with decorator metadata (tsx, esbuild and Vitest do not emit it), so constructor parameters use `@Inject(...)` and request bodies use `@ZodBody(Dto)`.
+- Logs never hold Amounts, notes, passwords or tokens: keys matching those are censored and requests are logged by method and path only.
+- Tests (`pnpm --filter @daric/api test`) recreate and migrate a `<database>_test` database next to `DATABASE_URL`'s.
+- The database user in `DATABASE_URL` must be able to create the `daric_app` role and be granted it (the first migration does both); a superuser works.
+
 ## Environment variables
 
 All variables live in `.env` (copied from [`.env.example`](.env.example), git-ignored).
 
-| Variable            | Default                                       | Used by        | Purpose                                   |
-| ------------------- | --------------------------------------------- | -------------- | ----------------------------------------- |
-| `POSTGRES_USER`     | `daric`                                       | Docker Compose | Postgres superuser created on first start |
-| `POSTGRES_PASSWORD` | `daric`                                       | Docker Compose | Its password                              |
-| `POSTGRES_DB`       | `daric`                                       | Docker Compose | Database created on first start           |
-| `POSTGRES_PORT`     | `5432`                                        | Docker Compose | Host port Postgres is published on        |
-| `DATABASE_URL`      | `postgres://daric:daric@localhost:5432/daric` | API            | Connection string; must match the above   |
-| `MAILPIT_SMTP_PORT` | `1025`                                        | Docker Compose | Host port of Mailpit's SMTP server        |
-| `MAILPIT_UI_PORT`   | `8025`                                        | Docker Compose | Host port of Mailpit's web inbox          |
-| `SMTP_HOST`         | `localhost`                                   | API            | SMTP server for outgoing mail             |
-| `SMTP_PORT`         | `1025`                                        | API            | Its port                                  |
-| `MAIL_FROM`         | `Daric <no-reply@daric.local>`                | API            | Sender address on outgoing mail           |
+| Variable                     | Default                                       | Used by        | Purpose                                   |
+| ---------------------------- | --------------------------------------------- | -------------- | ----------------------------------------- |
+| `POSTGRES_USER`              | `daric`                                       | Docker Compose | Postgres superuser created on first start |
+| `POSTGRES_PASSWORD`          | `daric`                                       | Docker Compose | Its password                              |
+| `POSTGRES_DB`                | `daric`                                       | Docker Compose | Database created on first start           |
+| `POSTGRES_PORT`              | `5432`                                        | Docker Compose | Host port Postgres is published on        |
+| `DATABASE_URL`               | `postgres://daric:daric@localhost:5432/daric` | API            | Connection string; must match the above   |
+| `MAILPIT_SMTP_PORT`          | `1025`                                        | Docker Compose | Host port of Mailpit's SMTP server        |
+| `MAILPIT_UI_PORT`            | `8025`                                        | Docker Compose | Host port of Mailpit's web inbox          |
+| `SMTP_HOST`                  | `localhost`                                   | API            | SMTP server for outgoing mail             |
+| `SMTP_PORT`                  | `1025`                                        | API            | Its port                                  |
+| `MAIL_FROM`                  | `Daric <no-reply@daric.local>`                | API            | Sender address on outgoing mail           |
+| `PORT`                       | `3000`                                        | API            | Port the API listens on                   |
+| `JWT_SECRET`                 | (dev placeholder)                             | API            | Signs access tokens; 32+ characters       |
+| `ACCESS_TOKEN_TTL_SECONDS`   | `900`                                         | API            | Access token lifetime                     |
+| `REFRESH_TOKEN_TTL_SECONDS`  | `2592000`                                     | API            | Refresh token lifetime                    |
+| `CORS_ORIGINS`               | `http://localhost:5173`                       | API            | Comma-separated allowed browser origins   |
+| `RATE_LIMIT_PER_MINUTE`      | `120`                                         | API            | Requests per minute per client            |
+| `AUTH_RATE_LIMIT_PER_MINUTE` | `10`                                          | API            | Same, for login and registration          |
+| `TRUST_PROXY`                | `0`                                           | API            | Reverse proxies in front of the API       |
+| `LOG_LEVEL`                  | `info`                                        | API            | Pino log level                            |
 
 Postgres credentials only apply when its volume is first created; after changing them run `docker compose --project-directory . -f docker/compose.yml down -v` (this deletes local data).
 

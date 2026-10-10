@@ -8,7 +8,8 @@ import {
 } from './jalali';
 
 /** The calendars a Workspace Calendar or a display calendar can use (ADR-0002). */
-export type CalendarSystem = 'jalali' | 'gregorian';
+export const calendarSystems = ['jalali', 'gregorian'] as const;
+export type CalendarSystem = (typeof calendarSystems)[number];
 
 /** A day in some calendar; months and days count from 1. */
 export interface CalendarDate {
