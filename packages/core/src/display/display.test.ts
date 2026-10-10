@@ -43,6 +43,18 @@ describe('displayFormatters', () => {
     expect(utc.date(nowruz)).toBe('۱۴۰۴/۱۲/۲۹');
   });
 
+  it("shows a Transaction's day in the display calendar, and knows the Workspace's today", () => {
+    const format = displayFormatters(settings);
+    expect(format.day('2026-10-09')).toBe('۱۴۰۵/۰۷/۱۷');
+    expect(format.day('2026-10-09', { style: 'long' })).toBe('۱۷ مهر ۱۴۰۵');
+    const gregorian = displayFormatters({
+      ...settings,
+      preferences: { displayCalendar: 'gregorian', digits: 'latin' },
+    });
+    expect(gregorian.day('2026-10-09')).toBe('2026/10/09');
+    expect(format.today(new Date('2026-03-20T21:00:00Z'))).toBe('2026-03-21');
+  });
+
   it('buckets Periods by the Workspace Calendar, whatever the display calendar', () => {
     const jalaliWorkspace = displayFormatters({
       ...settings,

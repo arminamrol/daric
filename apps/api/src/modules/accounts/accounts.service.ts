@@ -1,10 +1,10 @@
 import { Inject, Injectable, NotFoundException } from '@nestjs/common';
-import { accountBalance, amountToWire } from '@daric/core';
+import { accountBalance, amountToWire, balanceEffect, money } from '@daric/core';
 import type { AccountWire, CreateAccountInput, UpdateAccountInput } from '@daric/core';
 import { eq, isNull, sql, type SQL } from 'drizzle-orm';
 import { isUuid, type Membership } from '../../common/request';
 import { one } from '../../db/client';
-import { accounts, currencies, workspaces } from '../../db/schema';
+import { accounts, currencies, transactions, workspaces } from '../../db/schema';
 import { scopedTx } from '../../db/scope';
 import { AuditService } from '../audit/audit.service';
 
@@ -19,19 +19,39 @@ const columns = {
   archivedAt: accounts.archivedAt,
 };
 
+/** Each Account's Income and Expense totals, deleted Transactions left out. */
+function totalsByAccount() {
+  // `sum` of a bigint is a numeric, which arrives as a string.
+  const total = (type: 'INCOME' | 'EXPENSE') =>
+    sql<string>`coalesce(sum(${transactions.amount}) FILTER (WHERE ${transactions.type} = ${type}), 0)`;
+  return scopedTx()
+    .select({
+      accountId: transactions.accountId,
+      income: total('INCOME').as('income'),
+      expense: total('EXPENSE').as('expense'),
+    })
+    .from(transactions)
+    .where(isNull(transactions.deletedAt))
+    .groupBy(transactions.accountId)
+    .as('totals');
+}
+
 interface Row extends Omit<AccountWire, 'openingBalance' | 'balance' | 'archived'> {
   minorUnits: number;
   openingBalance: bigint;
   archivedAt: Date | null;
+  income: string | null;
+  expense: string | null;
 }
 
 function toWire(row: Row): AccountWire {
-  const { minorUnits, archivedAt, ...account } = row;
-  // No Transactions yet: the balance is the opening balance (ticket 11 adds their effect).
-  const balance = accountBalance({
-    currency: { code: row.currency, minorUnits },
-    openingBalance: row.openingBalance,
-  });
+  const { minorUnits, archivedAt, income, expense, ...account } = row;
+  const currency = { code: row.currency, minorUnits };
+  const effects = [
+    balanceEffect({ type: 'INCOME', amount: BigInt(income ?? 0) }, row.class),
+    balanceEffect({ type: 'EXPENSE', amount: BigInt(expense ?? 0) }, row.class),
+  ].map((amount) => money(amount, currency));
+  const balance = accountBalance({ currency, openingBalance: row.openingBalance }, effects);
   return {
     ...account,
     openingBalance: amountToWire(row.openingBalance),
@@ -47,10 +67,12 @@ export class AccountsService {
   constructor(@Inject(AuditService) private readonly audit: AuditService) {}
 
   private select(where: SQL | undefined) {
+    const totals = totalsByAccount();
     return scopedTx()
-      .select(columns)
+      .select({ ...columns, income: totals.income, expense: totals.expense })
       .from(accounts)
       .innerJoin(currencies, eq(currencies.code, accounts.currency))
+      .leftJoin(totals, eq(totals.accountId, accounts.id))
       .where(where)
       .orderBy(accounts.createdAt, accounts.id);
   }

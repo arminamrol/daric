@@ -254,6 +254,54 @@ describe('api-client', () => {
     });
   });
 
+  describe('Transactions', () => {
+    const transaction = {
+      id: '0199d0f0-0000-7000-8000-000000000001',
+      type: 'EXPENSE',
+      accountId: '01900000-0000-7000-8000-0000000000a1',
+      categoryId: '01900000-0000-7000-8000-0000000000c1',
+      amount: '9007199254740993',
+      occurredOn: '2026-10-10',
+      note: null,
+      createdBy: user.id,
+      version: 1,
+    } as const;
+    const base = `/v1/workspaces/${workspace.id}/transactions`;
+
+    it('lists them with filters, Amounts as bigints', async () => {
+      const { client, sent } = fakeServer({
+        [`GET ${base}`]: () => ({ status: 200, body: [transaction] }),
+      });
+      const [listed] = await client.listTransactions(workspace.id);
+      expect(listed?.amount).toBe(9007199254740993n);
+      await client.listTransactions(workspace.id, {
+        period: { kind: 'month', year: 1405, month: 7 },
+        accountId: transaction.accountId,
+        categoryId: transaction.categoryId,
+      });
+      expect(sent.map((r) => r.url)).toEqual([
+        base,
+        `${base}?period=1405-07&accountId=${transaction.accountId}&categoryId=${transaction.categoryId}`,
+      ]);
+    });
+
+    it('records one with its client-made id and the Amount as a decimal string', async () => {
+      const { client, sent } = fakeServer(
+        { [`POST ${base}`]: () => ({ status: 201, body: transaction }) },
+        { '__Host-daric_csrf': 'csrf-1' },
+      );
+      const { createdBy, version, ...input } = transaction;
+      void createdBy;
+      void version;
+      const recorded = await client.createTransaction(workspace.id, {
+        ...input,
+        amount: 9007199254740993n,
+      });
+      expect(recorded.id).toBe(transaction.id);
+      expect(sent[0]?.body).toEqual(input);
+    });
+  });
+
   it('prefixes paths with the base URL', async () => {
     const sent: string[] = [];
     const client = createApiClient({

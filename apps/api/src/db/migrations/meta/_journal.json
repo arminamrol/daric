@@ -36,6 +36,13 @@
       "when": 1791635806124,
       "tag": "0004_categories",
       "breakpoints": true
+    },
+    {
+      "idx": 5,
+      "version": "7",
+      "when": 1791639793786,
+      "tag": "0005_transactions",
+      "breakpoints": true
     }
   ]
 }

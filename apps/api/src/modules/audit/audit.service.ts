@@ -14,7 +14,8 @@ export type AuditAction =
   | 'account.update'
   | 'category.create'
   | 'category.update'
-  | 'category.reorder';
+  | 'category.reorder'
+  | 'transaction.create';
 
 export interface AuditEntry {
   action: AuditAction;

@@ -1,14 +1,16 @@
 import { ApiError, type ApiClient } from '@daric/api-client';
-import { categoryKinds, categoryTree, hasRole } from '@daric/core';
+import { balanceEffect, categoryKinds, categoryTree, hasRole, periodDays } from '@daric/core';
 import type {
   Account,
   Category,
   Me,
   Session,
+  Transaction,
   UserPreferences,
   Workspace,
   WorkspaceRole,
 } from '@daric/core';
+import { v7 as uuidv7 } from 'uuid';
 
 export const testPassword = 'correct horse battery';
 
@@ -46,6 +48,7 @@ export function fakeApi({
   let nextAccountId = 1;
   let categories: Category[] = [];
   let nextCategoryId = 1;
+  const transactions: Transaction[] = [];
 
   function signedIn(): FakeUser {
     if (!current) throw new ApiError(401, { message: 'Unauthorized' });
@@ -96,6 +99,43 @@ export function fakeApi({
     accounts.push(account);
     return account;
   }
+
+  /** The opening balance plus the Account's Transactions, as the API computes it. */
+  function withBalance(account: Account): Account {
+    const effects = transactions
+      .filter((t) => t.accountId === account.id)
+      .map((t) => balanceEffect(t, account.class));
+    return { ...account, balance: effects.reduce((a, b) => a + b, account.openingBalance) };
+  }
+
+  /** Puts a Transaction straight into the Workspace, as if recorded earlier. */
+  function addTransaction(
+    fields: Partial<Transaction> &
+      Pick<Transaction, 'type' | 'accountId' | 'categoryId' | 'amount' | 'occurredOn'>,
+  ): Transaction {
+    const transaction: Transaction = {
+      id: uuidv7(),
+      note: null,
+      createdBy: current?.id ?? null,
+      version: 1,
+      ...fields,
+    };
+    transactions.push(transaction);
+    return transaction;
+  }
+
+  /** Newest first, like the API. */
+  const newestFirst = (list: Transaction[]) =>
+    list
+      .map((t, index) => ({ t, index }))
+      .sort((a, b) =>
+        a.t.occurredOn === b.t.occurredOn
+          ? b.index - a.index
+          : a.t.occurredOn < b.t.occurredOn
+            ? 1
+            : -1,
+      )
+      .map(({ t }) => ({ ...t }));
 
   const siblings = (kind: Category['kind'], parentId: string | null) =>
     categories
@@ -166,7 +206,7 @@ export function fakeApi({
     },
     async listAccounts(workspaceId, { includeArchived = false } = {}) {
       inWorkspace(workspaceId);
-      return accounts.filter((a) => includeArchived || !a.archived).map((a) => ({ ...a }));
+      return accounts.filter((a) => includeArchived || !a.archived).map(withBalance);
     },
     async createAccount(workspaceId, input) {
       inWorkspace(workspaceId, 'ADMIN');
@@ -177,9 +217,8 @@ export function fakeApi({
       const account = accounts.find((a) => a.id === accountId);
       if (!account) throw new ApiError(404, { message: 'Not Found' });
       const updated = { ...account, ...input };
-      updated.balance = updated.openingBalance;
       accounts = accounts.map((a) => (a.id === accountId ? updated : a));
-      return { ...updated };
+      return withBalance(updated);
     },
     async listCategories(workspaceId, { includeArchived = false } = {}) {
       inWorkspace(workspaceId);
@@ -228,6 +267,30 @@ export function fakeApi({
       );
       return siblings(first.kind, first.parentId).map((c) => ({ ...c }));
     },
+    async listTransactions(workspaceId, { period, accountId, categoryId } = {}) {
+      inWorkspace(workspaceId);
+      const days = period && periodDays(period, workspace.calendar);
+      const childIds = categories.filter((c) => c.parentId === categoryId).map((c) => c.id);
+      return newestFirst(
+        transactions.filter(
+          (t) =>
+            (!days || (t.occurredOn >= days.from && t.occurredOn < days.until)) &&
+            (!accountId || t.accountId === accountId) &&
+            (!categoryId || t.categoryId === categoryId || childIds.includes(t.categoryId)),
+        ),
+      );
+    },
+    async createTransaction(workspaceId, { id, ...input }) {
+      inWorkspace(workspaceId, 'MEMBER');
+      const existing = transactions.find((t) => t.id === id);
+      if (existing) return { ...existing };
+      const account = accounts.find((a) => a.id === input.accountId && !a.archived);
+      const category = categories.find((c) => c.id === input.categoryId && !c.archived);
+      if (!account || category?.kind !== input.type) {
+        throw new ApiError(400, { message: 'Bad Account or Category' });
+      }
+      return { ...addTransaction({ ...input, ...(id && { id }) }) };
+    },
     async updatePreferences(input) {
       const user = signedIn();
       user.preferences = { ...user.preferences, ...input };
@@ -241,6 +304,9 @@ export function fakeApi({
     addAccount,
     accounts: () => accounts,
     addCategory,
+    addTransaction,
+    /** In the order recorded. */
+    transactions: () => transactions,
     /** In the API's list order, archived ones included. */
     categories: () => inTreeOrder(categories),
     signedInUser: () => current?.email,

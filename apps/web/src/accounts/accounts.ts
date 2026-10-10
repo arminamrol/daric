@@ -20,7 +20,7 @@ export function useAccounts({ includeArchived = false }: { includeArchived?: boo
  * Refetches every Account list, including ones no screen shows right now, so
  * the page a save navigates to never draws the list from before the save.
  */
-function useRefreshAccounts() {
+export function useRefreshAccounts() {
   const queryClient = useQueryClient();
   const { workspace } = useSignedIn();
   return () =>

@@ -1,7 +1,8 @@
-import { formatDate, formatPeriod, monthPeriodOf } from '../calendar';
+import { formatDate, formatDay, formatPeriod, monthPeriodOf, todayIn } from '../calendar';
 import type {
   CalendarSystem,
   FormatDateOptions,
+  IsoDay,
   MonthPeriod,
   Period,
   WorkspaceCalendar,
@@ -31,6 +32,10 @@ export interface DisplaySettings {
 export interface DisplayFormatters {
   money(m: Money, options?: Pick<FormatMoneyOptions, 'label' | 'grouping'>): string;
   date(instant: Date, options?: Pick<FormatDateOptions, 'style'>): string;
+  /** A day with no time of day (a Transaction's), in the display calendar. */
+  day(day: IsoDay, options?: Pick<FormatDateOptions, 'style'>): string;
+  /** The day `instant` falls on in the Workspace timezone. */
+  today(instant: Date): IsoDay;
   /** The month Period of the Workspace Calendar that `instant` falls in. */
   currentPeriod(instant: Date): MonthPeriod;
   /** Names a Period of the Workspace Calendar, whatever the display calendar is. */
@@ -57,6 +62,9 @@ export function displayFormatters(settings: DisplaySettings): DisplayFormatters 
         locale,
         digits,
       }),
+    day: (day, options) =>
+      formatDay(day, { ...options, calendar: preferences.displayCalendar, locale, digits }),
+    today: (instant) => todayIn(instant, workspace.timezone),
     currentPeriod: (instant) => monthPeriodOf(instant, workspaceCalendar),
     period: (period) => formatPeriod(period, { calendar: workspace.calendar, locale, digits }),
   };

@@ -1,4 +1,8 @@
+import { sql } from 'drizzle-orm';
 import {
+  bigint,
+  check,
+  date,
   foreignKey,
   index,
   integer,
@@ -9,8 +13,10 @@ import {
   unique,
   uuid,
 } from 'drizzle-orm/pg-core';
-import { categoryKinds } from '@daric/core';
+import { categoryKinds, transactionTypes } from '@daric/core';
 import { id, timestamps, version } from './columns';
+import { users } from './identity';
+import { accounts } from './money';
 import { workspaces } from './tenancy';
 
 export const categoryKind = pgEnum('category_kind', categoryKinds);
@@ -49,5 +55,60 @@ export const categories = pgTable(
     }),
     index('categories_workspace_id_idx').on(t.workspaceId),
     index('categories_parent_id_idx').on(t.parentId),
+  ],
+);
+
+/** TRANSFER is reserved for Transfers (ticket 13), so adding them needs no enum change. */
+export const transactionType = pgEnum('transaction_type', [...transactionTypes, 'TRANSFER']);
+
+/**
+ * An Income or Expense on an Account. Composite foreign keys keep its Account
+ * and Category in its own Workspace, and its Category of its own kind. Deleted
+ * softly (`deleted_at`) so offline clients replaying a create cannot bring it back.
+ */
+export const transactions = pgTable(
+  'transactions',
+  {
+    id: id(),
+    workspaceId: uuid('workspace_id')
+      .notNull()
+      .references(() => workspaces.id, { onDelete: 'cascade' }),
+    type: transactionType('type').notNull(),
+    accountId: uuid('account_id').notNull(),
+    categoryId: uuid('category_id'),
+    /** The kind a Category must have for this type; null for a Transfer. */
+    categoryKind: categoryKind('category_kind').generatedAlwaysAs(
+      sql`CASE type WHEN 'INCOME' THEN 'INCOME'::category_kind WHEN 'EXPENSE' THEN 'EXPENSE'::category_kind END`,
+    ),
+    /** Positive, in the Account's currency's minor unit; `type` says which way it went. */
+    amount: bigint('amount', { mode: 'bigint' }).notNull(),
+    /** The day it happened, on the Gregorian calendar; the Workspace Calendar decides its Period. */
+    occurredOn: date('occurred_on', { mode: 'string' }).notNull(),
+    note: text('note'),
+    createdBy: uuid('created_by').references(() => users.id, { onDelete: 'set null' }),
+    deletedAt: timestamp('deleted_at', { withTimezone: true }),
+    ...timestamps(),
+    version: version(),
+  },
+  (t) => [
+    foreignKey({
+      name: 'transactions_account_fk',
+      columns: [t.accountId, t.workspaceId],
+      foreignColumns: [accounts.id, accounts.workspaceId],
+    }),
+    foreignKey({
+      name: 'transactions_category_fk',
+      columns: [t.categoryId, t.workspaceId, t.categoryKind],
+      foreignColumns: [categories.id, categories.workspaceId, categories.kind],
+    }),
+    check('transactions_amount_check', sql`${t.amount} > 0`),
+    check(
+      'transactions_category_check',
+      sql`${t.type} = 'TRANSFER' OR ${t.categoryId} IS NOT NULL`,
+    ),
+    check('transactions_note_check', sql`char_length(${t.note}) <= 1000`),
+    index('transactions_workspace_id_occurred_on_idx').on(t.workspaceId, t.occurredOn),
+    index('transactions_account_id_idx').on(t.accountId),
+    index('transactions_category_id_idx').on(t.categoryId),
   ],
 );
