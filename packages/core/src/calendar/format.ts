@@ -1,7 +1,9 @@
 import { toPersianDigits } from '../locale';
 import type { Digits, Locale } from '../locale';
 import { fromEpochDay } from './calendar';
-import type { CalendarSystem } from './calendar';
+import type { CalendarDate, CalendarSystem } from './calendar';
+import { calendarDateOf } from './day';
+import type { IsoDay } from './day';
 import type { Period } from './period';
 import { instantMs, localEpochDay } from './zone';
 
@@ -81,8 +83,20 @@ const MONTH_NAMES: Record<CalendarSystem, Record<Locale, readonly string[]>> = {
 
 /** Formats the day `instant` falls on in `timeZone`, shown in the display calendar. */
 export function formatDate(instant: Date, options: FormatDateOptions): string {
-  const { calendar, timeZone, locale, digits, style = 'numeric' } = options;
-  const { year, month, day } = fromEpochDay(calendar, localEpochDay(instantMs(instant), timeZone));
+  const epochDay = localEpochDay(instantMs(instant), options.timeZone);
+  return formatCalendarDate(fromEpochDay(options.calendar, epochDay), options);
+}
+
+export type FormatDayOptions = Omit<FormatDateOptions, 'timeZone'>;
+
+/** Formats a day with no time of day (a Transaction's day), shown in the display calendar. */
+export function formatDay(day: IsoDay, options: FormatDayOptions): string {
+  return formatCalendarDate(calendarDateOf(day, options.calendar), options);
+}
+
+function formatCalendarDate(date: CalendarDate, options: FormatDayOptions): string {
+  const { calendar, locale, digits, style = 'numeric' } = options;
+  const { year, month, day } = date;
   const text =
     style === 'long'
       ? `${day} ${MONTH_NAMES[calendar][locale][month - 1]} ${year}`

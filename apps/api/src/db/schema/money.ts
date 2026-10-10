@@ -8,6 +8,7 @@ import {
   smallint,
   text,
   timestamp,
+  unique,
   uuid,
 } from 'drizzle-orm/pg-core';
 import { accountClasses, accountTypes } from '@daric/core';
@@ -47,5 +48,9 @@ export const accounts = pgTable(
     ...timestamps(),
     version: version(),
   },
-  (t) => [index('accounts_workspace_id_idx').on(t.workspaceId)],
+  (t) => [
+    // Lets Transactions reference an Account of their own Workspace only.
+    unique('accounts_id_workspace_id_key').on(t.id, t.workspaceId),
+    index('accounts_workspace_id_idx').on(t.workspaceId),
+  ],
 );

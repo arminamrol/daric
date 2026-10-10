@@ -28,4 +28,45 @@ describe('request logs', () => {
       expect(out).not.toContain(secret);
     }
   });
+
+  it('never contain Transaction notes or Amounts', async () => {
+    const { token, workspaceId } = await registerUser(t.url);
+    const base = `/v1/workspaces/${workspaceId}`;
+    const account = await call(t.url, 'POST', `${base}/accounts`, {
+      token,
+      body: { name: 'Melli', type: 'BANK', class: 'ASSET', currency: 'IRR', openingBalance: '0' },
+    });
+    const category = await call(t.url, 'POST', `${base}/categories`, {
+      token,
+      body: { kind: 'EXPENSE', name: 'Health', icon: 'pill', color: 'red' },
+    });
+    const note = 'psychiatrist-visit-7d1f';
+    const transaction = {
+      type: 'EXPENSE',
+      accountId: account.body.id,
+      categoryId: category.body.id,
+      amount: '987654321',
+      occurredOn: '2026-10-10',
+      note,
+    };
+    expect(
+      (await call(t.url, 'POST', `${base}/transactions`, { token, body: transaction })).status,
+    ).toBe(201);
+    // Refused requests too: an invalid day, and a Category that does not exist.
+    await call(t.url, 'POST', `${base}/transactions`, {
+      token,
+      body: { ...transaction, occurredOn: 'yesterday' },
+    });
+    await call(t.url, 'POST', `${base}/transactions`, {
+      token,
+      body: { ...transaction, categoryId: account.body.id },
+    });
+
+    await vi.waitFor(() =>
+      expect(lines.filter((l) => l.includes(`"path":"${base}/transactions"`))).toHaveLength(3),
+    );
+    const out = lines.join('');
+    expect(out).not.toContain(note);
+    expect(out).not.toContain('987654321');
+  });
 });

@@ -7,15 +7,21 @@ import {
   categorySchema,
   type CreateAccountInput,
   type CreateCategoryInput,
+  type CreateTransactionInput,
   CSRF_COOKIE,
   CSRF_HEADER,
+  type ListTransactionsQuery,
   type LoginInput,
   type Me,
   meSchema,
   type RegisterInput,
   type ReorderCategoriesInput,
+  periodParam,
   type Session,
   sessionSchema,
+  type Transaction,
+  transactionListSchema,
+  transactionSchema,
   type UpdateAccountInput,
   type UpdateCategoryInput,
   type UpdateUserPreferencesInput,
@@ -74,6 +80,13 @@ export interface ApiClient {
   ): Promise<Category>;
   /** Owner or Admin only: every sibling under one parent, in the new order. */
   reorderCategories(workspaceId: string, input: ReorderCategoriesInput): Promise<Category[]>;
+  /** Newest first. A Period is of the Workspace Calendar; a parent Category includes its children. */
+  listTransactions(workspaceId: string, filters?: ListTransactionsQuery): Promise<Transaction[]>;
+  /**
+   * Member or above. Sending the same `id` again returns the Transaction
+   * already recorded instead of recording it twice.
+   */
+  createTransaction(workspaceId: string, input: CreateTransactionInput): Promise<Transaction>;
 }
 
 /** Amounts are bigints in code and decimal strings on the wire (ADR-0004). */
@@ -172,7 +185,21 @@ export function createApiClient(options: ApiClientOptions = {}): ApiClient {
       ),
     reorderCategories: (workspaceId, input) =>
       request('PUT', `${categoriesPath(workspaceId)}/order`, categoryListSchema, input),
+    listTransactions: (workspaceId, filters = {}) => {
+      const query = new URLSearchParams();
+      if (filters.period) query.set('period', periodParam(filters.period));
+      if (filters.accountId) query.set('accountId', filters.accountId);
+      if (filters.categoryId) query.set('categoryId', filters.categoryId);
+      const search = query.size > 0 ? `?${query}` : '';
+      return request('GET', `${transactionsPath(workspaceId)}${search}`, transactionListSchema);
+    },
+    createTransaction: (workspaceId, input) =>
+      request('POST', transactionsPath(workspaceId), transactionSchema, input),
   };
+}
+
+function transactionsPath(workspaceId: string): string {
+  return `/v1/workspaces/${encodeURIComponent(workspaceId)}/transactions`;
 }
 
 function categoriesPath(workspaceId: string): string {
