@@ -4,7 +4,7 @@
 
 **Blocked by:** 12, 13
 
-**Status:** ready-for-agent
+**Status:** in-progress
 
 - [ ] Idempotent seed command documented in README
 - [ ] Data spans at least 6 months in the Jalali calendar with realistic amounts in rials

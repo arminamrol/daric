@@ -36,6 +36,7 @@ pnpm install
 cp .env.example .env
 pnpm db:up           # Postgres on :5432, Mailpit SMTP on :1025, inbox at http://localhost:8025
 pnpm --filter @daric/api db:migrate
+pnpm db:seed          # optional: demo user with six months of Persian data
 pnpm check            # lint + typecheck + test across all packages (API tests need Postgres)
 ```
 
@@ -55,6 +56,7 @@ Stop the services with `pnpm db:down` (data persists in the `postgres-data` volu
 | `pnpm format:check` | Prettier, check only (run in CI)                     |
 | `pnpm db:up`        | Start Postgres and Mailpit (`docker/compose.yml`)    |
 | `pnpm db:down`      | Stop them                                            |
+| `pnpm db:seed`      | Create or reset the demo user (see below)            |
 
 Run one package's task with a filter, e.g. `pnpm --filter @daric/core test`.
 
@@ -79,6 +81,12 @@ NestJS on Express with Drizzle over Postgres. Routes live under `/v1`; the OpenA
 - Logs never hold Amounts, notes, passwords or tokens: keys matching those are censored and requests are logged by method and path only.
 - Tests (`pnpm --filter @daric/api test`) recreate and migrate a `<database>_test` database next to `DATABASE_URL`'s.
 - The database user in `DATABASE_URL` must be able to create the `daric_app` role and be granted it (the first migration does both); a superuser works.
+
+## Demo data
+
+`pnpm db:seed` creates a demo user, `demo@example.com` with password `daric-demo`, whose Personal Workspace (Jalali calendar, rials) holds Accounts, Categories, Labels, and Income, Expenses and Transfers from the start of the Jalali month six months ago up to today. Running it again deletes the demo user and their Workspace and seeds them afresh, dated from the new today; other users are untouched. It refuses to run with `NODE_ENV=production`.
+
+The seed lives in `apps/api/src/db/seed/demo.ts`. A feature that adds an entity (Budgets, Recurring Rules, …) adds demo rows for it there and extends `demo.http.test.ts`.
 
 ## Environment variables
 

@@ -15,7 +15,8 @@
     "format": "prettier --write .",
     "format:check": "prettier --check .",
     "db:up": "docker compose -f docker/compose.yml --env-file .env up -d",
-    "db:down": "docker compose -f docker/compose.yml --env-file .env down"
+    "db:down": "docker compose -f docker/compose.yml --env-file .env down",
+    "db:seed": "pnpm --filter @daric/api db:seed"
   },
   "devDependencies": {
     "prettier": "^3.9.9",

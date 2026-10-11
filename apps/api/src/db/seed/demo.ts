@@ -1,0 +1,497 @@
+import {
+  dayOf,
+  daysInMonth,
+  type IsoDay,
+  type MonthPeriod,
+  monthPeriodOfDay,
+  previousPeriod,
+} from '@daric/core';
+import { and, eq, inArray, sql } from 'drizzle-orm';
+import { v7 as uuidv7 } from 'uuid';
+import { hashPassword } from '../../modules/auth/passwords';
+import { seedDefaultCategories } from '../../modules/categories/defaults';
+import { type Database, type Transaction, one } from '../client';
+import {
+  accounts,
+  authIdentities,
+  categories,
+  labels,
+  transactionLabels,
+  transactions,
+  users,
+  workspaceMembers,
+  workspaces,
+} from '../schema';
+
+export const DEMO_EMAIL = 'demo@example.com';
+export const DEMO_PASSWORD = 'daric-demo';
+
+/** Full Jalali months before the current one that get activity. */
+const MONTHS_BACK = 6;
+
+const MONTH_NAMES = [
+  'فروردین',
+  'اردیبهشت',
+  'خرداد',
+  'تیر',
+  'مرداد',
+  'شهریور',
+  'مهر',
+  'آبان',
+  'آذر',
+  'دی',
+  'بهمن',
+  'اسفند',
+];
+
+const demoAccounts = {
+  mellat: {
+    name: 'بانک ملت',
+    type: 'BANK',
+    class: 'ASSET',
+    currency: 'IRR',
+    opening: 900_000_000n,
+  },
+  saman: {
+    name: 'کارت سامان',
+    type: 'CARD',
+    class: 'ASSET',
+    currency: 'IRR',
+    opening: 60_000_000n,
+  },
+  cash: { name: 'نقد', type: 'CASH', class: 'ASSET', currency: 'IRR', opening: 8_000_000n },
+  wallet: {
+    name: 'کیف پول اسنپ',
+    type: 'WALLET',
+    class: 'ASSET',
+    currency: 'IRR',
+    opening: 2_000_000n,
+  },
+  dollars: { name: 'دلار', type: 'CASH', class: 'ASSET', currency: 'USD', opening: 50_000n },
+  loan: {
+    name: 'وام قرض‌الحسنه',
+    type: 'LOAN',
+    class: 'LIABILITY',
+    currency: 'IRR',
+    opening: 300_000_000n,
+  },
+} as const;
+type AccountKey = keyof typeof demoAccounts;
+
+const demoLabels = {
+  eatingOut: { name: 'بیرون‌غذا', controllable: true },
+  subscriptions: { name: 'اشتراک‌ها', controllable: true },
+  online: { name: 'خرید آنلاین', controllable: true },
+  essential: { name: 'ضروری', controllable: false },
+  nowruz: { name: 'سفر نوروز', controllable: false },
+} as const;
+type LabelKey = keyof typeof demoLabels;
+
+/** What the generator plans before ids exist; Categories are named `KIND:name`. */
+type Planned = {
+  day: IsoDay;
+  account: AccountKey;
+  amount: bigint;
+  note?: string;
+  labels?: LabelKey[];
+} & (
+  | { type: 'INCOME' | 'EXPENSE'; category: string }
+  | { type: 'TRANSFER'; to: AccountKey; toAmount?: bigint }
+);
+
+/** A small seeded generator (mulberry32), so the same day always seeds the same data. */
+function random(seed: number) {
+  let state = seed;
+  const next = () => {
+    state = (state + 0x6d2b79f5) | 0;
+    let t = Math.imul(state ^ (state >>> 15), 1 | state);
+    t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t;
+    return ((t ^ (t >>> 14)) >>> 0) / 4_294_967_296;
+  };
+  return {
+    /** Rials between `min` and `max`, rounded to 10,000 rials (1,000 tomans) like a real price. */
+    rials: (min: number, max: number) =>
+      BigInt(Math.round((min + next() * (max - min)) / 10_000) * 10_000),
+    int: (min: number, max: number) => min + Math.floor(next() * (max - min + 1)),
+    pick: <T>(items: readonly T[]): T => items[Math.floor(next() * items.length)] as T,
+    chance: (p: number) => next() < p,
+  };
+}
+
+/** The months to fill: the last MONTHS_BACK full Jalali months and the current one. */
+function demoMonths(today: IsoDay): MonthPeriod[] {
+  let month = monthPeriodOfDay(today, 'jalali');
+  const months = [month];
+  for (let i = 0; i < MONTHS_BACK; i++) months.unshift((month = previousPeriod(month)));
+  return months;
+}
+
+/** A household's month: salary, rent and bills, groceries, eating out, getting around. */
+function planMonth(month: MonthPeriod, index: number, rand: ReturnType<typeof random>): Planned[] {
+  const name = MONTH_NAMES[month.month - 1] as string;
+  const last = daysInMonth('jalali', month.year, month.month);
+  const on = (day: number) => dayOf('jalali', { ...month, day: Math.min(day, last) });
+  const plan: Planned[] = [
+    {
+      day: on(1),
+      type: 'INCOME',
+      account: 'mellat',
+      category: 'INCOME:حقوق',
+      amount: 650_000_000n,
+      note: `حقوق ${name}`,
+    },
+    {
+      day: on(1),
+      type: 'EXPENSE',
+      account: 'mellat',
+      category: 'EXPENSE:اجاره',
+      amount: 250_000_000n,
+      note: `اجاره ${name}`,
+      labels: ['essential'],
+    },
+    { day: on(2), type: 'TRANSFER', account: 'mellat', to: 'saman', amount: 190_000_000n },
+    {
+      day: on(2),
+      type: 'TRANSFER',
+      account: 'mellat',
+      to: 'wallet',
+      amount: 18_000_000n,
+      note: 'شارژ کیف پول',
+    },
+    {
+      day: on(3),
+      type: 'TRANSFER',
+      account: 'mellat',
+      to: 'cash',
+      amount: 10_000_000n,
+      note: 'برداشت از خودپرداز',
+    },
+    {
+      day: on(5),
+      type: 'EXPENSE',
+      account: 'mellat',
+      category: 'EXPENSE:شارژ ساختمان',
+      amount: 12_000_000n,
+      labels: ['essential'],
+    },
+    {
+      day: on(10),
+      type: 'TRANSFER',
+      account: 'mellat',
+      to: 'loan',
+      amount: 15_000_000n,
+      note: 'قسط وام',
+    },
+    {
+      day: on(12),
+      type: 'EXPENSE',
+      account: 'wallet',
+      category: 'EXPENSE:تفریح و سفر',
+      amount: 2_500_000n,
+      note: 'اشتراک فیلیمو',
+      labels: ['subscriptions'],
+    },
+    {
+      day: on(14),
+      type: 'EXPENSE',
+      account: 'mellat',
+      category: 'EXPENSE:آب، برق و گاز',
+      amount: rand.rials(3_000_000, 9_000_000),
+      labels: ['essential'],
+    },
+    {
+      day: on(16),
+      type: 'EXPENSE',
+      account: 'saman',
+      category: 'EXPENSE:اینترنت و موبایل',
+      amount: rand.rials(4_000_000, 6_500_000),
+      note: 'بسته اینترنت',
+    },
+    {
+      day: on(29),
+      type: 'INCOME',
+      account: 'mellat',
+      category: 'INCOME:سود سپرده',
+      amount: rand.rials(8_000_000, 10_000_000),
+    },
+  ];
+
+  for (const day of [4, 11, 18, 25]) {
+    plan.push({
+      day: on(day + rand.int(0, 2)),
+      type: 'EXPENSE',
+      account: 'saman',
+      category: 'EXPENSE:خواربار',
+      amount: rand.rials(18_000_000, 42_000_000),
+      note: rand.pick(['هایپراستار', 'افق کوروش', 'میوه و تره‌بار', 'سوپرمارکت محل']),
+    });
+  }
+  for (let i = 0; i < 3; i++) {
+    plan.push({
+      day: on(rand.int(1, last)),
+      type: 'EXPENSE',
+      account: 'saman',
+      category: 'EXPENSE:رستوران و کافه',
+      amount: rand.rials(4_000_000, 22_000_000),
+      note: rand.pick(['کافه', 'پیتزا', 'رستوران سنتی', 'سفارش از اسنپ‌فود']),
+      labels: ['eatingOut'],
+    });
+  }
+  for (let i = 0; i < 6; i++) {
+    plan.push({
+      day: on(rand.int(1, last)),
+      type: 'EXPENSE',
+      account: 'wallet',
+      category: 'EXPENSE:تاکسی و حمل‌ونقل عمومی',
+      amount: rand.rials(800_000, 3_500_000),
+      note: 'اسنپ',
+    });
+  }
+  for (const day of [8, 22]) {
+    plan.push({
+      day: on(day),
+      type: 'EXPENSE',
+      account: 'cash',
+      category: 'EXPENSE:سوخت',
+      amount: rand.rials(1_000_000, 2_500_000),
+      note: 'بنزین',
+    });
+  }
+  for (let i = 0; i < 4; i++) {
+    plan.push({
+      day: on(rand.int(1, last)),
+      type: 'EXPENSE',
+      account: 'cash',
+      category: 'EXPENSE:خوراک',
+      amount: rand.rials(500_000, 2_000_000),
+      note: rand.pick(['نان', 'میوه', 'بستنی']),
+    });
+  }
+
+  if (index % 2 === 1) {
+    plan.push({
+      day: on(rand.int(15, 25)),
+      type: 'INCOME',
+      account: 'mellat',
+      category: 'INCOME:کار آزاد',
+      amount: rand.rials(80_000_000, 220_000_000),
+      note: 'پروژه طراحی سایت',
+    });
+  }
+  if (rand.chance(0.5)) {
+    plan.push({
+      day: on(rand.int(1, last)),
+      type: 'EXPENSE',
+      account: 'saman',
+      category: 'EXPENSE:دارو',
+      amount: rand.rials(1_500_000, 9_000_000),
+      note: 'داروخانه',
+    });
+  }
+  if (rand.chance(0.6)) {
+    plan.push({
+      day: on(rand.int(1, last)),
+      type: 'EXPENSE',
+      account: 'saman',
+      category: 'EXPENSE:خرید و پوشاک',
+      amount: rand.rials(15_000_000, 60_000_000),
+      note: 'دیجی‌کالا',
+      labels: ['online'],
+    });
+  }
+  if (index % 3 === 1) {
+    // Buys dollars at about 1,050,000 rials each.
+    plan.push({
+      day: on(rand.int(5, 20)),
+      type: 'TRANSFER',
+      account: 'mellat',
+      to: 'dollars',
+      amount: 210_000_000n,
+      toAmount: 20_000n,
+      note: 'خرید ۲۰۰ دلار',
+    });
+  }
+  return plan;
+}
+
+/** Once-a-year events that fall inside the seeded months. */
+function planOneOffs(months: MonthPeriod[]): Planned[] {
+  const plan: Planned[] = [];
+  for (const month of months) {
+    const on = (day: number) => dayOf('jalali', { ...month, day });
+    if (month.month === 1) {
+      plan.push(
+        {
+          day: on(3),
+          type: 'EXPENSE',
+          account: 'mellat',
+          category: 'EXPENSE:تفریح و سفر',
+          amount: 85_000_000n,
+          note: 'هتل شیراز',
+          labels: ['nowruz'],
+        },
+        {
+          day: on(4),
+          type: 'EXPENSE',
+          account: 'saman',
+          category: 'EXPENSE:رستوران و کافه',
+          amount: 18_000_000n,
+          note: 'شام در شیراز',
+          labels: ['nowruz', 'eatingOut'],
+        },
+        {
+          day: on(2),
+          type: 'EXPENSE',
+          account: 'cash',
+          category: 'EXPENSE:هدیه و نیکوکاری',
+          amount: 6_000_000n,
+          note: 'عیدی بچه‌ها',
+        },
+        {
+          day: on(1),
+          type: 'INCOME',
+          account: 'cash',
+          category: 'INCOME:هدیه',
+          amount: 5_000_000n,
+          note: 'عیدی',
+        },
+      );
+    }
+    if (month.month === 6) {
+      plan.push({
+        day: on(20),
+        type: 'EXPENSE',
+        account: 'mellat',
+        category: 'EXPENSE:آموزش',
+        amount: 45_000_000n,
+        note: 'کلاس زبان',
+        labels: ['essential'],
+      });
+    }
+    if (month.month === 4) {
+      plan.push({
+        day: on(9),
+        type: 'EXPENSE',
+        account: 'mellat',
+        category: 'EXPENSE:تعمیرات',
+        amount: 28_000_000n,
+        note: 'تعمیر کولر',
+      });
+    }
+  }
+  return plan;
+}
+
+/** Removes the demo User and every Workspace they own, so a rerun starts clean. */
+async function removeDemo(tx: Transaction): Promise<void> {
+  const [user] = await tx
+    .select({ id: users.id })
+    .from(users)
+    .where(sql`lower(${users.email}) = ${DEMO_EMAIL}`);
+  if (!user) return;
+  const owned = tx
+    .select({ id: workspaceMembers.workspaceId })
+    .from(workspaceMembers)
+    .where(and(eq(workspaceMembers.userId, user.id), eq(workspaceMembers.role, 'OWNER')));
+  await tx.delete(workspaces).where(inArray(workspaces.id, owned));
+  await tx.delete(users).where(eq(users.id, user.id));
+}
+
+/**
+ * Creates the demo User (DEMO_EMAIL / DEMO_PASSWORD) with a Jalali Personal
+ * Workspace: Accounts, the default Categories, Labels, and Transactions and
+ * Transfers from the start of the Jalali month six months before `today` up
+ * to `today`. Replaces the demo User if they exist, so it can run any number
+ * of times. Later features add their own entities to the plan here.
+ */
+export async function seedDemo(
+  db: Database,
+  options: { today: IsoDay },
+): Promise<{ userId: string; workspaceId: string }> {
+  const secretHash = await hashPassword(DEMO_PASSWORD);
+  return db.transaction(async (tx) => {
+    await removeDemo(tx);
+
+    const user = one(await tx.insert(users).values({ email: DEMO_EMAIL }).returning());
+    await tx
+      .insert(authIdentities)
+      .values({ userId: user.id, provider: 'PASSWORD', identifier: DEMO_EMAIL, secretHash });
+    const workspace = one(
+      await tx.insert(workspaces).values({ type: 'PERSONAL', name: 'شخصی' }).returning(),
+    );
+    const workspaceId = workspace.id;
+    await tx.insert(workspaceMembers).values({ workspaceId, userId: user.id, role: 'OWNER' });
+    await seedDefaultCategories(tx, workspaceId);
+
+    const accountIds = Object.fromEntries(
+      Object.keys(demoAccounts).map((key) => [key, uuidv7()]),
+    ) as Record<AccountKey, string>;
+    await tx.insert(accounts).values(
+      Object.entries(demoAccounts).map(([key, { opening, ...account }]) => ({
+        ...account,
+        id: accountIds[key as AccountKey],
+        workspaceId,
+        openingBalance: opening,
+      })),
+    );
+
+    const labelIds = Object.fromEntries(
+      Object.keys(demoLabels).map((key) => [key, uuidv7()]),
+    ) as Record<LabelKey, string>;
+    await tx.insert(labels).values(
+      Object.entries(demoLabels).map(([key, label]) => ({
+        ...label,
+        id: labelIds[key as LabelKey],
+        workspaceId,
+      })),
+    );
+
+    const categoryIds = new Map(
+      (
+        await tx
+          .select({ id: categories.id, kind: categories.kind, name: categories.name })
+          .from(categories)
+          .where(eq(categories.workspaceId, workspaceId))
+      ).map((c) => [`${c.kind}:${c.name}`, c.id]),
+    );
+    const categoryId = (key: string) => {
+      const id = categoryIds.get(key);
+      if (!id) throw new Error(`No default Category ${key}`);
+      return id;
+    };
+
+    const rand = random(1405);
+    const months = demoMonths(options.today);
+    const planned = [...months.flatMap((m, i) => planMonth(m, i, rand)), ...planOneOffs(months)]
+      .filter((p) => p.day <= options.today)
+      // Stable, so ties keep their planned order and the same day seeds the same rows.
+      .sort((a, b) => (a.day < b.day ? -1 : a.day > b.day ? 1 : 0));
+
+    const rows = planned.map((p) => {
+      const common = {
+        id: uuidv7(),
+        workspaceId,
+        type: p.type,
+        accountId: accountIds[p.account],
+        amount: p.amount,
+        occurredOn: p.day,
+        note: p.note ?? null,
+        createdBy: user.id,
+      };
+      return p.type === 'TRANSFER'
+        ? { ...common, toAccountId: accountIds[p.to], toAmount: p.toAmount ?? p.amount }
+        : { ...common, categoryId: categoryId(p.category) };
+    });
+    await tx.insert(transactions).values(rows);
+    const attached = planned.flatMap((p, i) =>
+      (p.labels ?? []).map((label) => ({
+        transactionId: (rows[i] as { id: string }).id,
+        labelId: labelIds[label],
+        workspaceId,
+      })),
+    );
+    if (attached.length > 0) await tx.insert(transactionLabels).values(attached);
+
+    return { userId: user.id, workspaceId };
+  });
+}
