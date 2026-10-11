@@ -176,7 +176,7 @@ export class TransactionsService {
       const replayed = await this.replayed(input.id, input);
       if (replayed) return { created: false, transaction: replayed };
     }
-    const toAmount = await this.assertUsable(input);
+    const toAmount = await this.validate(input);
 
     const { labelIds, ...fields } = input;
     const [inserted] = await tx
@@ -230,7 +230,7 @@ export class TransactionsService {
    * active, and the Category fits the type. For a Transfer, answers the
    * destination Amount to store.
    */
-  private async assertUsable(input: CreateTransactionInput): Promise<bigint | undefined> {
+  private async validate(input: CreateTransactionInput): Promise<bigint | undefined> {
     const account = await this.usableAccount(input.accountId, 'Account');
     let toAmount: bigint | undefined;
     if (input.type === 'TRANSFER') {
@@ -276,9 +276,6 @@ export class TransactionsService {
    */
   private async transferredAmount(input: CreateTransferInput, currency: string): Promise<bigint> {
     const destination = await this.usableAccount(input.toAccountId, 'destination Account');
-    if (input.toAccountId.toLowerCase() === input.accountId.toLowerCase()) {
-      throw new BadRequestException('A Transfer moves money between two different Accounts');
-    }
     if (destination.currency === currency) {
       if (input.toAmount !== undefined && input.toAmount !== input.amount) {
         throw new BadRequestException('Between Accounts of one currency both Amounts are the same');

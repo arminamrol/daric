@@ -34,7 +34,9 @@ function flowsByAccount() {
     .select({
       accountId: transactions.accountId,
       inflow: sumOf(transactions.amount, sql`${transactions.type} = 'INCOME'`).as('inflow'),
-      outflow: sumOf(transactions.amount, sql`${transactions.type} <> 'INCOME'`).as('outflow'),
+      outflow: sumOf(transactions.amount, sql`${transactions.type} IN ('EXPENSE', 'TRANSFER')`).as(
+        'outflow',
+      ),
     })
     .from(transactions)
     .where(isNull(transactions.deletedAt))

@@ -75,7 +75,7 @@ function Month({
             });
             // Neither Income nor Expense: no sign. Both Amounts when they are in different currencies.
             shown =
-              amount === toAmount
+              !account || !to || account.currency === to.currency
                 ? amount
                 : t('transactions.list.transferAmounts', {
                     amount: isolate(amount),
