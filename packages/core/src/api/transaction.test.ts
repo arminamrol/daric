@@ -132,7 +132,6 @@ describe('transactionSchema', () => {
     expect(transactionSchema.parse(wire)).toEqual({ ...wire, amount: 100n, toAmount: 5000000n });
   });
 
-
   it('reads a Transaction from the wire', () => {
     const wire = {
       ...valid,

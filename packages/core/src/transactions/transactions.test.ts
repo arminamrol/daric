@@ -30,15 +30,33 @@ describe('balanceEffect', () => {
   });
 
   it('lowers what a Liability owes when a Transfer pays it off, and raises it when drawn from', () => {
-    const payOff = { type: 'TRANSFER', accountId: 'a', amount: 300n, toAccountId: 'c', toAmount: 300n } as const;
+    const payOff = {
+      type: 'TRANSFER',
+      accountId: 'a',
+      amount: 300n,
+      toAccountId: 'c',
+      toAmount: 300n,
+    } as const;
     expect(balanceEffect(payOff, card)).toBe(-300n);
-    const advance = { type: 'TRANSFER', accountId: 'c', amount: 300n, toAccountId: 'a', toAmount: 300n } as const;
+    const advance = {
+      type: 'TRANSFER',
+      accountId: 'c',
+      amount: 300n,
+      toAccountId: 'a',
+      toAmount: 300n,
+    } as const;
     expect(balanceEffect(advance, card)).toBe(300n);
   });
 
   it('is zero for an Account the Transaction does not touch', () => {
     expect(balanceEffect({ type: 'INCOME', accountId: 'a', amount: 500n }, other)).toBe(0n);
-    const transfer = { type: 'TRANSFER', accountId: 'a', amount: 1n, toAccountId: 'c', toAmount: 1n } as const;
+    const transfer = {
+      type: 'TRANSFER',
+      accountId: 'a',
+      amount: 1n,
+      toAccountId: 'c',
+      toAmount: 1n,
+    } as const;
     expect(balanceEffect(transfer, other)).toBe(0n);
   });
 });

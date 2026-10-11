@@ -48,7 +48,10 @@ export const transferSchema = z.object({
 export type Transfer = z.infer<typeof transferSchema>;
 
 /** A Transaction as the API returns it: an Income, Expense or Transfer. */
-export const transactionSchema = z.discriminatedUnion('type', [incomeExpenseSchema, transferSchema]);
+export const transactionSchema = z.discriminatedUnion('type', [
+  incomeExpenseSchema,
+  transferSchema,
+]);
 export type Transaction = z.infer<typeof transactionSchema>;
 export type TransactionWire = z.input<typeof transactionSchema>;
 export const transactionListSchema = z.array(transactionSchema);
