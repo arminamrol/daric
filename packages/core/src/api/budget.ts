@@ -1,7 +1,13 @@
 import { z } from 'zod';
 import { budgetPeriods, budgetStates } from '../budgets';
 import { amountSchema } from '../money';
-import { monthParamSchema, notEmpty, periodParamSchema, positiveAmountSchema } from './shared';
+import {
+  idSchema,
+  monthParamSchema,
+  notEmpty,
+  periodParamSchema,
+  positiveAmountSchema,
+} from './shared';
 
 /** How a Budget stands in one of its Periods. */
 export const budgetProgressSchema = z.object({
@@ -41,9 +47,6 @@ export const budgetSchema = z.object({
 export type Budget = z.infer<typeof budgetSchema>;
 export type BudgetWire = z.input<typeof budgetSchema>;
 export const budgetListSchema = z.array(budgetSchema);
-
-/** Ids are lowercased, as the database writes them, so they compare as text. */
-const idSchema = z.uuid().transform((id) => id.toLowerCase());
 
 /**
  * Sets a limit on an active Expense Category, optionally narrowed to an active

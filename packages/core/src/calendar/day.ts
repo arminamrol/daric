@@ -46,6 +46,11 @@ export function todayIn(instant: Date, timeZone: string): IsoDay {
   return toIsoDay(localEpochDay(instantMs(instant), timeZone));
 }
 
+/** The day `days` days after `day` (before it when negative). */
+export function addDays(day: IsoDay, days: number): IsoDay {
+  return toIsoDay(requireEpochDay(day) + days);
+}
+
 /** The ISO day of a valid `date` of `calendar`. */
 export function dayOf(calendar: CalendarSystem, date: CalendarDate): IsoDay {
   return toIsoDay(toEpochDay(calendar, date));

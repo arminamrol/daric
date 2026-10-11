@@ -17,6 +17,7 @@ import { BudgetsModule } from './modules/budgets/budgets.module';
 import { CategoriesModule } from './modules/categories/categories.module';
 import { LabelsModule } from './modules/labels/labels.module';
 import { MeModule } from './modules/me/me.module';
+import { RecurringModule } from './modules/recurring/recurring.module';
 import { TransactionsModule } from './modules/transactions/transactions.module';
 import { WorkspacesModule } from './modules/workspaces/workspaces.module';
 
@@ -72,6 +73,7 @@ export class AppModule {
         LabelsModule,
         TransactionsModule,
         BudgetsModule,
+        RecurringModule,
       ],
       providers: [
         // Order matters: rate limiting, then CSRF, then authentication.

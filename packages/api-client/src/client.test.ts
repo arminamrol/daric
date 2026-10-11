@@ -349,6 +349,110 @@ describe('api-client', () => {
     });
   });
 
+  describe('Recurring Rules', () => {
+    const rule = {
+      id: '01900000-0000-7000-8000-0000000000e1',
+      name: 'اجاره',
+      type: 'EXPENSE',
+      accountId: '01900000-0000-7000-8000-0000000000a1',
+      categoryId: '01900000-0000-7000-b000-000000000001',
+      amount: '250000000',
+      frequency: 'MONTHLY',
+      interval: 1,
+      startOn: '2026-09-23',
+      endOn: null,
+      autoPost: false,
+      archived: false,
+      nextDueOn: '2026-10-23',
+      version: 1,
+    } as const;
+    const transaction = {
+      id: '0199d0f0-0000-7000-8000-000000000001',
+      type: 'EXPENSE',
+      accountId: rule.accountId,
+      categoryId: rule.categoryId,
+      amount: '260000000',
+      occurredOn: '2026-09-23',
+      note: 'اجاره',
+      createdBy: null,
+      labelIds: [],
+      version: 1,
+    };
+    const base = `/v1/workspaces/${workspace.id}/recurring`;
+    const occurrence = `${base}/${rule.id}/occurrences/2026-09-23`;
+
+    it('lists, makes and changes rules, and confirms and skips Due Occurrences', async () => {
+      const { client, sent } = fakeServer(
+        {
+          [`GET ${base}`]: () => ({ status: 200, body: [rule] }),
+          [`POST ${base}`]: () => ({ status: 201, body: rule }),
+          [`PATCH ${base}/${rule.id}`]: () => ({ status: 200, body: rule }),
+          [`GET ${base}/due`]: () => ({
+            status: 200,
+            body: {
+              occurrences: [{ ...rule, ruleId: rule.id, dueOn: '2026-09-23' }].map(
+                ({ ruleId, dueOn, name, type, accountId, categoryId, amount }) => ({
+                  ruleId,
+                  dueOn,
+                  name,
+                  type,
+                  accountId,
+                  categoryId,
+                  amount,
+                }),
+              ),
+              autoPosted: 1,
+            },
+          }),
+          [`POST ${occurrence}/confirm`]: () => ({ status: 201, body: transaction }),
+          [`POST ${occurrence}/skip`]: () => ({ status: 204 }),
+        },
+        { '__Host-daric_csrf': 'csrf-1' },
+      );
+      const [listed] = await client.listRecurringRules(workspace.id);
+      expect(listed).toMatchObject({ amount: 250000000n, nextDueOn: '2026-10-23' });
+      await client.listRecurringRules(workspace.id, { includeArchived: true });
+      await client.createRecurringRule(workspace.id, {
+        name: 'اجاره',
+        type: 'EXPENSE',
+        accountId: rule.accountId,
+        categoryId: rule.categoryId,
+        amount: 250000000n,
+        frequency: 'MONTHLY',
+        startOn: '2026-09-23',
+      });
+      await client.updateRecurringRule(workspace.id, rule.id, { archived: true });
+      const due = await client.listDueOccurrences(workspace.id);
+      expect(due).toMatchObject({ occurrences: [{ amount: 250000000n }], autoPosted: 1 });
+      const confirmed = await client.confirmOccurrence(workspace.id, rule.id, '2026-09-23', {
+        amount: 260000000n,
+      });
+      expect(confirmed.amount).toBe(260000000n);
+      await client.skipOccurrence(workspace.id, rule.id, '2026-09-23');
+      expect(sent.map((r) => [r.method, r.url, r.body])).toEqual([
+        ['GET', base, undefined],
+        ['GET', `${base}?includeArchived=true`, undefined],
+        [
+          'POST',
+          base,
+          {
+            name: 'اجاره',
+            type: 'EXPENSE',
+            accountId: rule.accountId,
+            categoryId: rule.categoryId,
+            amount: '250000000',
+            frequency: 'MONTHLY',
+            startOn: '2026-09-23',
+          },
+        ],
+        ['PATCH', `${base}/${rule.id}`, { archived: true }],
+        ['GET', `${base}/due`, undefined],
+        ['POST', `${occurrence}/confirm`, { amount: '260000000' }],
+        ['POST', `${occurrence}/skip`, undefined],
+      ]);
+    });
+  });
+
   describe('Transactions', () => {
     const transaction = {
       id: '0199d0f0-0000-7000-8000-000000000001',

@@ -7,6 +7,7 @@ import type {
   Period,
   WorkspaceCalendar,
 } from '../calendar';
+import { toPersianDigits } from '../locale';
 import type { Digits, Locale } from '../locale';
 import { formatMoney } from '../money';
 import type { FormatMoneyOptions, Money, MoneyDisplay } from '../money';
@@ -40,6 +41,8 @@ export interface DisplayFormatters {
   currentPeriod(instant: Date): MonthPeriod;
   /** Names a Period of the Workspace Calendar, whatever the display calendar is. */
   period(period: Period): string;
+  /** A whole number, ungrouped, in the User's digits. */
+  count(n: number): string;
 }
 
 /** Formatters for one User looking at one Workspace; every screen should go through these. */
@@ -67,5 +70,6 @@ export function displayFormatters(settings: DisplaySettings): DisplayFormatters 
     today: (instant) => todayIn(instant, workspace.timezone),
     currentPeriod: (instant) => monthPeriodOf(instant, workspaceCalendar),
     period: (period) => formatPeriod(period, { calendar: workspace.calendar, locale, digits }),
+    count: (n) => (digits === 'persian' ? toPersianDigits(String(n)) : String(n)),
   };
 }

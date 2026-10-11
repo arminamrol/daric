@@ -18,6 +18,8 @@ import {
   budgets,
   categories,
   labels,
+  recurringOccurrences,
+  recurringRules,
   transactionLabels,
   transactions,
   users,
@@ -110,10 +112,59 @@ type Scripted = {
   amount: bigint;
   note?: string;
   labels?: LabelKey[];
+  /** The demo Recurring Rule it is an occurrence of, confirmed. */
+  rule?: RuleKey;
 } & (
   | { type: 'INCOME' | 'EXPENSE'; category: string }
   | { type: 'TRANSFER'; to: AccountKey; toAmount?: bigint }
 );
+
+/**
+ * Recurring Rules behind the monthly salary, rent and subscription, starting
+ * with the first demo month on the scripted day. Salary and rent wait for
+ * confirmation; the subscription posts itself.
+ */
+const demoRules = {
+  salary: {
+    name: 'حقوق',
+    type: 'INCOME',
+    account: 'mellat',
+    category: 'INCOME:حقوق',
+    amount: 650_000_000n,
+    day: 1,
+    autoPost: false,
+  },
+  rent: {
+    name: 'اجارهٔ خانه',
+    type: 'EXPENSE',
+    account: 'mellat',
+    category: 'EXPENSE:اجاره',
+    amount: 250_000_000n,
+    day: 1,
+    autoPost: false,
+  },
+  filimo: {
+    name: 'اشتراک فیلیمو',
+    type: 'EXPENSE',
+    account: 'wallet',
+    category: 'EXPENSE:تفریح و سفر',
+    amount: 2_500_000n,
+    day: 12,
+    autoPost: true,
+  },
+} as const satisfies Record<
+  string,
+  {
+    name: string;
+    type: 'INCOME' | 'EXPENSE';
+    account: AccountKey;
+    category: string;
+    amount: bigint;
+    day: number;
+    autoPost: boolean;
+  }
+>;
+type RuleKey = keyof typeof demoRules;
 
 /** A small seeded generator (mulberry32), so the same day always seeds the same data. */
 function seededRandom(seed: number) {
@@ -159,6 +210,7 @@ function scriptMonth(
       category: 'INCOME:حقوق',
       amount: 650_000_000n,
       note: `حقوق ${name}`,
+      rule: 'salary',
     },
     {
       day: on(1),
@@ -168,6 +220,7 @@ function scriptMonth(
       amount: 250_000_000n,
       note: `اجاره ${name}`,
       labels: ['essential'],
+      rule: 'rent',
     },
     { day: on(2), type: 'TRANSFER', account: 'mellat', to: 'saman', amount: 170_000_000n },
     {
@@ -210,6 +263,7 @@ function scriptMonth(
       amount: 2_500_000n,
       note: 'اشتراک فیلیمو',
       labels: ['subscriptions'],
+      rule: 'filimo',
     },
     {
       day: on(14),
@@ -424,7 +478,7 @@ async function removeDemo(tx: Transaction): Promise<void> {
 
 /**
  * Creates the demo User (DEMO_EMAIL / DEMO_PASSWORD) with a Jalali Personal
- * Workspace: Accounts, the default Categories, Labels, Budgets, and Transactions and
+ * Workspace: Accounts, the default Categories, Labels, Budgets, Recurring Rules, and Transactions and
  * Transfers from the start of the Jalali month MONTHS_BACK months before
  * `today` up to `today`. Replaces the demo User if they exist, so it can run any number
  * of times. Later features add their own entities here.
@@ -493,11 +547,14 @@ export async function seedDemo(
 
     const rand = seededRandom(1405);
     const months = demoMonths(options.today);
+    const thisMonth = monthPeriodOfDay(options.today, 'jalali');
     const scripted = [
       ...months.flatMap((m, i) => scriptMonth(m, i, rand)),
       ...scriptOneOffs(months),
     ]
       .filter((p) => p.day <= options.today)
+      // This month's rent is left as a Due Occurrence waiting for confirmation.
+      .filter((p) => !(p.rule === 'rent' && p.day >= dayOf('jalali', { ...thisMonth, day: 1 })))
       // Stable, so ties keep their scripted order and the same day seeds the same rows.
       .sort((a, b) => (a.day < b.day ? -1 : a.day > b.day ? 1 : 0));
 
@@ -536,6 +593,41 @@ export async function seedDemo(
         currency: 'IRR',
       })),
     );
+
+    const first = months[0] as MonthPeriod;
+    const ruleIds = idsFor(demoRules);
+    await tx.insert(recurringRules).values(
+      (Object.keys(demoRules) as RuleKey[]).map((key) => {
+        const r = demoRules[key];
+        return {
+          id: ruleIds[key],
+          workspaceId,
+          name: r.name,
+          type: r.type,
+          accountId: accountIds[r.account],
+          categoryId: categoryId(r.category),
+          amount: r.amount,
+          frequency: 'MONTHLY' as const,
+          startOn: dayOf('jalali', { ...first, day: r.day }),
+          autoPost: r.autoPost,
+          createdBy: user.id,
+        };
+      }),
+    );
+    const confirmed = scripted.flatMap((p, i) =>
+      p.rule
+        ? [
+            {
+              ruleId: ruleIds[p.rule],
+              dueOn: p.day,
+              workspaceId,
+              status: 'CONFIRMED' as const,
+              transactionId: (rows[i] as { id: string }).id,
+            },
+          ]
+        : [],
+    );
+    await tx.insert(recurringOccurrences).values(confirmed);
 
     return { userId: user.id, workspaceId };
   });

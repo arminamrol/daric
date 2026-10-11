@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import {
+  addDays,
   dayOf,
   formatDay,
   isIsoDay,
@@ -34,6 +35,15 @@ describe('dayOf', () => {
   it('turns a day of either calendar into its ISO day', () => {
     expect(dayOf('jalali', { year: 1405, month: 7, day: 18 })).toBe('2026-10-10');
     expect(dayOf('gregorian', { year: 2026, month: 3, day: 1 })).toBe('2026-03-01');
+  });
+});
+
+describe('addDays', () => {
+  it('moves across months, years and leap days, either way', () => {
+    expect(addDays('2026-10-31', 1)).toBe('2026-11-01');
+    expect(addDays('2028-02-28', 1)).toBe('2028-02-29');
+    expect(addDays('2027-01-01', -1)).toBe('2026-12-31');
+    expect(addDays('2026-10-11', 0)).toBe('2026-10-11');
   });
 });
 
