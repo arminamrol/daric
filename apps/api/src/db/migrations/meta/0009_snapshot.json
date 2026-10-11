@@ -1,5 +1,5 @@
 {
-  "id": "44ac876b-6474-4c2b-931e-03957b6b1eb7",
+  "id": "4981ce6d-b2cf-429b-92c5-8f44a4c2103f",
   "prevId": "73dd25c3-1f37-4dda-ab51-bc2bde0e93ab",
   "version": "7",
   "dialect": "postgresql",
@@ -1276,6 +1276,12 @@
         },
         "end_on": {
           "name": "end_on",
+          "type": "date",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "due_from": {
+          "name": "due_from",
           "type": "date",
           "primaryKey": false,
           "notNull": false

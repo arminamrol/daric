@@ -162,6 +162,12 @@ describe('dueOccurrences', () => {
     ]);
   });
 
+  it('leaves out occurrences before `from`, as after a schedule change', () => {
+    expect(dueOccurrences(rent, 'jalali', j(1405, 7, 19), [], j(1405, 6, 2))).toEqual([
+      j(1405, 7, 1),
+    ]);
+  });
+
   it('stops at the end day', () => {
     const ended = { ...rent, endOn: j(1405, 5, 20) };
     expect(dueOccurrences(ended, 'jalali', g(2027, 1, 1), [])).toEqual([j(1405, 5, 1)]);

@@ -692,8 +692,11 @@ export function fakeApi({
         const account = accounts.find((a) => a.id === rule.accountId);
         const category = categories.find((c) => c.id === rule.categoryId);
         if (rule.autoPost && !account?.archived && !category?.archived) {
-          days.forEach((dueOn) => recordOccurrence(rule, dueOn));
-          autoPosted += days.length;
+          // Only a Member or above records them; a Viewer's list leaves them out.
+          if (hasRole(workspace.role, 'MEMBER')) {
+            days.forEach((dueOn) => recordOccurrence(rule, dueOn));
+            autoPosted += days.length;
+          }
           continue;
         }
         const { id: ruleId, name, type, accountId, categoryId, amount } = rule;

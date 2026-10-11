@@ -33,6 +33,7 @@ import {
   OCCURRENCE_CONFIRMED,
   OCCURRENCE_SKIPPED,
   RecurringService,
+  TRANSACTION_DELETED,
 } from './recurring.service';
 
 class RecurringRuleDto extends createZodDto(recurringRuleSchema) {}
@@ -83,7 +84,7 @@ export class RecurringController {
   @ApiOkResponse({
     type: DueOccurrencesDto,
     description:
-      'Every occurrence up to today not yet confirmed or skipped, oldest first. Those of auto-posting rules are recorded as Transactions first, whoever asks.',
+      "Every occurrence up to today not yet confirmed or skipped, oldest first. When a Member or above asks, those of auto-posting rules are recorded as Transactions first; a Viewer's list leaves them out.",
   })
   due(@CurrentMembership() membership: Membership, @CurrentUserId() userId: string) {
     return this.recurring.due(membership, userId);
@@ -128,7 +129,7 @@ export class RecurringController {
   @ApiBadRequestResponse({
     description: `${NOT_DUE}, an invalid Amount, or the rule's Account or Category is archived`,
   })
-  @ApiConflictResponse({ description: OCCURRENCE_SKIPPED })
+  @ApiConflictResponse({ description: `${OCCURRENCE_SKIPPED}, or ${TRANSACTION_DELETED}` })
   async confirm(
     @CurrentMembership() membership: Membership,
     @CurrentUserId() userId: string,

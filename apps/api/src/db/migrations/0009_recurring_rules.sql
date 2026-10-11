@@ -24,6 +24,7 @@ CREATE TABLE "recurring_rules" (
 	"interval" integer DEFAULT 1 NOT NULL,
 	"start_on" date NOT NULL,
 	"end_on" date,
+	"due_from" date,
 	"auto_post" boolean DEFAULT false NOT NULL,
 	"created_by" uuid,
 	"archived_at" timestamp with time zone,
@@ -46,7 +47,8 @@ ALTER TABLE "recurring_rules" ADD CONSTRAINT "recurring_rules_account_fk" FOREIG
 ALTER TABLE "recurring_rules" ADD CONSTRAINT "recurring_rules_category_fk" FOREIGN KEY ("category_id","workspace_id","type") REFERENCES "public"."categories"("id","workspace_id","kind") ON DELETE no action ON UPDATE no action;--> statement-breakpoint
 CREATE INDEX "recurring_rules_workspace_id_idx" ON "recurring_rules" USING btree ("workspace_id");--> statement-breakpoint
 CREATE INDEX "recurring_rules_account_id_idx" ON "recurring_rules" USING btree ("account_id");--> statement-breakpoint
-CREATE INDEX "recurring_rules_category_id_idx" ON "recurring_rules" USING btree ("category_id");-- Rules are archived, never deleted; a handled occurrence is never changed or undone.
+CREATE INDEX "recurring_rules_category_id_idx" ON "recurring_rules" USING btree ("category_id");--> statement-breakpoint
+-- Rules are archived, never deleted; a handled occurrence is never changed or undone.
 GRANT SELECT, INSERT, UPDATE ON "recurring_rules" TO daric_app;
 --> statement-breakpoint
 GRANT SELECT, INSERT ON "recurring_occurrences" TO daric_app;

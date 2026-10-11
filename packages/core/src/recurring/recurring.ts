@@ -81,16 +81,18 @@ export function nextOccurrence(
 /**
  * The Due Occurrences of `schedule` on `today`: every occurrence up to and
  * including today, missed ones too, that is not `handled` (confirmed or
- * skipped), oldest first.
+ * skipped) nor before `from` when given, oldest first.
  */
 export function dueOccurrences(
   schedule: RecurrenceSchedule,
   calendar: CalendarSystem,
   today: IsoDay,
   handled: readonly IsoDay[],
+  from: IsoDay | null = null,
 ): IsoDay[] {
   const done = new Set(handled);
-  return occurrencesBetween(schedule, calendar, schedule.startOn, addDays(today, 1)).filter(
+  const first = from !== null && from > schedule.startOn ? from : schedule.startOn;
+  return occurrencesBetween(schedule, calendar, first, addDays(today, 1)).filter(
     (day) => !done.has(day),
   );
 }

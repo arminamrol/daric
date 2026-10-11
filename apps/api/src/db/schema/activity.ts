@@ -215,6 +215,11 @@ export const recurringRules = pgTable(
     /** The first occurrence, a Gregorian day; its day in the Workspace Calendar repeats. */
     startOn: date('start_on', { mode: 'string' }).notNull(),
     endOn: date('end_on', { mode: 'string' }),
+    /**
+     * Occurrences before this day never come due: set to the next day when the
+     * schedule changes, so a new schedule does not bring back days already handled.
+     */
+    dueFrom: date('due_from', { mode: 'string' }),
     autoPost: boolean('auto_post').notNull().default(false),
     /** Who made it; Transactions it auto-posts are theirs. */
     createdBy: uuid('created_by').references(() => users.id, { onDelete: 'set null' }),

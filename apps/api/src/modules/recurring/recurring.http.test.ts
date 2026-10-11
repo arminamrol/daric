@@ -277,6 +277,39 @@ describe('Recurring Rules', () => {
     expect((await api.due()).body.occurrences).toEqual([]);
   });
 
+  it('bring nothing back due when the schedule changes', async () => {
+    const { api, rent } = await setUp();
+    const { body: rule } = await api.create({ ...rent, startOn: firstOfMonthsAgo(2) });
+    for (const n of [2, 1, 0]) await api.confirm(rule.id, firstOfMonthsAgo(n));
+    const moved = addDays(firstOfMonthsAgo(2), 4);
+    const changed = await api.update(rule.id, { startOn: moved, frequency: 'WEEKLY' });
+    expect(changed.status).toBe(200);
+    expect((await api.due()).body.occurrences).toEqual([]);
+    expect((await api.confirm(rule.id, moved)).status).toBe(400);
+    expect(changed.body.nextDueOn > today).toBe(true);
+  });
+
+  it('answer 409 when confirming again after its Transaction was deleted', async () => {
+    const { user, api, rent } = await setUp();
+    const dueOn = firstOfMonthsAgo(0);
+    const { body: rule } = await api.create({ ...rent, startOn: dueOn });
+    const { body: confirmed } = await api.confirm(rule.id, dueOn);
+    await call(t.url, 'DELETE', `/v1/workspaces/${user.workspaceId}/transactions/${confirmed.id}`, {
+      token: user.token,
+    });
+    expect((await api.confirm(rule.id, dueOn)).status).toBe(409);
+    expect((await api.due()).body.occurrences).toEqual([]);
+  });
+
+  it('auto-post only when a Member or above asks; a Viewer sees nothing of it', async () => {
+    const { user: owner, api, rent } = await setUp();
+    await api.create({ ...rent, startOn: firstOfMonthsAgo(0), autoPost: true });
+    const viewer = client(t, await addMember(owner.workspaceId, 'VIEWER'), owner.workspaceId);
+    expect((await viewer.due()).body).toEqual({ occurrences: [], autoPosted: 0 });
+    expect((await api.transactions()).body).toEqual([]);
+    expect((await api.due()).body.autoPosted).toBe(1);
+  });
+
   it('reject an Account or Category that is archived, missing or does not fit', async () => {
     const { api, account, category, rent } = await setUp();
     const salary = await api.category(salaryCategory);

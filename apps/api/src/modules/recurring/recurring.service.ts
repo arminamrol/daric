@@ -9,6 +9,7 @@ import {
   addDays,
   amountToWire,
   dueOccurrences,
+  hasRole,
   isIsoDay,
   isOccurrence,
   nextOccurrence,
@@ -51,6 +52,7 @@ const columns = {
   interval: recurringRules.interval,
   startOn: recurringRules.startOn,
   endOn: recurringRules.endOn,
+  dueFrom: recurringRules.dueFrom,
   autoPost: recurringRules.autoPost,
   createdBy: recurringRules.createdBy,
   archivedAt: recurringRules.archivedAt,
@@ -68,9 +70,11 @@ interface Today {
 export const OCCURRENCE_SKIPPED = 'This occurrence was skipped';
 export const OCCURRENCE_CONFIRMED = 'This occurrence was confirmed';
 export const NOT_DUE = 'Not a Due Occurrence of this rule';
+export const TRANSACTION_DELETED =
+  'This occurrence was confirmed, and the Transaction confirming it was deleted since';
 
 function toWire(row: Row, { calendar, today }: Today): RecurringRuleWire {
-  const { archivedAt, createdBy: _, ...rest } = row;
+  const { archivedAt, createdBy: _, dueFrom: _from, ...rest } = row;
   return {
     ...rest,
     amount: amountToWire(row.amount),
@@ -168,7 +172,9 @@ export class RecurringService {
 
   /**
    * Changes a rule. Occurrences already confirmed or skipped stay so; an
-   * archived Account or Category the rule already has may stay.
+   * archived Account or Category the rule already has may stay. A new start,
+   * frequency or interval applies from tomorrow: no earlier day of the new
+   * schedule comes due, so days already handled do not come back.
    */
   async update(
     membership: Membership,
@@ -186,11 +192,17 @@ export class RecurringService {
     if (next.categoryId !== current.categoryId || next.type !== current.type) {
       await this.assertUsableCategory(next.categoryId, next.type, current.categoryId);
     }
+    const rescheduled =
+      next.startOn !== current.startOn ||
+      next.frequency !== current.frequency ||
+      next.interval !== current.interval;
+    const { today } = await this.today(membership.workspaceId);
     const tx = scopedTx();
     await tx
       .update(recurringRules)
       .set({
         ...fields,
+        ...(rescheduled && { dueFrom: addDays(today, 1) }),
         // Archiving again keeps the first archive time.
         ...(archived !== undefined && {
           archivedAt: archived ? (current.archivedAt ?? sql`now()`) : null,
@@ -210,7 +222,8 @@ export class RecurringService {
   /**
    * The Workspace's Due Occurrences, oldest first. Those of auto-posting rules
    * are recorded first, and leave the list, unless the rule's Account or
-   * Category is archived: then they wait like any other.
+   * Category is archived: then they wait like any other. Only a Member or
+   * above records them; a Viewer's list leaves them out until then.
    */
   async due(membership: Membership, userId: string): Promise<DueOccurrencesWire> {
     const today = await this.today(membership.workspaceId);
@@ -219,9 +232,12 @@ export class RecurringService {
     let autoPosted = 0;
     const due: DueOccurrenceWire[] = [];
     for (const rule of rules) {
-      const days = dueOccurrences(rule, today.calendar, today.today, handled.get(rule.id) ?? []);
+      const handledDays = handled.get(rule.id) ?? [];
+      const days = dueOccurrences(rule, today.calendar, today.today, handledDays, rule.dueFrom);
       if (days.length > 0 && rule.autoPost && (await this.usable(rule))) {
-        autoPosted += await this.autoPost(membership, userId, rule.id, today);
+        if (hasRole(membership.role, 'MEMBER')) {
+          autoPosted += await this.autoPost(membership, userId, rule.id, today);
+        }
       } else {
         due.push(...days.map((dueOn) => toDueWire(rule, dueOn)));
       }
@@ -257,7 +273,7 @@ export class RecurringService {
   ): Promise<number> {
     const rule = await this.row(ruleId, { lock: true });
     const handled = (await this.handled([ruleId])).get(ruleId) ?? [];
-    const days = dueOccurrences(rule, calendar, today, handled);
+    const days = dueOccurrences(rule, calendar, today, handled, rule.dueFrom);
     for (const dueOn of days) {
       const { transaction } = await this.record(
         membership,
@@ -293,7 +309,12 @@ export class RecurringService {
       if (handled.status === 'SKIPPED' || !handled.transactionId) {
         throw new ConflictException(OCCURRENCE_SKIPPED);
       }
-      return { created: false, transaction: await this.transactions.get(handled.transactionId) };
+      try {
+        return { created: false, transaction: await this.transactions.get(handled.transactionId) };
+      } catch (error) {
+        if (error instanceof NotFoundException) throw new ConflictException(TRANSACTION_DELETED);
+        throw error;
+      }
     }
     const recorded = await this.record(membership, userId, rule, dueOn, input);
     await this.audit.record(scopedTx(), {
@@ -345,7 +366,8 @@ export class RecurringService {
       .where(and(eq(recurringOccurrences.ruleId, ruleId), eq(recurringOccurrences.dueOn, dueOn)));
     if (handled) return { rule, handled };
     const { calendar, today } = await this.today(membership.workspaceId);
-    if (rule.archivedAt || dueOn > today || !isOccurrence(rule, calendar, dueOn)) {
+    const beforeDue = dueOn > today || (rule.dueFrom !== null && dueOn < rule.dueFrom);
+    if (rule.archivedAt || beforeDue || !isOccurrence(rule, calendar, dueOn)) {
       throw new BadRequestException(NOT_DUE);
     }
     return { rule, handled: undefined };

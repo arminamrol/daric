@@ -2,7 +2,7 @@ import { z } from 'zod';
 import { MAX_RECURRENCE_INTERVAL, recurrenceFrequencies } from '../recurring';
 import { amountSchema } from '../money';
 import { transactionTypes } from '../transactions';
-import { nameSchema, notEmpty, positiveAmountSchema } from './shared';
+import { idSchema, nameSchema, notEmpty, positiveAmountSchema } from './shared';
 import { isoDaySchema } from './transaction';
 
 /** A Recurring Rule as the API returns it. Lists come oldest first. */
@@ -35,9 +35,6 @@ export const recurringRuleSchema = z.object({
 export type RecurringRule = z.infer<typeof recurringRuleSchema>;
 export type RecurringRuleWire = z.input<typeof recurringRuleSchema>;
 export const recurringRuleListSchema = z.array(recurringRuleSchema);
-
-/** Ids are lowercased, as the database writes them, so they compare as text. */
-const idSchema = z.uuid().transform((id) => id.toLowerCase());
 
 const intervalSchema = z.number().int().min(1).max(MAX_RECURRENCE_INTERVAL);
 
