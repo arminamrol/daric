@@ -112,7 +112,7 @@ describe('Recording a Transaction', () => {
     await userEvent.selectOptions(category, bread.id);
     await userEvent.type(amountField(form), '40000{Enter}');
     await screen.findByText('−۴۰٬۰۰۰ ریال');
-    expect(fake.transactions()[0]?.categoryId).toBe(bread.id);
+    expect(fake.transactions()[0]).toMatchObject({ categoryId: bread.id });
   });
 
   it('tags it with Labels, offering only active ones, and starts the next one untagged', async () => {
@@ -231,6 +231,102 @@ describe('Recording a Transaction', () => {
     expect(await screen.findByText('−۱٬۰۰۰ ریال')).toBeTruthy();
     expect(screen.queryByRole('form', { name: 'ثبت تراکنش' })).toBeNull();
     expect(screen.getByText('بیننده‌ها نمی‌توانند تراکنش ثبت کنند.')).toBeTruthy();
+  });
+});
+
+describe('Recording a Transfer', () => {
+  it('moves money between two Accounts of one currency, counting it as neither Income nor Expense', async () => {
+    const { fake, melli } = setUp();
+    const cash = fake.addAccount({ name: 'نقد', type: 'CASH' });
+    renderApp({ path: '/transactions', api: fake.api });
+    const form = await entryForm();
+    await userEvent.click(form.getByRole('radio', { name: 'انتقال' }));
+    expect(form.queryByRole('combobox', { name: 'دسته' })).toBeNull();
+    expect(form.getByRole('combobox', { name: 'از حساب' })).toHaveProperty('value', melli.id);
+    // The other Account is the only destination offered.
+    const to = form.getByRole('combobox', { name: 'به حساب' });
+    expect(
+      within(to)
+        .getAllByRole('option')
+        .map((o) => o.textContent),
+    ).toEqual(['نقد']);
+    expect(form.queryByRole('textbox', { name: 'مبلغ دریافتی' })).toBeNull();
+    await userEvent.type(amountField(form), '300000{Enter}');
+
+    const mehr = within(await screen.findByRole('region', { name: 'مهر ۱۴۰۵' }));
+    const row = (await mehr.findByText('۳۰۰٬۰۰۰ ریال')).closest('li') as HTMLElement;
+    expect(within(row).getByText('انتقال')).toBeTruthy();
+    expect(
+      within(row).getByText(`${isolate('ملی')} ← ${isolate('نقد')}`, { exact: false }),
+    ).toBeTruthy();
+    expect(mehr.queryByText(/هزینه:|درآمد:/)).toBeNull();
+    expect(fake.transactions()).toMatchObject([
+      {
+        type: 'TRANSFER',
+        accountId: melli.id,
+        toAccountId: cash.id,
+        amount: 300000n,
+        toAmount: 300000n,
+        occurredOn: '2026-10-10',
+      },
+    ]);
+    const balances = (await fake.api.listAccounts(fake.workspace().id)).map((a) => a.balance);
+    expect(balances).toEqual([700000n, 300000n]);
+  });
+
+  it('asks for the Amount received in the other currency, converting nothing', async () => {
+    const { fake, melli } = setUp();
+    const dollars = fake.addAccount({ name: 'دلاری', currency: 'USD' });
+    renderApp({ path: '/transactions', api: fake.api });
+    const form = await entryForm();
+    await userEvent.click(form.getByRole('radio', { name: 'انتقال' }));
+    await userEvent.selectOptions(form.getByRole('combobox', { name: 'به حساب' }), dollars.id);
+    const received = form.getByRole('textbox', { name: 'مبلغ دریافتی' });
+    expect(form.getByText('به دلار آمریکا')).toBeTruthy();
+    await userEvent.type(amountField(form), '5000000');
+    await userEvent.click(form.getByRole('button', { name: 'ثبت' }));
+    expect(await form.findByText('مبلغ دریافتی را وارد کنید.')).toBeTruthy();
+    expect(document.activeElement).toBe(received);
+    expect(fake.transactions()).toEqual([]);
+
+    await userEvent.type(received, '12.5{Enter}');
+    const row = (await screen.findByText('۵٬۰۰۰٬۰۰۰ ریال', { exact: false })).closest('li');
+    expect(row?.textContent).toContain(`${isolate('۵٬۰۰۰٬۰۰۰ ریال')} ← ${isolate('۱۲٫۵۰ دلار')}`);
+    expect(fake.transactions()).toMatchObject([
+      {
+        type: 'TRANSFER',
+        accountId: melli.id,
+        toAccountId: dollars.id,
+        amount: 5000000n,
+        toAmount: 1250n,
+      },
+    ]);
+    expect(received).toHaveProperty('value', '');
+  });
+
+  it('remembers the destination Account on this device', async () => {
+    const { fake } = setUp();
+    fake.addAccount({ name: 'نقد', type: 'CASH' });
+    const savings = fake.addAccount({ name: 'پس‌انداز' });
+    const first = renderApp({ path: '/transactions', api: fake.api });
+    let form = await entryForm();
+    await userEvent.click(form.getByRole('radio', { name: 'انتقال' }));
+    await userEvent.selectOptions(form.getByRole('combobox', { name: 'به حساب' }), savings.id);
+    await userEvent.type(amountField(form), '1000{Enter}');
+    await screen.findByText('۱٬۰۰۰ ریال');
+    first.unmount();
+
+    renderApp({ path: '/transactions', api: fake.api });
+    form = await entryForm();
+    await userEvent.click(form.getByRole('radio', { name: 'انتقال' }));
+    expect(form.getByRole('combobox', { name: 'به حساب' })).toHaveProperty('value', savings.id);
+  });
+
+  it('is not offered with a single Account', async () => {
+    const { fake } = setUp();
+    renderApp({ path: '/transactions', api: fake.api });
+    const form = await entryForm();
+    expect(form.queryByRole('radio', { name: 'انتقال' })).toBeNull();
   });
 });
 

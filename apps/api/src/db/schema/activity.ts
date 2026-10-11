@@ -61,12 +61,12 @@ export const categories = pgTable(
   ],
 );
 
-/** TRANSFER is reserved for Transfers (ticket 13), so adding them needs no enum change. */
 export const transactionType = pgEnum('transaction_type', [...transactionTypes, 'TRANSFER']);
 
 /**
- * An Income or Expense on an Account. Composite foreign keys keep its Account
- * and Category in its own Workspace, and its Category of its own kind. Deleted
+ * An Income or Expense on an Account, or a Transfer from it to another
+ * (`to_account_id`, `to_amount`). Composite foreign keys keep its Accounts and
+ * Category in its own Workspace, and its Category of its own kind. Deleted
  * softly (`deleted_at`) so offline clients replaying a create cannot bring it back.
  */
 export const transactions = pgTable(
@@ -86,6 +86,10 @@ export const transactions = pgTable(
     /** Positive, in the Account's currency's minor unit; `type` says which way it went. */
     amount: bigint('amount', { mode: 'bigint' }).notNull(),
     /** The day it happened, on the Gregorian calendar; the Workspace Calendar decides its Period. */
+    /** A Transfer's destination Account; null otherwise. */
+    toAccountId: uuid('to_account_id'),
+    /** What a Transfer puts into its destination Account, in that Account's currency; null otherwise. */
+    toAmount: bigint('to_amount', { mode: 'bigint' }),
     occurredOn: date('occurred_on', { mode: 'string' }).notNull(),
     note: text('note'),
     createdBy: uuid('created_by').references(() => users.id, { onDelete: 'set null' }),
@@ -101,6 +105,11 @@ export const transactions = pgTable(
       foreignColumns: [accounts.id, accounts.workspaceId],
     }),
     foreignKey({
+      name: 'transactions_to_account_fk',
+      columns: [t.toAccountId, t.workspaceId],
+      foreignColumns: [accounts.id, accounts.workspaceId],
+    }),
+    foreignKey({
       name: 'transactions_category_fk',
       columns: [t.categoryId, t.workspaceId, t.categoryKind],
       foreignColumns: [categories.id, categories.workspaceId, categories.kind],
@@ -110,9 +119,17 @@ export const transactions = pgTable(
       'transactions_category_check',
       sql`${t.type} = 'TRANSFER' OR ${t.categoryId} IS NOT NULL`,
     ),
+    // A Transfer has a destination and no Category; Income and Expense the other way round.
+    check(
+      'transactions_transfer_check',
+      sql`CASE WHEN ${t.type} = 'TRANSFER' THEN ${t.toAccountId} IS NOT NULL AND ${t.toAmount} IS NOT NULL AND ${t.categoryId} IS NULL ELSE ${t.toAccountId} IS NULL AND ${t.toAmount} IS NULL END`,
+    ),
+    check('transactions_to_amount_check', sql`${t.toAmount} > 0`),
+    check('transactions_to_account_check', sql`${t.toAccountId} <> ${t.accountId}`),
     check('transactions_note_check', sql`char_length(${t.note}) <= 1000`),
     index('transactions_workspace_id_occurred_on_idx').on(t.workspaceId, t.occurredOn),
     index('transactions_account_id_idx').on(t.accountId),
+    index('transactions_to_account_id_idx').on(t.toAccountId),
     index('transactions_category_id_idx').on(t.categoryId),
   ],
 );

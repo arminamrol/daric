@@ -50,6 +50,13 @@
       "when": 1791643230545,
       "tag": "0006_labels",
       "breakpoints": true
+    },
+    {
+      "idx": 7,
+      "version": "7",
+      "when": 1791706673471,
+      "tag": "0007_transfers",
+      "breakpoints": true
     }
   ]
 }

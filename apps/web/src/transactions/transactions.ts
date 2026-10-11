@@ -32,9 +32,11 @@ export function useRecordTransaction() {
   });
 }
 
-/** The Account and Categories last used on this device, so the next Transaction starts from them. */
+/** The Accounts and Categories last used on this device, so the next Transaction starts from them. */
 export interface LastPicks {
   accountId?: string;
+  /** A Transfer's destination. */
+  toAccountId?: string;
   categoryIds?: Partial<Record<TransactionType, string>>;
 }
 
