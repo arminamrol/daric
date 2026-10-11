@@ -4,8 +4,12 @@ import {
   budgetExpenses,
   budgetPeriodOf,
   budgetProgress,
+  addDays,
   categoryKinds,
   dayOf,
+  dueOccurrences,
+  isOccurrence,
+  nextOccurrence,
   monthPeriodOfDay,
   categoryTree,
   hasRole,
@@ -19,7 +23,9 @@ import type {
   BudgetPeriod,
   Category,
   MonthPeriod,
+  DueOccurrence,
   Label,
+  RecurringRule,
   Me,
   Session,
   Transaction,
@@ -72,6 +78,10 @@ export function fakeApi({
   let nextLabelId = 1;
   let budgets: StoredBudget[] = [];
   let nextBudgetId = 1;
+  let rules: StoredRule[] = [];
+  let nextRuleId = 1;
+  /** Occurrences confirmed (with their Transaction) or skipped, by `ruleId|dueOn`. */
+  const handled = new Map<string, { transactionId: string | null }>();
   /** Unreachable: every call fails as fetch does when the network is down. */
   let offline = false;
 
@@ -274,6 +284,95 @@ export function fakeApi({
         b.period === budget.period,
     );
     if (taken) throw new ApiError(409, { message: 'Taken' });
+  }
+
+  /** Puts a Recurring Rule straight into the Workspace, as if made earlier. */
+  function addRule(
+    fields: Partial<StoredRule> &
+      Pick<StoredRule, 'name' | 'type' | 'accountId' | 'categoryId' | 'amount' | 'startOn'>,
+  ): StoredRule {
+    const rule: StoredRule = {
+      id: `01900000-0000-7000-8e00-${String(nextRuleId++).padStart(12, '0')}`,
+      frequency: 'MONTHLY',
+      interval: 1,
+      endOn: null,
+      autoPost: false,
+      archived: false,
+      createdBy: current?.id ?? null,
+      version: 1,
+      ...fields,
+    };
+    rules.push(rule);
+    return rule;
+  }
+
+  const today = () => todayIn(new Date(), workspace.timezone);
+
+  function ruleWire({ createdBy: _, ...rule }: StoredRule): RecurringRule {
+    return {
+      ...rule,
+      nextDueOn: rule.archived
+        ? null
+        : nextOccurrence(rule, workspace.calendar, addDays(today(), 1)),
+    };
+  }
+
+  function findRule(ruleId: string): StoredRule {
+    const rule = rules.find((r) => r.id === ruleId);
+    if (!rule) throw new ApiError(404, { message: 'Not Found' });
+    return rule;
+  }
+
+  const handledDays = (ruleId: string) =>
+    [...handled.keys()].filter((key) => key.startsWith(`${ruleId}|`)).map((k) => k.slice(-10));
+
+  /** As the API checks a rule's Account and Category; archived ones it has may stay. */
+  function assertRuleFits(rule: StoredRule, current?: StoredRule) {
+    const account = accounts.find((a) => a.id === rule.accountId);
+    if (!account || (account.archived && account.id !== current?.accountId)) {
+      throw new ApiError(400, { message: 'Bad Account' });
+    }
+    const category = categories.find((c) => c.id === rule.categoryId);
+    if (
+      category?.kind !== rule.type ||
+      (category.archived && category.id !== current?.categoryId)
+    ) {
+      throw new ApiError(400, { message: 'Bad Category' });
+    }
+    if (rule.endOn !== null && rule.endOn < rule.startOn) {
+      throw new ApiError(400, { message: 'Ends before it starts' });
+    }
+  }
+
+  /** Records an occurrence as the API does: on the day it fell due, noted with the rule's name. */
+  function recordOccurrence(rule: StoredRule, dueOn: string, amount = rule.amount) {
+    const account = accounts.find((a) => a.id === rule.accountId);
+    const category = categories.find((c) => c.id === rule.categoryId);
+    if (account?.archived || category?.archived) {
+      throw new ApiError(400, { message: 'Archived' });
+    }
+    const transaction = addTransaction({
+      type: rule.type,
+      accountId: rule.accountId,
+      categoryId: rule.categoryId,
+      amount,
+      occurredOn: dueOn,
+      note: rule.name,
+      createdBy: rule.autoPost ? rule.createdBy : (current?.id ?? null),
+    });
+    handled.set(`${rule.id}|${dueOn}`, { transactionId: transaction.id });
+    return transaction;
+  }
+
+  /** 404 for a rule that is missing; 400 unless `dueOn` is due and not handled. */
+  function dueOccurrence(ruleId: string, dueOn: string) {
+    const rule = findRule(ruleId);
+    const done = handled.get(`${ruleId}|${dueOn}`);
+    if (done) return { rule, done };
+    if (rule.archived || dueOn > today() || !isOccurrence(rule, workspace.calendar, dueOn)) {
+      throw new ApiError(400, { message: 'Not a Due Occurrence' });
+    }
+    return { rule, done: undefined };
   }
 
   const currentMonth = () =>
@@ -556,6 +655,71 @@ export function fakeApi({
       findBudget(budgetId);
       budgets = budgets.filter((b) => b.id !== budgetId);
     },
+    async listRecurringRules(workspaceId, { includeArchived = false } = {}) {
+      inWorkspace(workspaceId);
+      return rules.filter((r) => includeArchived || !r.archived).map(ruleWire);
+    },
+    async createRecurringRule(workspaceId, input) {
+      inWorkspace(workspaceId, 'ADMIN');
+      const draft: StoredRule = {
+        id: '',
+        interval: 1,
+        endOn: null,
+        autoPost: false,
+        archived: false,
+        createdBy: null,
+        version: 1,
+        ...input,
+      };
+      assertRuleFits(draft);
+      const { id: _, ...fields } = draft;
+      return ruleWire(addRule({ ...fields, createdBy: signedIn().id }));
+    },
+    async updateRecurringRule(workspaceId, ruleId, input) {
+      inWorkspace(workspaceId, 'ADMIN');
+      const current = findRule(ruleId);
+      const updated = { ...current, ...input, version: current.version + 1 };
+      assertRuleFits(updated, current);
+      rules = rules.map((r) => (r.id === ruleId ? updated : r));
+      return ruleWire(updated);
+    },
+    async listDueOccurrences(workspaceId) {
+      inWorkspace(workspaceId);
+      let autoPosted = 0;
+      const occurrences: DueOccurrence[] = [];
+      for (const rule of rules.filter((r) => !r.archived)) {
+        const days = dueOccurrences(rule, workspace.calendar, today(), handledDays(rule.id));
+        const account = accounts.find((a) => a.id === rule.accountId);
+        const category = categories.find((c) => c.id === rule.categoryId);
+        if (rule.autoPost && !account?.archived && !category?.archived) {
+          days.forEach((dueOn) => recordOccurrence(rule, dueOn));
+          autoPosted += days.length;
+          continue;
+        }
+        const { id: ruleId, name, type, accountId, categoryId, amount } = rule;
+        occurrences.push(
+          ...days.map((dueOn) => ({ ruleId, dueOn, name, type, accountId, categoryId, amount })),
+        );
+      }
+      occurrences.sort((a, b) => (a.dueOn < b.dueOn ? -1 : a.dueOn > b.dueOn ? 1 : 0));
+      return { occurrences, autoPosted };
+    },
+    async confirmOccurrence(workspaceId, ruleId, dueOn, { amount } = {}) {
+      inWorkspace(workspaceId, 'MEMBER');
+      const { rule, done } = dueOccurrence(ruleId, dueOn);
+      if (done) {
+        const transaction = transactions.find((t) => t.id === done.transactionId);
+        if (!transaction) throw new ApiError(409, { message: 'Skipped' });
+        return { ...transaction };
+      }
+      return { ...recordOccurrence(rule, dueOn, amount) };
+    },
+    async skipOccurrence(workspaceId, ruleId, dueOn) {
+      inWorkspace(workspaceId, 'MEMBER');
+      const { done } = dueOccurrence(ruleId, dueOn);
+      if (done?.transactionId) throw new ApiError(409, { message: 'Confirmed' });
+      handled.set(`${ruleId}|${dueOn}`, { transactionId: null });
+    },
     async updatePreferences(input) {
       const user = signedIn();
       user.preferences = { ...user.preferences, ...input };
@@ -589,6 +753,9 @@ export function fakeApi({
     addBudget,
     /** As stored, without progress. */
     budgets: () => budgets,
+    addRule,
+    /** As stored, archived ones included. */
+    rules: () => rules,
     /** In the order recorded, deleted ones left out. */
     transactions: () => live(),
     /** Ids of those deleted softly. */
@@ -612,6 +779,9 @@ interface StoredBudget {
   currency: string;
   version: number;
 }
+
+/** A Recurring Rule as the fake keeps it; the next occurrence is worked out on every read. */
+type StoredRule = Omit<RecurringRule, 'nextDueOn'> & { createdBy: string | null };
 
 type Defaulted = 'id' | 'note' | 'createdBy' | 'labelIds' | 'version';
 

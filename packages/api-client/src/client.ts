@@ -10,6 +10,14 @@ import {
   categorySchema,
   type CreateAccountInput,
   type CreateBudgetInput,
+  type ConfirmOccurrenceInput,
+  type CreateRecurringRuleInput,
+  type DueOccurrences,
+  dueOccurrencesSchema,
+  type RecurringRule,
+  recurringRuleListSchema,
+  recurringRuleSchema,
+  type UpdateRecurringRuleInput,
   type CreateCategoryInput,
   type CreateLabelInput,
   type CreateTransactionInput,
@@ -124,6 +132,36 @@ export interface ApiClient {
   updateBudget(workspaceId: string, budgetId: string, input: UpdateBudgetInput): Promise<Budget>;
   /** Owner or Admin only. */
   deleteBudget(workspaceId: string, budgetId: string): Promise<void>;
+  /** Oldest first. Archived rules are left out unless `includeArchived`. */
+  listRecurringRules(
+    workspaceId: string,
+    options?: { includeArchived?: boolean },
+  ): Promise<RecurringRule[]>;
+  /** Owner or Admin only. */
+  createRecurringRule(workspaceId: string, input: CreateRecurringRuleInput): Promise<RecurringRule>;
+  /** Owner or Admin only; also archives and unarchives. */
+  updateRecurringRule(
+    workspaceId: string,
+    ruleId: string,
+    input: UpdateRecurringRuleInput,
+  ): Promise<RecurringRule>;
+  /**
+   * The Due Occurrences, oldest first. Occurrences of auto-posting rules are
+   * recorded first; `autoPosted` says how many, so Transactions can be refetched.
+   */
+  listDueOccurrences(workspaceId: string): Promise<DueOccurrences>;
+  /**
+   * Member or above. Records the occurrence as a Transaction on the day it fell
+   * due; confirming it again returns the same Transaction.
+   */
+  confirmOccurrence(
+    workspaceId: string,
+    ruleId: string,
+    dueOn: string,
+    input?: ConfirmOccurrenceInput,
+  ): Promise<Transaction>;
+  /** Member or above. Skipping it again changes nothing. */
+  skipOccurrence(workspaceId: string, ruleId: string, dueOn: string): Promise<void>;
   /** Newest first. A Period is of the Workspace Calendar; a parent Category includes its children. */
   listTransactions(workspaceId: string, filters?: ListTransactionsQuery): Promise<Transaction[]>;
   /** One that is not deleted. */
@@ -303,7 +341,41 @@ export function createApiClient(options: ApiClientOptions = {}): ApiClient {
       request('PATCH', budgetPath(workspaceId, budgetId), budgetSchema, input),
     deleteBudget: (workspaceId, budgetId) =>
       request('DELETE', budgetPath(workspaceId, budgetId), noContent),
+    listRecurringRules: (workspaceId, { includeArchived = false } = {}) =>
+      request(
+        'GET',
+        `${recurringPath(workspaceId)}${includeArchived ? '?includeArchived=true' : ''}`,
+        recurringRuleListSchema,
+      ),
+    createRecurringRule: (workspaceId, input) =>
+      request('POST', recurringPath(workspaceId), recurringRuleSchema, input),
+    updateRecurringRule: (workspaceId, ruleId, input) =>
+      request(
+        'PATCH',
+        `${recurringPath(workspaceId)}/${encodeURIComponent(ruleId)}`,
+        recurringRuleSchema,
+        input,
+      ),
+    listDueOccurrences: (workspaceId) =>
+      request('GET', `${recurringPath(workspaceId)}/due`, dueOccurrencesSchema),
+    confirmOccurrence: (workspaceId, ruleId, dueOn, input = {}) =>
+      request(
+        'POST',
+        `${occurrencePath(workspaceId, ruleId, dueOn)}/confirm`,
+        transactionSchema,
+        input,
+      ),
+    skipOccurrence: (workspaceId, ruleId, dueOn) =>
+      request('POST', `${occurrencePath(workspaceId, ruleId, dueOn)}/skip`, noContent),
   };
+}
+
+function recurringPath(workspaceId: string): string {
+  return `/v1/workspaces/${encodeURIComponent(workspaceId)}/recurring`;
+}
+
+function occurrencePath(workspaceId: string, ruleId: string, dueOn: string) {
+  return `${recurringPath(workspaceId)}/${encodeURIComponent(ruleId)}/occurrences/${encodeURIComponent(dueOn)}`;
 }
 
 function budgetsPath(workspaceId: string): string {

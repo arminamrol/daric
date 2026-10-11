@@ -4,6 +4,7 @@ export * from './account';
 export * from './category';
 export * from './label';
 export * from './budget';
+export * from './recurring';
 export {
   currencyCodes,
   monthParamSchema,

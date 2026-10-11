@@ -11,6 +11,8 @@ import { LabelFormPage } from '../pages/LabelFormPage';
 import { LabelsPage } from '../pages/LabelsPage';
 import { LoginPage } from '../pages/LoginPage';
 import { NotFoundPage } from '../pages/NotFoundPage';
+import { RecurringFormPage } from '../pages/RecurringFormPage';
+import { RecurringPage } from '../pages/RecurringPage';
 import { SettingsPage } from '../pages/SettingsPage';
 import { SignupPage } from '../pages/SignupPage';
 import { TransactionEditPage } from '../pages/TransactionEditPage';
@@ -39,6 +41,9 @@ export const routes: RouteObject[] = [
           { path: 'budgets', element: <BudgetsPage /> },
           { path: 'budgets/new', element: <BudgetFormPage /> },
           { path: 'budgets/:budgetId', element: <BudgetFormPage /> },
+          { path: 'recurring', element: <RecurringPage /> },
+          { path: 'recurring/new', element: <RecurringFormPage /> },
+          { path: 'recurring/:ruleId', element: <RecurringFormPage /> },
           { path: 'settings', element: <SettingsPage /> },
         ],
       },

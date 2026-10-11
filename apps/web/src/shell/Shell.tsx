@@ -6,6 +6,7 @@ import { useI18n } from '../i18n/locale';
 import { SyncStatus } from '../transactions/SyncStatus';
 import { ThemeToggle } from '../theme/ThemeToggle';
 import { Logo } from './Logo';
+import { RecurringNavLink } from './RecurringNavLink';
 
 const navLinkClass = ({ isActive }: { isActive: boolean }) =>
   `rounded-md px-3 py-1 text-sm ${isActive ? 'bg-surface-muted font-medium text-foreground' : 'text-foreground-muted hover:text-foreground'}`;
@@ -50,6 +51,7 @@ export function Shell() {
               <NavLink to="/budgets" className={navLinkClass}>
                 {t('nav.budgets')}
               </NavLink>
+              <RecurringNavLink className={navLinkClass} />
               <NavLink to="/settings" className={navLinkClass}>
                 {t('nav.settings')}
               </NavLink>

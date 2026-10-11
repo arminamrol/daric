@@ -73,4 +73,13 @@ describe('displayFormatters', () => {
     expect(regrouped).toEqual({ kind: 'month', year: 2026, month: 10 });
     expect(gregorianWorkspace.period(regrouped)).toBe('اکتبر ۲۰۲۶');
   });
+
+  it("counts in the User's digits", () => {
+    expect(displayFormatters(settings).count(12)).toBe('۱۲');
+    const latin = {
+      ...settings,
+      preferences: { ...settings.preferences, digits: 'latin' as const },
+    };
+    expect(displayFormatters(latin).count(12)).toBe('12');
+  });
 });

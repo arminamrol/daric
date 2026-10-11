@@ -122,6 +122,22 @@ describe('demo seed', () => {
     expect(new Set(list.map((b) => b.progress.state))).toEqual(new Set(['ok', 'warning', 'over']));
   });
 
+  it('makes Recurring Rules for salary, rent and a subscription, with this month’s rent due', async () => {
+    const token = await login();
+    const base = `/v1/workspaces/${seeded.workspaceId}/recurring`;
+    const rules = await call(t.url, 'GET', base, { token });
+    expect(rules.body).toMatchObject([
+      { name: 'حقوق', type: 'INCOME', autoPost: false },
+      { name: 'اجارهٔ خانه', type: 'EXPENSE', autoPost: false },
+      { name: 'اشتراک فیلیمو', type: 'EXPENSE', autoPost: true },
+    ]);
+    // Seeded for 1405/07/19 but read today: only check what is due up to the seeded day.
+    const due = await call(t.url, 'GET', `${base}/due`, { token });
+    expect(due.body.occurrences.filter((o: { dueOn: string }) => o.dueOn <= today)).toMatchObject([
+      { name: 'اجارهٔ خانه', dueOn: '2026-09-23' },
+    ]);
+  });
+
   it('uses rial amounts in the range of a Tehran household', async () => {
     const rows = await demoTransactions(seeded.workspaceId);
     const salaries = rows.filter((r) => r.type === 'INCOME' && r.note?.startsWith('حقوق'));

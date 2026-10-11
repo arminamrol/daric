@@ -16,7 +16,7 @@ import {
   uniqueIndex,
   uuid,
 } from 'drizzle-orm/pg-core';
-import { categoryKinds, transactionTypes } from '@daric/core';
+import { categoryKinds, recurrenceFrequencies, transactionTypes } from '@daric/core';
 import { id, timestamps, version } from './columns';
 import { users } from './identity';
 import { accounts } from './money';
@@ -185,5 +185,102 @@ export const transactionLabels = pgTable(
       foreignColumns: [labels.id, labels.workspaceId],
     }),
     index('transaction_labels_label_id_idx').on(t.labelId),
+  ],
+);
+
+export const recurrenceFrequency = pgEnum('recurrence_frequency', recurrenceFrequencies);
+
+/**
+ * A template that makes Income or Expense Transactions on a schedule (rent,
+ * salary, subscriptions). Its `type` is a Category kind, so the composite
+ * foreign key keeps its Category of its own type and, with its Account, in
+ * its own Workspace. Never deleted, only archived: archived, nothing of it
+ * comes due.
+ */
+export const recurringRules = pgTable(
+  'recurring_rules',
+  {
+    id: id(),
+    workspaceId: uuid('workspace_id')
+      .notNull()
+      .references(() => workspaces.id, { onDelete: 'cascade' }),
+    name: text('name').notNull(),
+    type: categoryKind('type').notNull(),
+    accountId: uuid('account_id').notNull(),
+    categoryId: uuid('category_id').notNull(),
+    /** Positive, in the Account's currency's minor unit. */
+    amount: bigint('amount', { mode: 'bigint' }).notNull(),
+    frequency: recurrenceFrequency('frequency').notNull(),
+    interval: integer('interval').notNull().default(1),
+    /** The first occurrence, a Gregorian day; its day in the Workspace Calendar repeats. */
+    startOn: date('start_on', { mode: 'string' }).notNull(),
+    endOn: date('end_on', { mode: 'string' }),
+    autoPost: boolean('auto_post').notNull().default(false),
+    /** Who made it; Transactions it auto-posts are theirs. */
+    createdBy: uuid('created_by').references(() => users.id, { onDelete: 'set null' }),
+    archivedAt: timestamp('archived_at', { withTimezone: true }),
+    ...timestamps(),
+    version: version(),
+  },
+  (t) => [
+    unique('recurring_rules_id_workspace_id_key').on(t.id, t.workspaceId),
+    foreignKey({
+      name: 'recurring_rules_account_fk',
+      columns: [t.accountId, t.workspaceId],
+      foreignColumns: [accounts.id, accounts.workspaceId],
+    }),
+    foreignKey({
+      name: 'recurring_rules_category_fk',
+      columns: [t.categoryId, t.workspaceId, t.type],
+      foreignColumns: [categories.id, categories.workspaceId, categories.kind],
+    }),
+    check('recurring_rules_amount_check', sql`${t.amount} > 0`),
+    check('recurring_rules_interval_check', sql`${t.interval} BETWEEN 1 AND 52`),
+    check('recurring_rules_end_on_check', sql`${t.endOn} >= ${t.startOn}`),
+    check('recurring_rules_name_check', sql`char_length(${t.name}) <= 100`),
+    index('recurring_rules_workspace_id_idx').on(t.workspaceId),
+    index('recurring_rules_account_id_idx').on(t.accountId),
+    index('recurring_rules_category_id_idx').on(t.categoryId),
+  ],
+);
+
+export const occurrenceStatus = pgEnum('occurrence_status', ['CONFIRMED', 'SKIPPED']);
+
+/**
+ * An occurrence of a Recurring Rule that was handled: confirmed with the
+ * Transaction it made, or skipped. One per rule and day, so an occurrence is
+ * handled once; those of the rule's schedule up to today with no row here
+ * are its Due Occurrences.
+ */
+export const recurringOccurrences = pgTable(
+  'recurring_occurrences',
+  {
+    ruleId: uuid('rule_id').notNull(),
+    dueOn: date('due_on', { mode: 'string' }).notNull(),
+    workspaceId: uuid('workspace_id')
+      .notNull()
+      .references(() => workspaces.id, { onDelete: 'cascade' }),
+    status: occurrenceStatus('status').notNull(),
+    /** The Transaction a confirmation made; null for a skipped occurrence. */
+    transactionId: uuid('transaction_id'),
+    createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => [
+    primaryKey({ name: 'recurring_occurrences_pkey', columns: [t.ruleId, t.dueOn] }),
+    foreignKey({
+      name: 'recurring_occurrences_rule_fk',
+      columns: [t.ruleId, t.workspaceId],
+      foreignColumns: [recurringRules.id, recurringRules.workspaceId],
+    }),
+    foreignKey({
+      name: 'recurring_occurrences_transaction_fk',
+      columns: [t.transactionId, t.workspaceId],
+      foreignColumns: [transactions.id, transactions.workspaceId],
+    }),
+    unique('recurring_occurrences_transaction_id_key').on(t.transactionId),
+    check(
+      'recurring_occurrences_transaction_check',
+      sql`(${t.status} = 'CONFIRMED') = (${t.transactionId} IS NOT NULL)`,
+    ),
   ],
 );

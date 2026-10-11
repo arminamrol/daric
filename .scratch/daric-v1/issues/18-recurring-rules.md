@@ -4,7 +4,7 @@
 
 **Blocked by:** 11
 
-**Status:** ready-for-agent
+**Status:** in-progress
 
 - [ ] core occurrence generator for weekly/monthly/yearly rules in the Workspace Calendar (incl. day 31 and Esfand edge cases)
 - [ ] Recurring Rules API; Due Occurrences listed and confirmed/skipped
