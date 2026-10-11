@@ -111,6 +111,17 @@ describe('api-client', () => {
     expect(sent[0]?.headers.has('x-csrf-token')).toBe(false);
   });
 
+  it('logs out with the CSRF header and no body: the browser sends the refresh cookie', async () => {
+    const { client, sent } = fakeServer(
+      { 'POST /v1/auth/logout': () => ({ status: 204 }) },
+      { '__Host-daric_csrf': 'csrf-1' },
+    );
+    await client.logout();
+    expect(sent[0]?.headers.get('x-csrf-token')).toBe('csrf-1');
+    expect(sent[0]?.body).toBeUndefined();
+    expect(sent[0]?.credentials).toBe('include');
+  });
+
   it('never asks for tokens: it sends no Authorization header and no mobile client header', async () => {
     const { client, sent } = fakeServer(
       { 'POST /v1/auth/login': () => ({ status: 200, body: session }) },

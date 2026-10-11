@@ -43,6 +43,8 @@ describe('login', () => {
 
     expect(await emptyHome()).toBeTruthy();
     expect(server.signedInUser()).toBe('sara@example.com');
+    // The header shows the signed-in nav at once, without a reload.
+    expect(await screen.findByRole('link', { name: 'تراکنش‌ها' })).toBeTruthy();
   });
 
   it('says so when the email or password is wrong', async () => {

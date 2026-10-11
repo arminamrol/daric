@@ -4,7 +4,7 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useApi } from '../api/api';
 import { useSignedIn } from '../auth/session';
 
-const accountsKey = (workspaceId: string) => ['accounts', workspaceId] as const;
+export const accountsKey = (workspaceId: string) => ['accounts', workspaceId] as const;
 
 /** The Workspace's Accounts; archived ones only when asked. */
 export function useAccounts({ includeArchived = false }: { includeArchived?: boolean } = {}) {

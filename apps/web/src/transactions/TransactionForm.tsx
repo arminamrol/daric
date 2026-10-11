@@ -1,4 +1,3 @@
-import { ApiError, transactionConflict } from '@daric/api-client';
 import { IRR, money, parseAmount, parseDisplayDay, transactionTypes } from '@daric/core';
 import type {
   Account,
@@ -23,11 +22,15 @@ import { useFormatters } from '../settings/settings';
 import { ChoiceGroup } from '../ui/ChoiceGroup';
 import { categoryChoices } from './choices';
 import {
+  EditConflict,
   readLastPicks,
+  TransactionGone,
   useRecordTransaction,
+  useSettleConflict,
   useUpdateTransaction,
   writeLastPicks,
 } from './transactions';
+import type { Saved } from './transactions';
 
 const inputClass =
   'w-full rounded-md border border-border bg-background px-3 py-2 text-foreground aria-invalid:border-danger';
@@ -204,14 +207,15 @@ export function TransactionForm({
   const [note, setNote] = useState(start.note);
   const [labelIds, setLabelIds] = useState(start.labelIds);
   const [errors, setErrors] = useState<FieldErrors>({});
-  const [saved, setSaved] = useState(false);
+  const [saved, setSaved] = useState<Saved>();
   // One id per draft: sending the same draft again (a retry) cannot record it twice.
   const draftId = useRef<string | null>(null);
   const record = useRecordTransaction();
   const update = useUpdateTransaction(transaction?.id ?? '');
   const save = transaction ? update : record;
+  const settle = useSettleConflict();
   // The newer copy an edit ran into; the user picks it or their own changes.
-  const conflict = transactionConflict(update.error);
+  const conflict = update.error instanceof EditConflict ? update.error.current : undefined;
 
   function load(draft: Draft) {
     setType(draft.type);
@@ -256,7 +260,7 @@ export function TransactionForm({
 
   function changed() {
     draftId.current = null;
-    setSaved(false);
+    setSaved(undefined);
     // A save in flight must still finish: its success clears the form for the next one.
     if (!save.isPending) save.reset();
   }
@@ -314,10 +318,12 @@ export function TransactionForm({
     return { ...common, type, categoryId };
   }
 
-  /** Saves the edit as starting from `version`; a stale one comes back as a conflict. */
+  /**
+   * Saves the edit as starting from `version`; a stale one comes back as a
+   * conflict. Offline it is kept and sent later, and the form is done with it.
+   */
   function saveEdit(input: CreateTransactionInput, version: number) {
-    const { id: _, ...fields } = input;
-    update.mutate({ ...fields, version }, { onSuccess: () => onSaved?.() });
+    update.mutate({ input, version }, { onSuccess: () => onSaved?.() });
   }
 
   function onSubmit(event: FormEvent<HTMLFormElement>) {
@@ -328,7 +334,7 @@ export function TransactionForm({
     // The destination is kept for the next Transfer, also while recording others.
     const rememberedTo = transfer ? input.type === 'TRANSFER' && input.toAccountId : toAccountId;
     record.mutate(input, {
-      onSuccess: () => {
+      onSuccess: (outcome) => {
         writeLastPicks(workspace.id, {
           accountId: input.accountId,
           ...(rememberedTo && { toAccountId: rememberedTo }),
@@ -342,7 +348,7 @@ export function TransactionForm({
         setToAmount('');
         setNote('');
         setLabelIds([]);
-        setSaved(true);
+        setSaved(outcome);
         amountRef.current?.focus();
       },
     });
@@ -594,6 +600,7 @@ export function TransactionForm({
               <button
                 type="button"
                 onClick={() => {
+                  void settle(conflict.id, 'theirs');
                   setBase(conflict);
                   update.reset();
                   load(draftOf(conflict));
@@ -623,7 +630,7 @@ export function TransactionForm({
               {t(
                 !transaction
                   ? 'transactions.form.failed'
-                  : save.error instanceof ApiError && save.error.status === 404
+                  : save.error instanceof TransactionGone
                     ? 'transactions.edit.gone'
                     : 'transactions.edit.failed',
               )}
@@ -639,7 +646,11 @@ export function TransactionForm({
             {t(transaction ? 'transactions.edit.submit' : 'transactions.form.submit')}
           </button>
           <p role="status" className="text-sm text-success">
-            {saved ? t('transactions.form.saved') : ''}
+            {saved === 'synced'
+              ? t('transactions.form.saved')
+              : saved === 'queued'
+                ? t('transactions.form.queued')
+                : ''}
           </p>
         </div>
       </form>

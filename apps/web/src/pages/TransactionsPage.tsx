@@ -1,4 +1,5 @@
 import { hasRole, mayChangeTransaction } from '@daric/core';
+import type { Transaction } from '@daric/core';
 import { useId, useState } from 'react';
 import { Link, useSearchParams } from 'react-router';
 import { useAccounts } from '../accounts/accounts';
@@ -54,7 +55,7 @@ export function TransactionsPage() {
   const remove = useDeleteTransaction();
   const restore = useRestoreTransaction();
   // The Transaction just deleted, which can still be brought back.
-  const [deletedId, setDeletedId] = useState<string>();
+  const [deleted, setDeleted] = useState<{ transaction: Transaction; local: boolean }>();
 
   function setParam(name: string, value: string | undefined) {
     const next = new URLSearchParams(params);
@@ -177,7 +178,7 @@ export function TransactionsPage() {
             {t('transactions.list.deleteFailed')}
           </p>
         )}
-        {deletedId && (
+        {deleted && (
           <div
             role="status"
             className="flex flex-wrap items-center gap-3 rounded-md bg-surface-muted px-4 py-2"
@@ -189,9 +190,7 @@ export function TransactionsPage() {
             <button
               type="button"
               disabled={restore.isPending}
-              onClick={() =>
-                restore.mutate(deletedId, { onSuccess: () => setDeletedId(undefined) })
-              }
+              onClick={() => restore.mutate(deleted, { onSuccess: () => setDeleted(undefined) })}
               className="rounded-md border border-border px-3 py-1 text-sm font-medium disabled:opacity-60"
             >
               {t('transactions.list.undo')}
@@ -214,6 +213,7 @@ export function TransactionsPage() {
         ) : (
           <TransactionList
             transactions={transactions.data}
+            states={transactions.states}
             accounts={accounts.data ?? []}
             categories={categories.data ?? []}
             labels={labels.data ?? []}
@@ -222,9 +222,9 @@ export function TransactionsPage() {
                 mayChangeTransaction(workspace.role, me.user.id, transaction),
               onDelete: (transaction) =>
                 remove.mutate(transaction.id, {
-                  onSuccess: () => {
+                  onSuccess: ({ local }) => {
                     restore.reset();
-                    setDeletedId(transaction.id);
+                    setDeleted({ transaction, local });
                   },
                 }),
               busy: remove.isPending,

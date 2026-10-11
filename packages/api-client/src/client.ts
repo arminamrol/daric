@@ -73,6 +73,8 @@ export interface ApiClientOptions {
 export interface ApiClient {
   register(input: RegisterInput): Promise<Session>;
   login(input: LoginInput): Promise<Session>;
+  /** Ends this Signed-in Device; the API clears the session cookies. */
+  logout(): Promise<void>;
   me(): Promise<Me>;
   /** Owner or Admin only. */
   updateWorkspace(workspaceId: string, input: UpdateWorkspaceInput): Promise<Workspace>;
@@ -192,6 +194,7 @@ export function createApiClient(options: ApiClientOptions = {}): ApiClient {
   return {
     register: (input) => request('POST', '/v1/auth/register', sessionSchema, input),
     login: (input) => request('POST', '/v1/auth/login', sessionSchema, input),
+    logout: () => request('POST', '/v1/auth/logout', noContent),
     me: () => request('GET', '/v1/me', meSchema),
     updateWorkspace: (workspaceId, input) =>
       request('PATCH', `/v1/workspaces/${encodeURIComponent(workspaceId)}`, workspaceSchema, input),
