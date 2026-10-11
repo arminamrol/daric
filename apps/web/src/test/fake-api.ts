@@ -1,5 +1,12 @@
 import { ApiError, type ApiClient } from '@daric/api-client';
-import { balanceEffect, categoryKinds, categoryTree, hasRole, periodDays } from '@daric/core';
+import {
+  balanceEffect,
+  categoryKinds,
+  categoryTree,
+  hasRole,
+  mayChangeTransaction,
+  periodDays,
+} from '@daric/core';
 import type {
   Account,
   Category,
@@ -50,6 +57,8 @@ export function fakeApi({
   let categories: Category[] = [];
   let nextCategoryId = 1;
   let transactions: Transaction[] = [];
+  /** Deleted softly: kept, but left out of lists and balances. */
+  const deleted = new Set<string>();
   let labels: Label[] = [];
   let nextLabelId = 1;
 
@@ -105,7 +114,7 @@ export function fakeApi({
 
   /** The opening balance plus the Account's Transactions, as the API computes it. */
   function withBalance(account: Account): Account {
-    const effects = transactions.map((t) => balanceEffect(t, account));
+    const effects = live().map((t) => balanceEffect(t, account));
     return { ...account, balance: effects.reduce((a, b) => a + b, account.openingBalance) };
   }
 
@@ -121,6 +130,26 @@ export function fakeApi({
     } as Transaction;
     transactions.push(transaction);
     return transaction;
+  }
+
+  const live = () => transactions.filter((t) => !deleted.has(t.id));
+
+  /** A Transaction the signed-in User may change; 404 when it is missing or deleted. */
+  function changeable(transactionId: string, { includeDeleted = false } = {}): Transaction {
+    const user = signedIn();
+    const transaction = transactions.find((t) => t.id === transactionId);
+    if (!transaction || (!includeDeleted && deleted.has(transactionId))) {
+      throw new ApiError(404, { message: 'Not Found' });
+    }
+    if (!mayChangeTransaction(workspace.role, user.id, transaction)) {
+      throw new ApiError(403, { message: 'Forbidden' });
+    }
+    return transaction;
+  }
+
+  function replace(updated: Transaction): Transaction {
+    transactions = transactions.map((t) => (t.id === updated.id ? updated : t));
+    return { ...updated };
   }
 
   /** Newest first, like the API. */
@@ -161,15 +190,13 @@ export function fakeApi({
 
   /** Changes a Transaction's Labels, as attaching or detaching does. */
   function relabel(transactionId: string, change: (labelIds: string[]) => string[]) {
-    const transaction = transactions.find((t) => t.id === transactionId);
-    if (!transaction) throw new ApiError(404, { message: 'Not Found' });
+    const transaction = changeable(transactionId);
     const labelIds = change(transaction.labelIds);
-    const updated =
+    return replace(
       labelIds.length === transaction.labelIds.length
         ? transaction
-        : { ...transaction, labelIds, version: transaction.version + 1 };
-    transactions = transactions.map((t) => (t.id === transactionId ? updated : t));
-    return { ...updated };
+        : { ...transaction, labelIds, version: transaction.version + 1 },
+    );
   }
 
   const siblings = (kind: Category['kind'], parentId: string | null) =>
@@ -339,7 +366,7 @@ export function fakeApi({
       const days = period && periodDays(period, workspace.calendar);
       const childIds = categories.filter((c) => c.parentId === categoryId).map((c) => c.id);
       return newestFirst(
-        transactions.filter(
+        live().filter(
           (t) =>
             (!days || (t.occurredOn >= days.from && t.occurredOn < days.until)) &&
             (!accountId ||
@@ -381,6 +408,48 @@ export function fakeApi({
       if (category?.kind !== input.type) throw new ApiError(400, { message: 'Bad Category' });
       return { ...addTransaction({ ...input, labelIds, ...(id && { id }) }) };
     },
+    async getTransaction(workspaceId, transactionId) {
+      inWorkspace(workspaceId);
+      const transaction = live().find((t) => t.id === transactionId);
+      if (!transaction) throw new ApiError(404, { message: 'Not Found' });
+      return { ...transaction };
+    },
+    async updateTransaction(workspaceId, transactionId, { version, ...input }) {
+      inWorkspace(workspaceId, 'MEMBER');
+      const current = changeable(transactionId);
+      if (current.version !== version) {
+        // As on the wire: Amounts as decimal strings.
+        const wire = JSON.parse(
+          JSON.stringify(current, (_, v: unknown) => (typeof v === 'bigint' ? String(v) : v)),
+        ) as unknown;
+        throw new ApiError(409, { message: 'Stale', transaction: wire });
+      }
+      const { labelIds = current.labelIds, ...fields } = input;
+      const common = {
+        id: current.id,
+        createdBy: current.createdBy,
+        labelIds: [...labelIds].sort(),
+        version: version + 1,
+      };
+      if (fields.type === 'TRANSFER') {
+        const { toAmount = fields.amount, ...rest } = fields;
+        return replace({ ...common, ...rest, toAmount });
+      }
+      return replace({ ...common, ...fields });
+    },
+    async deleteTransaction(workspaceId, transactionId) {
+      inWorkspace(workspaceId, 'MEMBER');
+      const current = changeable(transactionId, { includeDeleted: true });
+      if (deleted.has(transactionId)) return;
+      deleted.add(transactionId);
+      replace({ ...current, version: current.version + 1 });
+    },
+    async restoreTransaction(workspaceId, transactionId) {
+      inWorkspace(workspaceId, 'MEMBER');
+      const current = changeable(transactionId, { includeDeleted: true });
+      if (!deleted.delete(transactionId)) return { ...current };
+      return replace({ ...current, version: current.version + 1 });
+    },
     async updatePreferences(input) {
       const user = signedIn();
       user.preferences = { ...user.preferences, ...input };
@@ -398,8 +467,10 @@ export function fakeApi({
     addLabel,
     /** As stored, archived ones included. */
     labels: () => labels,
-    /** In the order recorded. */
-    transactions: () => transactions,
+    /** In the order recorded, deleted ones left out. */
+    transactions: () => live(),
+    /** Ids of those deleted softly. */
+    deletedTransactions: () => [...deleted],
     /** In the API's list order, archived ones included. */
     categories: () => inTreeOrder(categories),
     signedInUser: () => current?.email,

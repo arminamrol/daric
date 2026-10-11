@@ -464,3 +464,164 @@ describe('The Transaction list', () => {
     expect(await screen.findByText('در این سال تراکنشی نیست.')).toBeTruthy();
   });
 });
+
+describe('Editing and deleting a Transaction', () => {
+  /** The list row showing `text`. */
+  const row = async (text: string) => {
+    const item = (await screen.findByText(text)).closest('li');
+    if (!item) throw new Error(`No row shows ${text}`);
+    return within(item);
+  };
+  const editForm = async () => within(await screen.findByRole('form', { name: 'ویرایش تراکنش' }));
+
+  function withExpense(options: Parameters<typeof setUp>[0] = {}) {
+    const fixture = setUp(options);
+    const transaction = fixture.fake.addTransaction({
+      type: 'EXPENSE',
+      accountId: fixture.melli.id,
+      categoryId: fixture.food.id,
+      amount: 300n,
+      occurredOn: '2026-10-10',
+      note: 'نان',
+    });
+    return { ...fixture, transaction };
+  }
+
+  it('opens one from the list with its values, saves the changes and lists them', async () => {
+    const { fake, salary } = withExpense();
+    const { router } = renderApp({ path: '/transactions', api: fake.api });
+    await userEvent.click((await row('−۳۰۰ ریال')).getByRole('link', { name: 'ویرایش' }));
+
+    const form = await editForm();
+    expect(amountField(form)).toHaveProperty('value', '۳۰۰');
+    expect(form.getByRole('textbox', { name: 'یادداشت' })).toHaveProperty('value', 'نان');
+    expect(form.getByRole('textbox', { name: 'تاریخ' })).toHaveProperty('value', '۱۴۰۵/۰۷/۱۸');
+    await userEvent.click(form.getByRole('radio', { name: 'درآمد' }));
+    await userEvent.clear(amountField(form));
+    await userEvent.type(amountField(form), '400');
+    await userEvent.click(form.getByRole('button', { name: 'ذخیره' }));
+
+    expect(await screen.findByText('+۴۰۰ ریال')).toBeTruthy();
+    expect(router.state.location.pathname).toBe('/transactions');
+    expect(fake.transactions()).toMatchObject([
+      { type: 'INCOME', categoryId: salary.id, amount: 400n, note: 'نان', version: 2 },
+    ]);
+    expect((await fake.api.listAccounts(fake.workspace().id))[0]?.balance).toBe(1_000_400n);
+  });
+
+  it('keeps an archived Account the Transaction is on', async () => {
+    const { fake, melli, transaction } = withExpense();
+    fake.addAccount({ name: 'نقد' });
+    await fake.api.updateAccount(fake.workspace().id, melli.id, { archived: true });
+    renderApp({ path: `/transactions/${transaction.id}`, api: fake.api });
+    const form = await editForm();
+    const account = form.getByRole('combobox', { name: 'حساب' });
+    expect(account).toHaveProperty('value', melli.id);
+    await userEvent.click(form.getByRole('button', { name: 'ذخیره' }));
+    await screen.findByRole('form', { name: 'ثبت تراکنش' });
+    expect(fake.transactions()[0]).toMatchObject({ accountId: melli.id, version: 2 });
+  });
+
+  it('offers to keep theirs or mine when it changed elsewhere meanwhile', async () => {
+    const { fake, melli, food, transaction } = withExpense();
+    renderApp({ path: `/transactions/${transaction.id}`, api: fake.api });
+    const form = await editForm();
+    const changeElsewhere = (amount: bigint, version: number) =>
+      fake.api.updateTransaction(fake.workspace().id, transaction.id, {
+        type: 'EXPENSE',
+        accountId: melli.id,
+        categoryId: food.id,
+        amount,
+        occurredOn: '2026-10-10',
+        note: 'نان',
+        version,
+      });
+
+    await changeElsewhere(999n, 1);
+    const note = form.getByRole('textbox', { name: 'یادداشت' });
+    await userEvent.clear(note);
+    await userEvent.type(note, 'شیر');
+    await userEvent.click(form.getByRole('button', { name: 'ذخیره' }));
+    expect((await form.findByRole('alert')).textContent).toContain('جای دیگری تغییر کرد');
+    await userEvent.click(form.getByRole('button', { name: 'نسخهٔ تازه را بیاور' }));
+    expect(amountField(form)).toHaveProperty('value', '۹۹۹');
+    expect(note).toHaveProperty('value', 'نان');
+    expect(form.queryByRole('alert')).toBeNull();
+
+    await userEvent.clear(note);
+    await userEvent.type(note, 'شیر');
+    await changeElsewhere(5n, 2);
+    await userEvent.click(form.getByRole('button', { name: 'ذخیره' }));
+    await userEvent.click(await form.findByRole('button', { name: 'تغییرات من بماند' }));
+    await screen.findByRole('form', { name: 'ثبت تراکنش' });
+    expect(fake.transactions()[0]).toMatchObject({ amount: 999n, note: 'شیر', version: 4 });
+  });
+
+  it('says when it was deleted elsewhere, or cannot be found', async () => {
+    const { fake, transaction } = withExpense();
+    const { unmount } = renderApp({ path: `/transactions/${transaction.id}`, api: fake.api });
+    const form = await editForm();
+    await fake.api.deleteTransaction(fake.workspace().id, transaction.id);
+    await userEvent.click(form.getByRole('button', { name: 'ذخیره' }));
+    expect((await form.findByRole('alert')).textContent).toBe('این تراکنش حذف شده است.');
+    unmount();
+
+    renderApp({ path: `/transactions/${transaction.id}`, api: fake.api });
+    expect((await screen.findByRole('alert')).textContent).toBe('این تراکنش پیدا نشد.');
+    expect(screen.getByRole('link', { name: 'بازگشت به تراکنش‌ها' })).toBeTruthy();
+  });
+
+  it('deletes one from the list and undoes it', async () => {
+    const { fake, transaction } = withExpense();
+    renderApp({ path: '/transactions', api: fake.api });
+    await userEvent.click((await row('−۳۰۰ ریال')).getByRole('button', { name: 'حذف' }));
+
+    expect(await screen.findByText('تراکنش حذف شد.')).toBeTruthy();
+    expect(await screen.findByText('در این سال تراکنشی نیست.')).toBeTruthy();
+    expect(fake.deletedTransactions()).toEqual([transaction.id]);
+    expect((await fake.api.listAccounts(fake.workspace().id))[0]?.balance).toBe(1_000_000n);
+
+    await userEvent.click(screen.getByRole('button', { name: 'برگرداندن' }));
+    expect(await screen.findByText('−۳۰۰ ریال')).toBeTruthy();
+    expect(screen.queryByText('تراکنش حذف شد.')).toBeNull();
+    expect(fake.deletedTransactions()).toEqual([]);
+  });
+
+  it('lets a Member change only what they recorded, and a Viewer nothing', async () => {
+    const { fake, melli, food } = setUp({ role: 'MEMBER' });
+    const someoneElse = fake.addUser('reza@example.com');
+    fake.addTransaction({
+      type: 'EXPENSE',
+      accountId: melli.id,
+      categoryId: food.id,
+      amount: 300n,
+      occurredOn: '2026-10-10',
+    });
+    const theirs = fake.addTransaction({
+      type: 'EXPENSE',
+      accountId: melli.id,
+      categoryId: food.id,
+      amount: 700n,
+      occurredOn: '2026-10-09',
+      createdBy: someoneElse.id,
+    });
+    renderApp({ path: '/transactions', api: fake.api });
+    const mine = await row('−۳۰۰ ریال');
+    expect(mine.getByRole('link', { name: 'ویرایش' })).toBeTruthy();
+    expect(mine.getByRole('button', { name: 'حذف' })).toBeTruthy();
+    const others = await row('−۷۰۰ ریال');
+    expect(others.queryByRole('link', { name: 'ویرایش' })).toBeNull();
+    expect(others.queryByRole('button', { name: 'حذف' })).toBeNull();
+    // Nor by typing its address.
+    const { router } = renderApp({ path: `/transactions/${theirs.id}`, api: fake.api });
+    await vi.waitFor(() => expect(router.state.location.pathname).toBe('/transactions'));
+  });
+
+  it('offers a Viewer no way to change anything', async () => {
+    const { fake } = withExpense({ role: 'VIEWER' });
+    renderApp({ path: '/transactions', api: fake.api });
+    const only = await row('−۳۰۰ ریال');
+    expect(only.queryByRole('link', { name: 'ویرایش' })).toBeNull();
+    expect(only.queryByRole('button', { name: 'حذف' })).toBeNull();
+  });
+});

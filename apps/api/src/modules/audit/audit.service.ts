@@ -18,6 +18,9 @@ export type AuditAction =
   | 'label.create'
   | 'label.update'
   | 'transaction.create'
+  | 'transaction.update'
+  | 'transaction.delete'
+  | 'transaction.restore'
   | 'transaction.label_attach'
   | 'transaction.label_detach';
 

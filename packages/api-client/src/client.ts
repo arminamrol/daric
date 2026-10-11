@@ -29,6 +29,7 @@ import {
   type UpdateAccountInput,
   type UpdateCategoryInput,
   type UpdateLabelInput,
+  type UpdateTransactionInput,
   type UpdateUserPreferencesInput,
   type UpdateWorkspaceInput,
   type UserPreferences,
@@ -47,6 +48,19 @@ export class ApiError extends Error {
     this.name = 'ApiError';
   }
 }
+
+/**
+ * The server's current copy when an edit was refused for starting from a
+ * stale version; undefined for any other error.
+ */
+export function transactionConflict(error: unknown): Transaction | undefined {
+  if (!(error instanceof ApiError) || error.status !== 409) return undefined;
+  const body = error.body as { transaction?: unknown } | undefined;
+  const parsed = transactionSchema.safeParse(body?.transaction);
+  return parsed.success ? parsed.data : undefined;
+}
+
+const noContent = { parse: (): void => undefined };
 
 export interface ApiClientOptions {
   /** Origin of the API; empty when the API is served from the web app's own origin. */
@@ -93,11 +107,26 @@ export interface ApiClient {
   updateLabel(workspaceId: string, labelId: string, input: UpdateLabelInput): Promise<Label>;
   /** Newest first. A Period is of the Workspace Calendar; a parent Category includes its children. */
   listTransactions(workspaceId: string, filters?: ListTransactionsQuery): Promise<Transaction[]>;
+  /** One that is not deleted. */
+  getTransaction(workspaceId: string, transactionId: string): Promise<Transaction>;
   /**
    * Member or above. Sending the same `id` again returns the Transaction
    * already recorded instead of recording it twice.
    */
   createTransaction(workspaceId: string, input: CreateTransactionInput): Promise<Transaction>;
+  /**
+   * Member or above; a Member only their own. Replaces its fields, and its
+   * Labels when given. A stale `version` is refused: see `transactionConflict`.
+   */
+  updateTransaction(
+    workspaceId: string,
+    transactionId: string,
+    input: UpdateTransactionInput,
+  ): Promise<Transaction>;
+  /** Member or above; a Member only their own. Deletes it softly, whatever its version. */
+  deleteTransaction(workspaceId: string, transactionId: string): Promise<void>;
+  /** Member or above; a Member only their own. Brings a deleted Transaction back. */
+  restoreTransaction(workspaceId: string, transactionId: string): Promise<Transaction>;
   /** Member or above; an active Label. Attaching one it already carries changes nothing. */
   attachLabel(workspaceId: string, transactionId: string, labelId: string): Promise<Transaction>;
   /** Member or above. Detaching one it does not carry changes nothing. */
@@ -211,6 +240,14 @@ export function createApiClient(options: ApiClientOptions = {}): ApiClient {
     },
     createTransaction: (workspaceId, input) =>
       request('POST', transactionsPath(workspaceId), transactionSchema, input),
+    getTransaction: (workspaceId, transactionId) =>
+      request('GET', transactionPath(workspaceId, transactionId), transactionSchema),
+    updateTransaction: (workspaceId, transactionId, input) =>
+      request('PUT', transactionPath(workspaceId, transactionId), transactionSchema, input),
+    deleteTransaction: (workspaceId, transactionId) =>
+      request('DELETE', transactionPath(workspaceId, transactionId), noContent),
+    restoreTransaction: (workspaceId, transactionId) =>
+      request('POST', `${transactionPath(workspaceId, transactionId)}/restore`, transactionSchema),
     attachLabel: (workspaceId, transactionId, labelId) =>
       request('PUT', transactionLabelPath(workspaceId, transactionId, labelId), transactionSchema),
     detachLabel: (workspaceId, transactionId, labelId) =>
@@ -237,8 +274,12 @@ export function createApiClient(options: ApiClientOptions = {}): ApiClient {
   };
 }
 
+function transactionPath(workspaceId: string, transactionId: string) {
+  return `${transactionsPath(workspaceId)}/${encodeURIComponent(transactionId)}`;
+}
+
 function transactionLabelPath(workspaceId: string, transactionId: string, labelId: string) {
-  return `${transactionsPath(workspaceId)}/${encodeURIComponent(transactionId)}/labels/${encodeURIComponent(labelId)}`;
+  return `${transactionPath(workspaceId, transactionId)}/labels/${encodeURIComponent(labelId)}`;
 }
 
 function labelsPath(workspaceId: string): string {

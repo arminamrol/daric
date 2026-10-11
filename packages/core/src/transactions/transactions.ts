@@ -1,4 +1,5 @@
 import type { AccountClass } from '../accounts';
+import { hasRole, type WorkspaceRole } from '../api/workspace';
 import { monthPeriodOfDay } from '../calendar';
 import type { CalendarSystem, IsoDay, MonthPeriod } from '../calendar';
 import { money } from '../money';
@@ -10,6 +11,19 @@ export type TransactionType = (typeof transactionTypes)[number];
 
 /** Every type a Transaction may have. */
 export type AnyTransactionType = TransactionType | 'TRANSFER';
+
+/**
+ * Whether a Member with `role` may edit or delete a Transaction: the Owner and
+ * Admins any, a Member only those they recorded, a Viewer none.
+ */
+export function mayChangeTransaction(
+  role: WorkspaceRole,
+  userId: string,
+  transaction: { readonly createdBy: string | null },
+): boolean {
+  if (hasRole(role, 'ADMIN')) return true;
+  return hasRole(role, 'MEMBER') && transaction.createdBy === userId;
+}
 
 /** Money going into or out of an Account. */
 export type Flow = 'IN' | 'OUT';

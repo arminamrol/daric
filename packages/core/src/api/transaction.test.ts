@@ -4,6 +4,7 @@ import {
   listTransactionsQuerySchema,
   periodParam,
   transactionSchema,
+  updateTransactionInputSchema,
 } from './index';
 
 const accountId = '01900000-0000-7000-a000-000000000001';
@@ -111,6 +112,54 @@ describe('createTransactionInputSchema for a Transfer', () => {
 
   it('rejects a destination Account on an Income or Expense', () => {
     expect(createTransactionInputSchema.safeParse({ ...valid, toAccountId }).success).toBe(false);
+  });
+});
+
+describe('updateTransactionInputSchema', () => {
+  it('takes the whole Transaction with the version it started from', () => {
+    expect(updateTransactionInputSchema.parse({ ...valid, version: 3 })).toEqual({
+      ...valid,
+      amount: 250000n,
+      note: null,
+      version: 3,
+    });
+  });
+
+  it('keeps the Labels unless they are given', () => {
+    expect(updateTransactionInputSchema.parse({ ...valid, version: 1 })).not.toHaveProperty(
+      'labelIds',
+    );
+    expect(
+      updateTransactionInputSchema.parse({ ...valid, version: 1, labelIds: [] }).labelIds,
+    ).toEqual([]);
+  });
+
+  it('requires a version and takes no id', () => {
+    expect(updateTransactionInputSchema.safeParse(valid).success).toBe(false);
+    expect(updateTransactionInputSchema.safeParse({ ...valid, version: 0 }).success).toBe(false);
+    expect(
+      updateTransactionInputSchema.safeParse({
+        ...valid,
+        version: 1,
+        id: '0199d0f0-0000-7000-8000-000000000001',
+      }).success,
+    ).toBe(false);
+  });
+
+  it('can turn a Transaction into a Transfer between two different Accounts', () => {
+    const { categoryId: _, ...rest } = valid;
+    const toAccountId = '01900000-0000-7000-a000-000000000002';
+    expect(
+      updateTransactionInputSchema.parse({ ...rest, type: 'TRANSFER', toAccountId, version: 2 }),
+    ).toMatchObject({ type: 'TRANSFER', toAccountId });
+    expect(
+      updateTransactionInputSchema.safeParse({
+        ...rest,
+        type: 'TRANSFER',
+        toAccountId: accountId,
+        version: 2,
+      }).success,
+    ).toBe(false);
   });
 });
 

@@ -1,5 +1,5 @@
-import { hasRole } from '@daric/core';
-import { useId } from 'react';
+import { hasRole, mayChangeTransaction } from '@daric/core';
+import { useId, useState } from 'react';
 import { Link, useSearchParams } from 'react-router';
 import { useAccounts } from '../accounts/accounts';
 import { useSignedIn } from '../auth/session';
@@ -10,7 +10,11 @@ import { useFormatters } from '../settings/settings';
 import { categoryChoices } from '../transactions/choices';
 import { TransactionForm } from '../transactions/TransactionForm';
 import { TransactionList } from '../transactions/TransactionList';
-import { useTransactions } from '../transactions/transactions';
+import {
+  useDeleteTransaction,
+  useRestoreTransaction,
+  useTransactions,
+} from '../transactions/transactions';
 
 const selectClass =
   'rounded-md border border-border bg-background px-3 py-1.5 text-sm text-foreground';
@@ -23,7 +27,7 @@ const selectClass =
 export function TransactionsPage() {
   const { t } = useI18n();
   const format = useFormatters();
-  const { workspace } = useSignedIn();
+  const { me, workspace } = useSignedIn();
   const [params, setParams] = useSearchParams();
   const ids = { account: useId(), category: useId(), label: useId() };
 
@@ -47,6 +51,10 @@ export function TransactionsPage() {
   });
   const canRecord = hasRole(workspace.role, 'MEMBER');
   const activeAccounts = accounts.data?.filter((a) => !a.archived) ?? [];
+  const remove = useDeleteTransaction();
+  const restore = useRestoreTransaction();
+  // The Transaction just deleted, which can still be brought back.
+  const [deletedId, setDeletedId] = useState<string>();
 
   function setParam(name: string, value: string | undefined) {
     const next = new URLSearchParams(params);
@@ -164,6 +172,32 @@ export function TransactionsPage() {
             </>
           )}
         </div>
+        {remove.isError && (
+          <p role="alert" className="text-danger">
+            {t('transactions.list.deleteFailed')}
+          </p>
+        )}
+        {deletedId && (
+          <div
+            role="status"
+            className="flex flex-wrap items-center gap-3 rounded-md bg-surface-muted px-4 py-2"
+          >
+            <p className="me-auto">{t('transactions.list.deleted')}</p>
+            {restore.isError && (
+              <p className="text-sm text-danger">{t('transactions.list.undoFailed')}</p>
+            )}
+            <button
+              type="button"
+              disabled={restore.isPending}
+              onClick={() =>
+                restore.mutate(deletedId, { onSuccess: () => setDeletedId(undefined) })
+              }
+              className="rounded-md border border-border px-3 py-1 text-sm font-medium disabled:opacity-60"
+            >
+              {t('transactions.list.undo')}
+            </button>
+          </div>
+        )}
         {transactions.isPending ||
         accounts.isPending ||
         categories.isPending ||
@@ -183,6 +217,18 @@ export function TransactionsPage() {
             accounts={accounts.data ?? []}
             categories={categories.data ?? []}
             labels={labels.data ?? []}
+            actions={{
+              canChange: (transaction) =>
+                mayChangeTransaction(workspace.role, me.user.id, transaction),
+              onDelete: (transaction) =>
+                remove.mutate(transaction.id, {
+                  onSuccess: () => {
+                    restore.reset();
+                    setDeletedId(transaction.id);
+                  },
+                }),
+              busy: remove.isPending,
+            }}
           />
         )}
       </div>

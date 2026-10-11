@@ -51,6 +51,9 @@ function client(t: TestApp, user: User, workspaceId = user.workspaceId) {
     record: (body: unknown) => as('POST', '/transactions', body),
     list: (query = '') => as('GET', `/transactions${query}`),
     get: (id: string) => as('GET', `/transactions/${id}`),
+    update: (id: string, body: unknown) => as('PUT', `/transactions/${id}`, body),
+    remove: (id: string) => as('DELETE', `/transactions/${id}`),
+    restore: (id: string) => as('POST', `/transactions/${id}/restore`),
     async account(body: unknown = melli): Promise<{ id: string; balance: string }> {
       const res = await as('POST', '/accounts', body);
       expect(res.status).toBe(201);
@@ -444,9 +447,6 @@ describe('Labels on Transactions', () => {
     const again = await api.record(expense({ id, labelIds: [travel.id] }));
     expect(again.status).toBe(200);
     expect(again.body.labelIds).toEqual([travel.id, eatingOut.id].sort());
-    expect((await api.record(expense({ id, amount: '1', labelIds: [travel.id] }))).status).toBe(
-      409,
-    );
   });
 
   it('read Label ids in any case', async () => {
@@ -555,12 +555,15 @@ describe('Labels on Transactions', () => {
     }
   });
 
-  it('let Members label Transactions and Viewers only see Labels on them', async () => {
-    const { user: owner, travel, eatingOut, record } = await setUp();
-    const recorded = await record({ labelIds: [travel.id] });
+  it('let Members label their own Transactions and Viewers only see Labels on them', async () => {
+    const { user: owner, travel, eatingOut, expense, record } = await setUp();
     const asMember = client(t, await addMember(owner.workspaceId, 'MEMBER'), owner.workspaceId);
     const asViewer = client(t, await addMember(owner.workspaceId, 'VIEWER'), owner.workspaceId);
+    const recorded = (await asMember.record(expense({ labelIds: [travel.id] }))).body;
+    const owners = await record();
     expect((await asMember.attach(recorded.id, eatingOut.id)).status).toBe(200);
+    expect((await asMember.attach(owners.id, eatingOut.id)).status).toBe(403);
+    expect((await asMember.detach(owners.id, travel.id)).status).toBe(403);
     expect((await asViewer.attach(recorded.id, eatingOut.id)).status).toBe(403);
     expect((await asViewer.detach(recorded.id, travel.id)).status).toBe(403);
     expect((await asViewer.get(recorded.id)).body.labelIds).toEqual(
@@ -877,3 +880,303 @@ interface TransferSetUp {
   from: { id: string };
   category: { id: string };
 }
+
+describe('Editing and deleting Transactions', () => {
+  let t: TestApp;
+  beforeAll(async () => {
+    t = await startTestApp();
+  });
+  afterAll(() => t.close());
+
+  interface Stored {
+    id: string;
+    version: number;
+    labelIds: string[];
+    createdBy: string | null;
+  }
+
+  /** A fresh Owner with two IRR Accounts, a USD one, an Expense and an Income Category and a Label. */
+  async function setUp() {
+    const user = await registerUser(t.url);
+    const api = client(t, user);
+    const account = await api.account();
+    const cash = await api.account({ ...melli, name: 'Cash', type: 'CASH', openingBalance: '0' });
+    const dollars = await api.account({ ...card, name: 'Dollars', class: 'ASSET' });
+    const category = await api.category();
+    const income = await api.category(salary);
+    const travel = await api.label('Travel');
+    const expense = (fields: Record<string, unknown> = {}) => ({
+      type: 'EXPENSE',
+      accountId: account.id,
+      categoryId: category.id,
+      amount: '250000',
+      occurredOn: '2026-10-10',
+      ...fields,
+    });
+    const record = async (fields: Record<string, unknown> = {}, as = api) => {
+      const res = await as.record(expense(fields));
+      expect(res.status).toBe(201);
+      return res.body as Stored;
+    };
+    return { user, api, account, cash, dollars, category, income, travel, expense, record };
+  }
+
+  async function addMember(workspaceId: string, role: 'ADMIN' | 'MEMBER' | 'VIEWER') {
+    const user = await registerUser(t.url);
+    await db.insert(workspaceMembers).values({ workspaceId, userId: user.userId, role });
+    return user;
+  }
+
+  it('edit a Transaction from its current version, updating the balance', async () => {
+    const { api, account, expense, record } = await setUp();
+    const recorded = await record();
+    const res = await api.update(
+      recorded.id,
+      expense({ amount: '100000', note: ' Lunch ', occurredOn: '2026-10-09', version: 1 }),
+    );
+    expect(res.status).toBe(200);
+    expect(res.body).toEqual({
+      ...recorded,
+      amount: '100000',
+      note: 'Lunch',
+      occurredOn: '2026-10-09',
+      version: 2,
+    });
+    expect((await api.get(recorded.id)).body).toEqual(res.body);
+    expect(await api.balance(account.id)).toBe('900000');
+  });
+
+  it('refuse a stale edit with the server copy, changing nothing', async () => {
+    const { user, api, account, expense, record } = await setUp();
+    const recorded = await record();
+    const first = await api.update(recorded.id, expense({ amount: '100000', version: 1 }));
+    expect(first.status).toBe(200);
+    const stale = await api.update(recorded.id, expense({ amount: '5', version: 1 }));
+    expect(stale.status).toBe(409);
+    expect(stale.body.transaction).toEqual(first.body);
+    const ahead = await api.update(recorded.id, expense({ amount: '5', version: 7 }));
+    expect(ahead.status).toBe(409);
+    const [stored] = await storedTransactions(user.workspaceId);
+    expect(stored).toMatchObject({ amount: 100000n, version: 2 });
+    expect(await api.balance(account.id)).toBe('900000');
+  });
+
+  it('replace the Labels when given and keep them when left out', async () => {
+    const { api, expense, record, travel } = await setUp();
+    const work = await api.label('Work');
+    const recorded = await record({ labelIds: [travel.id] });
+    const kept = await api.update(recorded.id, expense({ note: 'x', version: 1 }));
+    expect(kept.body.labelIds).toEqual([travel.id]);
+    const replaced = await api.update(recorded.id, expense({ labelIds: [work.id], version: 2 }));
+    expect(replaced.status).toBe(200);
+    expect(replaced.body).toMatchObject({ labelIds: [work.id], version: 3 });
+    expect(await storedLabelIds(recorded.id)).toEqual([work.id]);
+  });
+
+  it('keep archived things the Transaction already names, but not pick new ones', async () => {
+    const { api, account, cash, category, expense, record, travel } = await setUp();
+    const recorded = await record({ labelIds: [travel.id] });
+    const otherCategory = await api.category({ ...food, name: 'Rent' });
+    const otherLabel = await api.label('Gifts');
+    for (const [kind, id] of [
+      ['accounts', account.id],
+      ['categories', category.id],
+      ['labels', travel.id],
+      ['accounts', cash.id],
+      ['categories', otherCategory.id],
+      ['labels', otherLabel.id],
+    ] as const) {
+      expect((await api.archive(kind, id)).status).toBe(200);
+    }
+    const noted = await api.update(
+      recorded.id,
+      expense({ note: 'still here', labelIds: [travel.id], version: 1 }),
+    );
+    expect(noted.status).toBe(200);
+    // Ids in any case name the same things.
+    const shouted = await api.update(
+      recorded.id,
+      expense({
+        accountId: account.id.toUpperCase(),
+        categoryId: category.id.toUpperCase(),
+        version: 2,
+      }),
+    );
+    expect(shouted.status).toBe(200);
+    for (const change of [
+      { accountId: cash.id },
+      { categoryId: otherCategory.id },
+      { labelIds: [travel.id, otherLabel.id] },
+    ]) {
+      expect((await api.update(recorded.id, expense({ ...change, version: 3 }))).status).toBe(400);
+    }
+  });
+
+  it('turn an Expense into a Transfer and back, applying the currency rule again', async () => {
+    const { api, account, cash, dollars, income, expense, record } = await setUp();
+    const recorded = await record();
+    const { categoryId: _, ...base } = expense();
+    const transfer = { ...base, type: 'TRANSFER', toAccountId: cash.id };
+    const moved = await api.update(recorded.id, { ...transfer, version: 1 });
+    expect(moved.status).toBe(200);
+    expect(moved.body).toMatchObject({ type: 'TRANSFER', toAmount: '250000', version: 2 });
+    expect(moved.body).not.toHaveProperty('categoryId');
+    expect(await api.balance(cash.id)).toBe('250000');
+
+    // Swapping sides keeps an archived Account the Transfer is already on.
+    expect((await api.archive('accounts', cash.id)).status).toBe(200);
+    const swapped = await api.update(recorded.id, {
+      ...transfer,
+      accountId: cash.id,
+      toAccountId: account.id,
+      version: 2,
+    });
+    expect(swapped.status).toBe(200);
+    expect((await api.update(recorded.id, { ...transfer, version: 3 })).status).toBe(200);
+
+    const toDollars = { ...transfer, toAccountId: dollars.id, version: 4 };
+    expect((await api.update(recorded.id, toDollars)).status).toBe(400);
+    const crossed = await api.update(recorded.id, { ...toDollars, toAmount: '500' });
+    expect(crossed.body).toMatchObject({ toAccountId: dollars.id, toAmount: '500', version: 5 });
+
+    const back = await api.update(
+      recorded.id,
+      expense({ type: 'INCOME', categoryId: income.id, version: 5 }),
+    );
+    expect(back.status).toBe(200);
+    expect(back.body).not.toHaveProperty('toAccountId');
+    expect(await api.balance(account.id)).toBe('1250000');
+    expect(await api.balance(cash.id)).toBe('0');
+    expect(await api.balance(dollars.id)).toBe('0');
+  });
+
+  it('validate an edit like a create', async () => {
+    const { api, income, expense, record } = await setUp();
+    const recorded = await record();
+    const bad = [
+      expense({ categoryId: income.id, version: 1 }),
+      expense({ amount: '0', version: 1 }),
+      expense(),
+      expense({ id: uuidv7(), version: 1 }),
+    ];
+    for (const body of bad) {
+      expect((await api.update(recorded.id, body)).status).toBe(400);
+    }
+  });
+
+  it('delete softly, whatever version the caller saw, and leave it deleted', async () => {
+    const { user, api, account, expense, record } = await setUp();
+    const recorded = await record();
+    await api.update(recorded.id, expense({ amount: '1', version: 1 }));
+    const res = await api.remove(recorded.id);
+    expect(res.status).toBe(204);
+    expect((await api.get(recorded.id)).status).toBe(404);
+    expect((await api.list()).body).toEqual([]);
+    expect(await api.balance(account.id)).toBe('1000000');
+    const [stored] = await storedTransactions(user.workspaceId);
+    expect(stored?.deletedAt).toBeInstanceOf(Date);
+    // Deleting again changes nothing; an edit after the delete finds nothing.
+    expect((await api.remove(recorded.id)).status).toBe(204);
+    expect((await api.update(recorded.id, expense({ version: 3 }))).status).toBe(404);
+    expect((await api.update(recorded.id, expense({ version: 2 }))).status).toBe(404);
+  });
+
+  it('restore a deleted Transaction, as an undo', async () => {
+    const { api, account, record } = await setUp();
+    const recorded = await record();
+    await api.remove(recorded.id);
+    const res = await api.restore(recorded.id);
+    expect(res.status).toBe(200);
+    expect(res.body).toEqual({ ...recorded, version: 3 });
+    expect(await api.balance(account.id)).toBe('750000');
+    // Restoring one that is not deleted changes nothing.
+    expect((await api.restore(recorded.id)).body.version).toBe(3);
+  });
+
+  it('answer a replayed create with the current copy once the Transaction changed', async () => {
+    const { api, expense, record } = await setUp();
+    const id = uuidv7();
+    await record({ id });
+    await api.update(id, expense({ amount: '1', version: 1 }));
+    const again = await api.record(expense({ id }));
+    expect(again.status).toBe(200);
+    expect(again.body).toMatchObject({ amount: '1', version: 2 });
+    await api.remove(id);
+    // A replay never brings a deleted Transaction back.
+    expect((await api.record(expense({ id }))).status).toBe(200);
+    expect((await api.get(id)).status).toBe(404);
+  });
+
+  it('let Members change only their own Transactions, Admins any, Viewers none', async () => {
+    const { user: owner, api, expense, record, travel } = await setUp();
+    const ws = owner.workspaceId;
+    const asMember = client(t, await addMember(ws, 'MEMBER'), ws);
+    const asAdmin = client(t, await addMember(ws, 'ADMIN'), ws);
+    const asViewer = client(t, await addMember(ws, 'VIEWER'), ws);
+    const owners = await record();
+    const members = await record({}, asMember);
+
+    expect((await asMember.update(owners.id, expense({ version: 1 }))).status).toBe(403);
+    expect((await asMember.remove(owners.id)).status).toBe(403);
+    expect((await asMember.attach(owners.id, travel.id)).status).toBe(403);
+    expect((await asMember.update(members.id, expense({ note: 'm', version: 1 }))).status).toBe(
+      200,
+    );
+    expect((await asMember.attach(members.id, travel.id)).status).toBe(200);
+    expect((await asMember.remove(members.id)).status).toBe(204);
+    expect((await asMember.restore(members.id)).status).toBe(200);
+
+    expect((await asAdmin.update(members.id, expense({ note: 'a', version: 5 }))).status).toBe(200);
+    expect((await asAdmin.remove(owners.id)).status).toBe(204);
+    expect((await api.restore(owners.id)).status).toBe(200);
+
+    for (const res of [
+      await asViewer.update(owners.id, expense({ version: 3 })),
+      await asViewer.remove(owners.id),
+      await asViewer.restore(owners.id),
+    ]) {
+      expect(res.status).toBe(403);
+    }
+    expect((await api.get(owners.id)).body.version).toBe(3);
+  });
+
+  it("refuse a Member a Transaction whose recorder's account is gone", async () => {
+    const { user: owner, expense, record } = await setUp();
+    const asMember = client(t, await addMember(owner.workspaceId, 'MEMBER'), owner.workspaceId);
+    const orphan = await record();
+    await db.update(transactions).set({ createdBy: null }).where(eq(transactions.id, orphan.id));
+    expect((await asMember.update(orphan.id, expense({ version: 1 }))).status).toBe(403);
+  });
+
+  it("answer 404 for another Workspace's Transactions and ids that are not uuids", async () => {
+    const a = await setUp();
+    const b = await setUp();
+    const theirs = await b.record();
+    for (const id of [theirs.id, randomUUID(), 'not-a-uuid']) {
+      expect((await a.api.update(id, a.expense({ version: 1 }))).status).toBe(404);
+      expect((await a.api.remove(id)).status).toBe(404);
+      expect((await a.api.restore(id)).status).toBe(404);
+    }
+    expect((await b.api.get(theirs.id)).body.version).toBe(1);
+  });
+
+  it('write ids to the audit log, never Amounts or notes', async () => {
+    const { user, api, expense, record } = await setUp();
+    const recorded = await record();
+    await api.update(recorded.id, expense({ amount: '424242', note: 'pharmacy', version: 1 }));
+    await api.remove(recorded.id);
+    await api.restore(recorded.id);
+    const rows = await db
+      .select()
+      .from(auditLogs)
+      .where(eq(auditLogs.workspaceId, user.workspaceId))
+      .orderBy(auditLogs.createdAt);
+    expect(rows.filter((r) => r.action.startsWith('transaction.'))).toMatchObject([
+      { action: 'transaction.create' },
+      { action: 'transaction.update', metadata: { transactionId: recorded.id } },
+      { action: 'transaction.delete', metadata: { transactionId: recorded.id } },
+      { action: 'transaction.restore', metadata: { transactionId: recorded.id } },
+    ]);
+    expect(JSON.stringify(rows)).not.toMatch(/424242|pharmacy/);
+  });
+});

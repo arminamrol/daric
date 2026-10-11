@@ -1,8 +1,9 @@
 import { groupByMonth, IRR, money } from '@daric/core';
 import type { Account, Category, Label, MonthGroup, Transaction } from '@daric/core';
 import { isolate } from '@daric/i18n';
-import { ArrowLeftRight } from 'lucide-react';
+import { ArrowLeftRight, Pencil, Trash2 } from 'lucide-react';
 import { useId, useMemo } from 'react';
+import { Link } from 'react-router';
 import { currencyOf } from '../accounts/accounts';
 import { CategoryBadge } from '../categories/CategoryBadge';
 import { useSignedIn } from '../auth/session';
@@ -10,18 +11,31 @@ import { useI18n } from '../i18n/locale';
 import { useFormatters } from '../settings/settings';
 import { categoryChoices } from './choices';
 
+/** Editing and deleting from the list, for the Transactions the viewer may change. */
+export interface ListActions {
+  canChange: (transaction: Transaction) => boolean;
+  onDelete: (transaction: Transaction) => void;
+  /** While a delete is on its way. */
+  busy: boolean;
+}
+
+const actionClass =
+  'inline-flex size-8 items-center justify-center rounded-md text-foreground-muted hover:bg-surface-muted hover:text-foreground disabled:opacity-60';
+
 function Month({
   group,
   accounts,
   categories,
   categoryLabels,
   labels,
+  actions,
 }: {
   group: MonthGroup<Transaction>;
   accounts: ReadonlyMap<string, Account>;
   categories: ReadonlyMap<string, Category>;
   categoryLabels: ReadonlyMap<string, string>;
   labels: readonly Label[];
+  actions: ListActions | undefined;
 }) {
   const { t } = useI18n();
   const format = useFormatters();
@@ -123,6 +137,28 @@ function Month({
                 )}
               </div>
               <span className={`shrink-0 font-medium tabular-nums ${tone}`}>{shown}</span>
+              {actions?.canChange(transaction) && (
+                <div className="flex shrink-0 gap-1">
+                  <Link
+                    to={`/transactions/${transaction.id}`}
+                    aria-label={t('transactions.list.edit')}
+                    title={t('transactions.list.edit')}
+                    className={actionClass}
+                  >
+                    <Pencil aria-hidden="true" className="size-4" strokeWidth={2} />
+                  </Link>
+                  <button
+                    type="button"
+                    aria-label={t('transactions.list.delete')}
+                    title={t('transactions.list.delete')}
+                    disabled={actions.busy}
+                    onClick={() => actions.onDelete(transaction)}
+                    className={actionClass}
+                  >
+                    <Trash2 aria-hidden="true" className="size-4" strokeWidth={2} />
+                  </button>
+                </div>
+              )}
             </li>
           );
         })}
@@ -141,6 +177,7 @@ export function TransactionList({
   accounts,
   categories,
   labels,
+  actions,
 }: {
   transactions: readonly Transaction[];
   /** Archived ones included: old Transactions still name them. */
@@ -148,6 +185,8 @@ export function TransactionList({
   categories: readonly Category[];
   /** By name, archived ones included. */
   labels: readonly Label[];
+  /** Left out, the list only shows. */
+  actions?: ListActions;
 }) {
   const { t } = useI18n();
   const { workspace } = useSignedIn();
@@ -174,6 +213,7 @@ export function TransactionList({
       categories={categoriesById}
       categoryLabels={categoryLabels}
       labels={labels}
+      actions={actions}
     />
   ));
 }

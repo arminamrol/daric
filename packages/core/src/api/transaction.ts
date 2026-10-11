@@ -63,8 +63,8 @@ const positiveAmountSchema = amountSchema.refine((amount) => amount > 0n, {
   message: 'An Amount must be positive',
 });
 
-const createFields = {
-  id: z.uuidv7().exactOptional(),
+/** What a Transaction is made of, as a create or an edit gives it. */
+const inputFields = {
   accountId: z.uuid(),
   amount: positiveAmountSchema,
   occurredOn: isoDaySchema,
@@ -83,27 +83,42 @@ const createFields = {
     .default([]),
 };
 
-const createIncomeExpenseInputSchema = z.strictObject({
-  ...createFields,
+const createFields = { ...inputFields, id: z.uuidv7().exactOptional() };
+
+const incomeExpenseFields = {
   type: z.enum(transactionTypes),
   categoryId: z.uuid(),
+};
+
+const transferFields = {
+  type: z.literal('TRANSFER'),
+  toAccountId: z.uuid(),
+  /**
+   * In the destination Account's currency. Required between currencies;
+   * of one currency it may be left out and must otherwise equal `amount`.
+   */
+  toAmount: positiveAmountSchema.exactOptional(),
+};
+
+/** A Transfer's Accounts differ. */
+function twoAccounts<T extends z.ZodType<{ accountId: string; toAccountId: string }>>(schema: T) {
+  return schema.refine(
+    (input) => input.accountId.toLowerCase() !== input.toAccountId.toLowerCase(),
+    {
+      message: 'A Transfer moves money between two different Accounts',
+      path: ['toAccountId'],
+    },
+  );
+}
+
+const createIncomeExpenseInputSchema = z.strictObject({
+  ...createFields,
+  ...incomeExpenseFields,
 });
 
-const createTransferInputSchema = z
-  .strictObject({
-    ...createFields,
-    type: z.literal('TRANSFER'),
-    toAccountId: z.uuid(),
-    /**
-     * In the destination Account's currency. Required between currencies;
-     * of one currency it may be left out and must otherwise equal `amount`.
-     */
-    toAmount: positiveAmountSchema.exactOptional(),
-  })
-  .refine((input) => input.accountId.toLowerCase() !== input.toAccountId.toLowerCase(), {
-    message: 'A Transfer moves money between two different Accounts',
-    path: ['toAccountId'],
-  });
+const createTransferInputSchema = twoAccounts(
+  z.strictObject({ ...createFields, ...transferFields }),
+);
 
 /**
  * Records an Income, Expense or Transfer. A client may make the id itself (a
@@ -114,7 +129,24 @@ export const createTransactionInputSchema = z.discriminatedUnion('type', [
   createTransferInputSchema,
 ]);
 export type CreateTransactionInput = z.infer<typeof createTransactionInputSchema>;
-export type CreateTransferInput = z.infer<typeof createTransferInputSchema>;
+
+const updateFields = {
+  ...inputFields,
+  /** Left out, the Labels stay as they are; given, they replace them. */
+  labelIds: inputFields.labelIds.removeDefault().exactOptional(),
+  /** The version the edit started from; a stale one is refused with the current copy. */
+  version: z.number().int().positive(),
+};
+
+/**
+ * Replaces a Transaction's fields, also switching it between Income, Expense
+ * and Transfer. Archived Accounts, Categories and Labels it already names may stay.
+ */
+export const updateTransactionInputSchema = z.discriminatedUnion('type', [
+  z.strictObject({ ...updateFields, ...incomeExpenseFields }),
+  twoAccounts(z.strictObject({ ...updateFields, ...transferFields })),
+]);
+export type UpdateTransactionInput = z.infer<typeof updateTransactionInputSchema>;
 
 // Year 0 does not exist on either calendar.
 const PERIOD_PARAM = /^(?!0000)(\d{4})(?:-(0[1-9]|1[0-2]))?$/;

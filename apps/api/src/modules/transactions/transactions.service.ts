@@ -1,16 +1,22 @@
 import {
   BadRequestException,
   ConflictException,
+  ForbiddenException,
   Inject,
   Injectable,
   NotFoundException,
 } from '@nestjs/common';
-import { amountToWire, MAX_LABELS_PER_TRANSACTION, periodDays } from '@daric/core';
+import {
+  amountToWire,
+  MAX_LABELS_PER_TRANSACTION,
+  mayChangeTransaction,
+  periodDays,
+} from '@daric/core';
 import type {
   CreateTransactionInput,
-  CreateTransferInput,
   ListTransactionsQuery,
   TransactionWire,
+  UpdateTransactionInput,
 } from '@daric/core';
 import { and, desc, eq, gte, inArray, isNull, lt, or, sql, type SQL } from 'drizzle-orm';
 import { isUuid, type Membership } from '../../common/request';
@@ -50,6 +56,9 @@ type Row = Pick<typeof transactions.$inferSelect, Exclude<keyof typeof columns, 
 
 const ID_TAKEN = 'This id is already used by another Transaction';
 
+/** A create or an edit: what validation looks at. */
+type TransactionInput = CreateTransactionInput | UpdateTransactionInput;
+
 function toWire(row: Row): TransactionWire {
   const { type, categoryId, toAccountId, toAmount, ...rest } = row;
   const common = { ...rest, amount: amountToWire(row.amount) };
@@ -66,10 +75,12 @@ function toWire(row: Row): TransactionWire {
 
 /**
  * Whether a stored Transaction is the one `input` describes (a replayed create).
- * Labels count only while it is unchanged: once Labels were attached or
- * detached, a client still replaying its queued create gets the current copy.
+ * Once it changed (edited, relabelled, deleted or restored), the create can no
+ * longer be compared with it: a client still replaying its queued create gets
+ * the current copy.
  */
 function sameTransaction(row: Row, input: CreateTransactionInput): boolean {
+  if (row.version > 1) return true;
   const sameKind =
     input.type === 'TRANSFER'
       ? row.toAccountId === input.toAccountId &&
@@ -83,7 +94,7 @@ function sameTransaction(row: Row, input: CreateTransactionInput): boolean {
     row.amount === input.amount &&
     row.occurredOn === input.occurredOn &&
     row.note === input.note &&
-    (row.version > 1 || row.labelIds.join() === [...input.labelIds].sort().join())
+    row.labelIds.join() === [...input.labelIds].sort().join()
   );
 }
 
@@ -227,46 +238,59 @@ export class TransactionsService {
 
   /**
    * Throws a 400 unless the Accounts, Category and Labels exist and are
-   * active, and the Category fits the type. For a Transfer, answers the
+   * active, and the Category fits the type. An edit may keep the archived ones
+   * the `current` Transaction already names. For a Transfer, answers the
    * destination Amount to store.
    */
-  private async validate(input: CreateTransactionInput): Promise<bigint | undefined> {
-    const account = await this.usableAccount(input.accountId, 'Account');
+  private async validate(input: TransactionInput, current?: Row): Promise<bigint | undefined> {
+    // Either of its Accounts may stay archived, also when a Transfer swaps sides.
+    const keptAccounts = current ? [current.accountId, current.toAccountId] : [];
+    const account = await this.usableAccount(input.accountId, 'Account', keptAccounts);
     let toAmount: bigint | undefined;
     if (input.type === 'TRANSFER') {
-      toAmount = await this.transferredAmount(input, account.currency);
+      toAmount = await this.transferredAmount(input, account.currency, keptAccounts);
     } else {
       const [category] = await scopedTx()
-        .select({ kind: categories.kind, archivedAt: categories.archivedAt })
+        .select({ id: categories.id, kind: categories.kind, archivedAt: categories.archivedAt })
         .from(categories)
         .where(eq(categories.id, input.categoryId));
       if (!category) throw new BadRequestException('Category not found');
-      if (category.archivedAt) throw new BadRequestException('The Category is archived');
+      // Compared as stored (lowercase): the input may spell the id in any case.
+      if (category.archivedAt && category.id !== current?.categoryId) {
+        throw new BadRequestException('The Category is archived');
+      }
       if (category.kind !== input.type) {
         throw new BadRequestException(`An ${input.type} needs an ${input.type} Category`);
       }
     }
 
-    if (input.labelIds.length > 0) {
+    if (input.labelIds && input.labelIds.length > 0) {
       const found = await scopedTx()
-        .select({ archivedAt: labels.archivedAt })
+        .select({ id: labels.id, archivedAt: labels.archivedAt })
         .from(labels)
         .where(inArray(labels.id, input.labelIds));
       if (found.length !== input.labelIds.length) throw new BadRequestException('Label not found');
-      if (found.some((label) => label.archivedAt)) {
+      if (found.some((label) => label.archivedAt && !current?.labelIds.includes(label.id))) {
         throw new BadRequestException('A Label is archived');
       }
     }
     return toAmount;
   }
 
-  private async usableAccount(accountId: string, name: string) {
+  /** An Account to put a Transaction on: active, or archived but one it is on already. */
+  private async usableAccount(
+    accountId: string,
+    name: string,
+    kept: readonly (string | null)[] = [],
+  ) {
     const [account] = await scopedTx()
       .select({ id: accounts.id, currency: accounts.currency, archivedAt: accounts.archivedAt })
       .from(accounts)
       .where(eq(accounts.id, accountId));
     if (!account) throw new BadRequestException(`${name} not found`);
-    if (account.archivedAt) throw new BadRequestException(`The ${name} is archived`);
+    if (account.archivedAt && !kept.includes(account.id)) {
+      throw new BadRequestException(`The ${name} is archived`);
+    }
     return account;
   }
 
@@ -274,8 +298,12 @@ export class TransactionsService {
    * What a Transfer puts into its destination Account. Nothing is converted:
    * of one currency it is the Amount itself, between currencies the user gives it.
    */
-  private async transferredAmount(input: CreateTransferInput, currency: string): Promise<bigint> {
-    const destination = await this.usableAccount(input.toAccountId, 'destination Account');
+  private async transferredAmount(
+    input: Extract<TransactionInput, { type: 'TRANSFER' }>,
+    currency: string,
+    kept: readonly (string | null)[],
+  ): Promise<bigint> {
+    const destination = await this.usableAccount(input.toAccountId, 'destination Account', kept);
     if (destination.currency === currency) {
       if (input.toAmount !== undefined && input.toAmount !== input.amount) {
         throw new BadRequestException('Between Accounts of one currency both Amounts are the same');
@@ -289,6 +317,138 @@ export class TransactionsService {
   }
 
   /**
+   * Replaces a Transaction's fields, and its Labels when given. Refused with a
+   * 409 carrying the current copy unless `input.version` is the current one; a
+   * deleted Transaction answers 404, as a delete wins over any edit.
+   */
+  async update(
+    membership: Membership,
+    userId: string,
+    transactionId: string,
+    input: UpdateTransactionInput,
+  ): Promise<TransactionWire> {
+    const tx = scopedTx();
+    const { deletedAt: _, ...current } = await this.lockToChange(membership, userId, transactionId);
+    if (current.version !== input.version) {
+      throw new ConflictException({
+        statusCode: 409,
+        error: 'Conflict',
+        message: 'The Transaction was changed since this version',
+        transaction: toWire(current),
+      });
+    }
+    const toAmount = await this.validate(input, current);
+
+    const { labelIds, version: _version, ...fields } = input;
+    const transfer = fields.type === 'TRANSFER';
+    await tx
+      .update(transactions)
+      .set({
+        type: fields.type,
+        accountId: fields.accountId,
+        amount: fields.amount,
+        occurredOn: fields.occurredOn,
+        note: fields.note,
+        // Switching between Transfer and Income/Expense sets one side and clears the other.
+        categoryId: transfer ? null : fields.categoryId,
+        toAccountId: transfer ? fields.toAccountId : null,
+        toAmount: transfer ? (toAmount ?? null) : null,
+        version: sql`${transactions.version} + 1`,
+      })
+      .where(eq(transactions.id, transactionId));
+    if (labelIds) {
+      const { workspaceId } = membership;
+      await tx.delete(transactionLabels).where(eq(transactionLabels.transactionId, transactionId));
+      if (labelIds.length > 0) {
+        await tx
+          .insert(transactionLabels)
+          .values(labelIds.map((labelId) => ({ transactionId, labelId, workspaceId })));
+      }
+    }
+    await this.audit.record(tx, {
+      action: 'transaction.update',
+      actorUserId: userId,
+      workspaceId: membership.workspaceId,
+      metadata: { transactionId },
+    });
+    return this.get(transactionId);
+  }
+
+  /**
+   * Deletes a Transaction softly, whatever version the caller saw. Deleting
+   * one already deleted changes nothing.
+   */
+  async remove(membership: Membership, userId: string, transactionId: string): Promise<void> {
+    const tx = scopedTx();
+    const current = await this.lockToChange(membership, userId, transactionId, {
+      deleted: true,
+    });
+    if (current.deletedAt) return;
+    await tx
+      .update(transactions)
+      .set({ deletedAt: sql`now()`, version: sql`${transactions.version} + 1` })
+      .where(eq(transactions.id, transactionId));
+    await this.audit.record(tx, {
+      action: 'transaction.delete',
+      actorUserId: userId,
+      workspaceId: membership.workspaceId,
+      metadata: { transactionId },
+    });
+  }
+
+  /** Brings a deleted Transaction back (undo); restoring one not deleted changes nothing. */
+  async restore(
+    membership: Membership,
+    userId: string,
+    transactionId: string,
+  ): Promise<TransactionWire> {
+    const tx = scopedTx();
+    const current = await this.lockToChange(membership, userId, transactionId, {
+      deleted: true,
+    });
+    if (current.deletedAt) {
+      await tx
+        .update(transactions)
+        .set({ deletedAt: null, version: sql`${transactions.version} + 1` })
+        .where(eq(transactions.id, transactionId));
+      await this.audit.record(tx, {
+        action: 'transaction.restore',
+        actorUserId: userId,
+        workspaceId: membership.workspaceId,
+        metadata: { transactionId },
+      });
+    }
+    return this.get(transactionId);
+  }
+
+  /**
+   * Locks a Transaction so changes to it take turns, and reads it. 404 unless
+   * it exists in the Workspace and, unless `deleted`, is not deleted; 403
+   * unless the caller may change it.
+   */
+  private async lockToChange(
+    membership: Membership,
+    userId: string,
+    transactionId: string,
+    { deleted = false } = {},
+  ): Promise<Row & { deletedAt: Date | null }> {
+    if (!isUuid(transactionId)) throw new NotFoundException();
+    const [row] = await scopedTx()
+      .select({ ...columns, deletedAt: transactions.deletedAt })
+      .from(transactions)
+      .where(
+        and(
+          eq(transactions.id, transactionId),
+          deleted ? undefined : isNull(transactions.deletedAt),
+        ),
+      )
+      .for('update');
+    if (!row) throw new NotFoundException();
+    if (!mayChangeTransaction(membership.role, userId, row)) throw new ForbiddenException();
+    return row;
+  }
+
+  /**
    * Attaches an active Label to a Transaction. Attaching one it already
    * carries changes nothing, so a repeated request is harmless.
    */
@@ -299,7 +459,7 @@ export class TransactionsService {
     labelId: string,
   ): Promise<TransactionWire> {
     const tx = scopedTx();
-    const label = await this.lockForLabel(transactionId, labelId);
+    const label = await this.lockForLabel(membership, userId, transactionId, labelId);
     const carried = await tx
       .select({ labelId: transactionLabels.labelId })
       .from(transactionLabels)
@@ -332,7 +492,7 @@ export class TransactionsService {
     labelId: string,
   ): Promise<TransactionWire> {
     const tx = scopedTx();
-    await this.lockForLabel(transactionId, labelId);
+    await this.lockForLabel(membership, userId, transactionId, labelId);
     const [detached] = await tx
       .delete(transactionLabels)
       .where(
@@ -357,18 +517,18 @@ export class TransactionsService {
   /**
    * Locks a Transaction that is not deleted, so concurrent changes to its
    * Labels take turns (the Label count stays within the limit), and reads the
-   * Label. 404 unless both exist in the Workspace.
+   * Label. 404 unless both exist in the Workspace, 403 unless the caller may
+   * change the Transaction.
    */
-  private async lockForLabel(transactionId: string, labelId: string) {
-    if (!isUuid(transactionId) || !isUuid(labelId)) throw new NotFoundException();
-    const tx = scopedTx();
-    const [row] = await tx
-      .select({ id: transactions.id })
-      .from(transactions)
-      .where(and(eq(transactions.id, transactionId), isNull(transactions.deletedAt)))
-      .for('update');
-    if (!row) throw new NotFoundException();
-    const [label] = await tx
+  private async lockForLabel(
+    membership: Membership,
+    userId: string,
+    transactionId: string,
+    labelId: string,
+  ) {
+    if (!isUuid(labelId)) throw new NotFoundException();
+    await this.lockToChange(membership, userId, transactionId);
+    const [label] = await scopedTx()
       .select({ archivedAt: labels.archivedAt })
       .from(labels)
       .where(eq(labels.id, labelId));

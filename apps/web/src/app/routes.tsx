@@ -11,6 +11,7 @@ import { LoginPage } from '../pages/LoginPage';
 import { NotFoundPage } from '../pages/NotFoundPage';
 import { SettingsPage } from '../pages/SettingsPage';
 import { SignupPage } from '../pages/SignupPage';
+import { TransactionEditPage } from '../pages/TransactionEditPage';
 import { TransactionsPage } from '../pages/TransactionsPage';
 import { Shell } from '../shell/Shell';
 
@@ -23,6 +24,7 @@ export const routes: RouteObject[] = [
         children: [
           { index: true, element: <HomePage /> },
           { path: 'transactions', element: <TransactionsPage /> },
+          { path: 'transactions/:transactionId', element: <TransactionEditPage /> },
           { path: 'accounts', element: <AccountsPage /> },
           { path: 'accounts/new', element: <AccountFormPage /> },
           { path: 'accounts/:accountId', element: <AccountFormPage /> },
