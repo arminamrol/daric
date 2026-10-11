@@ -2,6 +2,8 @@ import type { RouteObject } from 'react-router';
 import { GuestOnly, RequireSession } from '../auth/session';
 import { AccountFormPage } from '../pages/AccountFormPage';
 import { AccountsPage } from '../pages/AccountsPage';
+import { BudgetFormPage } from '../pages/BudgetFormPage';
+import { BudgetsPage } from '../pages/BudgetsPage';
 import { CategoriesPage } from '../pages/CategoriesPage';
 import { CategoryFormPage } from '../pages/CategoryFormPage';
 import { HomePage } from '../pages/HomePage';
@@ -34,6 +36,9 @@ export const routes: RouteObject[] = [
           { path: 'labels', element: <LabelsPage /> },
           { path: 'labels/new', element: <LabelFormPage /> },
           { path: 'labels/:labelId', element: <LabelFormPage /> },
+          { path: 'budgets', element: <BudgetsPage /> },
+          { path: 'budgets/new', element: <BudgetFormPage /> },
+          { path: 'budgets/:budgetId', element: <BudgetFormPage /> },
           { path: 'settings', element: <SettingsPage /> },
         ],
       },

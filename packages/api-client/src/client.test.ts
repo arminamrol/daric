@@ -296,6 +296,59 @@ describe('api-client', () => {
     });
   });
 
+  describe('Budgets', () => {
+    const budget = {
+      id: '01900000-0000-7000-8000-0000000000b1',
+      categoryId: '01900000-0000-7000-b000-000000000001',
+      labelId: null,
+      period: 'MONTHLY',
+      amount: '1000',
+      currency: 'IRR',
+      version: 1,
+      progress: {
+        period: '1405-07',
+        spent: '900',
+        remaining: '100',
+        percent: 90,
+        state: 'warning',
+        otherCurrencyExpenses: 0,
+      },
+    } as const;
+    const base = `/v1/workspaces/${workspace.id}/budgets`;
+
+    it('lists them for a month with Amounts as bigints, and creates, updates and deletes them', async () => {
+      const { client, sent } = fakeServer(
+        {
+          [`GET ${base}`]: () => ({ status: 200, body: [budget] }),
+          [`POST ${base}`]: () => ({ status: 201, body: budget }),
+          [`PATCH ${base}/${budget.id}`]: () => ({ status: 200, body: budget }),
+          [`DELETE ${base}/${budget.id}`]: () => ({ status: 204 }),
+        },
+        { '__Host-daric_csrf': 'csrf-1' },
+      );
+      const [listed] = await client.listBudgets(workspace.id);
+      expect(listed).toMatchObject({
+        amount: 1000n,
+        progress: { period: { kind: 'month', year: 1405, month: 7 }, remaining: 100n },
+      });
+      await client.listBudgets(workspace.id, { month: { kind: 'month', year: 1405, month: 6 } });
+      await client.createBudget(workspace.id, {
+        categoryId: budget.categoryId,
+        period: 'MONTHLY',
+        amount: 1000n,
+      });
+      await client.updateBudget(workspace.id, budget.id, { amount: 2000n });
+      await client.deleteBudget(workspace.id, budget.id);
+      expect(sent.map((r) => [r.method, r.url, r.body])).toEqual([
+        ['GET', base, undefined],
+        ['GET', `${base}?month=1405-06`, undefined],
+        ['POST', base, { categoryId: budget.categoryId, period: 'MONTHLY', amount: '1000' }],
+        ['PATCH', `${base}/${budget.id}`, { amount: '2000' }],
+        ['DELETE', `${base}/${budget.id}`, undefined],
+      ]);
+    });
+  });
+
   describe('Transactions', () => {
     const transaction = {
       id: '0199d0f0-0000-7000-8000-000000000001',

@@ -1,15 +1,24 @@
 import { ApiError, type ApiClient } from '@daric/api-client';
 import {
   balanceEffect,
+  budgetExpenses,
+  budgetPeriodOf,
+  budgetProgress,
   categoryKinds,
+  dayOf,
+  monthPeriodOfDay,
   categoryTree,
   hasRole,
   mayChangeTransaction,
   periodDays,
+  todayIn,
 } from '@daric/core';
 import type {
   Account,
+  Budget,
+  BudgetPeriod,
   Category,
+  MonthPeriod,
   Label,
   Me,
   Session,
@@ -61,6 +70,8 @@ export function fakeApi({
   const deleted = new Set<string>();
   let labels: Label[] = [];
   let nextLabelId = 1;
+  let budgets: StoredBudget[] = [];
+  let nextBudgetId = 1;
   /** Unreachable: every call fails as fetch does when the network is down. */
   let offline = false;
 
@@ -200,6 +211,73 @@ export function fakeApi({
         : { ...transaction, labelIds, version: transaction.version + 1 },
     );
   }
+
+  /** Puts a Budget straight into the Workspace, in its Base Currency unless told otherwise. */
+  function addBudget(
+    fields: Partial<StoredBudget> & Pick<StoredBudget, 'categoryId' | 'period' | 'amount'>,
+  ): StoredBudget {
+    const budget: StoredBudget = {
+      id: `01900000-0000-7000-8b00-${String(nextBudgetId++).padStart(12, '0')}`,
+      labelId: null,
+      currency: workspace.baseCurrency,
+      version: 1,
+      ...fields,
+    };
+    budgets.push(budget);
+    return budget;
+  }
+
+  /** A Budget with its progress in `month`, as the API computes it. */
+  function withProgress(budget: StoredBudget, month: MonthPeriod): Budget {
+    const day = dayOf(workspace.calendar, { year: month.year, month: month.month, day: 1 });
+    const period = budgetPeriodOf(budget.period, day, workspace.calendar);
+    const counted = budgetExpenses(
+      { budget, period, calendar: workspace.calendar, categories },
+      live(),
+    );
+    const currencyOf = (t: Transaction) => accounts.find((a) => a.id === t.accountId)?.currency;
+    const same = counted.filter((t) => currencyOf(t) === budget.currency);
+    const progress = budgetProgress(
+      budget.amount,
+      same.reduce((sum, t) => sum + t.amount, 0n),
+    );
+    return {
+      ...budget,
+      progress: { ...progress, period, otherCurrencyExpenses: counted.length - same.length },
+    };
+  }
+
+  function findBudget(budgetId: string): StoredBudget {
+    const budget = budgets.find((b) => b.id === budgetId);
+    if (!budget) throw new ApiError(404, { message: 'Not Found' });
+    return budget;
+  }
+
+  /** As the API checks a Budget's Category and Label, and one per Category, Label and Period. */
+  function assertBudgetFits(budget: StoredBudget, current?: StoredBudget) {
+    const category = categories.find((c) => c.id === budget.categoryId);
+    const keptCategory = category?.id === current?.categoryId;
+    if (category?.kind !== 'EXPENSE' || (category.archived && !keptCategory)) {
+      throw new ApiError(400, { message: 'Bad Category' });
+    }
+    if (budget.labelId !== null) {
+      const label = labels.find((l) => l.id === budget.labelId);
+      if (!label || (label.archived && label.id !== current?.labelId)) {
+        throw new ApiError(400, { message: 'Bad Label' });
+      }
+    }
+    const taken = budgets.some(
+      (b) =>
+        b.id !== budget.id &&
+        b.categoryId === budget.categoryId &&
+        b.labelId === budget.labelId &&
+        b.period === budget.period,
+    );
+    if (taken) throw new ApiError(409, { message: 'Taken' });
+  }
+
+  const currentMonth = () =>
+    monthPeriodOfDay(todayIn(new Date(), workspace.timezone), workspace.calendar);
 
   const siblings = (kind: Category['kind'], parentId: string | null) =>
     categories
@@ -455,6 +533,29 @@ export function fakeApi({
       if (!deleted.delete(transactionId)) return { ...current };
       return replace({ ...current, version: current.version + 1 });
     },
+    async listBudgets(workspaceId, { month = currentMonth() } = {}) {
+      inWorkspace(workspaceId);
+      return budgets.map((b) => withProgress(b, month));
+    },
+    async createBudget(workspaceId, { labelId = null, ...input }) {
+      inWorkspace(workspaceId, 'ADMIN');
+      const draft = { id: '', labelId, currency: workspace.baseCurrency, version: 1, ...input };
+      assertBudgetFits(draft);
+      return withProgress(addBudget({ ...input, labelId }), currentMonth());
+    },
+    async updateBudget(workspaceId, budgetId, input) {
+      inWorkspace(workspaceId, 'ADMIN');
+      const current = findBudget(budgetId);
+      const updated = { ...current, ...input, version: current.version + 1 };
+      assertBudgetFits(updated, current);
+      budgets = budgets.map((b) => (b.id === budgetId ? updated : b));
+      return withProgress(updated, currentMonth());
+    },
+    async deleteBudget(workspaceId, budgetId) {
+      inWorkspace(workspaceId, 'ADMIN');
+      findBudget(budgetId);
+      budgets = budgets.filter((b) => b.id !== budgetId);
+    },
     async updatePreferences(input) {
       const user = signedIn();
       user.preferences = { ...user.preferences, ...input };
@@ -485,6 +586,9 @@ export function fakeApi({
     addLabel,
     /** As stored, archived ones included. */
     labels: () => labels,
+    addBudget,
+    /** As stored, without progress. */
+    budgets: () => budgets,
     /** In the order recorded, deleted ones left out. */
     transactions: () => live(),
     /** Ids of those deleted softly. */
@@ -497,6 +601,17 @@ export function fakeApi({
   };
 }
 export type FakeApi = ReturnType<typeof fakeApi>;
+
+/** A Budget as the fake keeps it; progress is worked out on every read. */
+interface StoredBudget {
+  id: string;
+  categoryId: string;
+  labelId: string | null;
+  period: BudgetPeriod;
+  amount: bigint;
+  currency: string;
+  version: number;
+}
 
 type Defaulted = 'id' | 'note' | 'createdBy' | 'labelIds' | 'version';
 
