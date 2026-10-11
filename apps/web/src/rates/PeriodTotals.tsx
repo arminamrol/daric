@@ -1,4 +1,4 @@
-import { currencyOf, rateDayOf, toBaseCurrency } from '@daric/core';
+import { currencyByCode, rateDayOf, toBaseCurrency } from '@daric/core';
 import type { CurrencyTotals, Money, Period } from '@daric/core';
 import { isolate } from '@daric/i18n';
 import { useSignedIn } from '../auth/session';
@@ -7,17 +7,23 @@ import { useFormatters } from '../settings/settings';
 import { RateNotes } from './RateNotes';
 import { useExchangeRates } from './rates';
 
+function uniqueBy<T>(items: readonly T[], key: (item: T) => string): T[] {
+  return items.filter(
+    (item, index) => items.findIndex((other) => key(other) === key(item)) === index,
+  );
+}
+
 function IncomeExpense({ income, expense }: { income: Money; expense: Money }) {
   const { t } = useI18n();
   const format = useFormatters();
   return (
     <div className="flex gap-3 text-sm tabular-nums">
-      {income.amount !== 0n && (
+      {income.amount > 0n && (
         <p className="text-success">
           {t('transactions.list.income', { amount: isolate(format.money(income)) })}
         </p>
       )}
-      {expense.amount !== 0n && (
+      {expense.amount > 0n && (
         <p className="text-foreground-muted">
           {t('transactions.list.expense', { amount: isolate(format.money(expense)) })}
         </p>
@@ -37,7 +43,7 @@ export function PeriodTotals({ period, totals }: { period: Period; totals: Curre
   const format = useFormatters();
   const { workspace } = useSignedIn();
   const rates = useExchangeRates();
-  const base = currencyOf(workspace.baseCurrency);
+  const base = currencyByCode(workspace.baseCurrency);
   const mixed = totals.some((total) => total.currency.code !== base.code);
 
   if (!mixed || !rates.data) {
@@ -45,25 +51,12 @@ export function PeriodTotals({ period, totals }: { period: Period; totals: Curre
   }
 
   const day = rateDayOf(period, workspace.calendar, format.today(new Date()));
-  const income = toBaseCurrency(
-    totals.map((total) => total.income),
-    base,
-    rates.data,
-    day,
-  );
-  const expense = toBaseCurrency(
-    totals.map((total) => total.expense),
-    base,
-    rates.data,
-    day,
-  );
+  const convert = (amounts: Money[]) => toBaseCurrency(amounts, base, rates.data, day);
+  const income = convert(totals.map((total) => total.income));
+  const expense = convert(totals.map((total) => total.expense));
   // Income and Expense convert on the same day, so one rate serves both.
-  const ratesUsed = [...income.ratesUsed, ...expense.ratesUsed].filter(
-    (rate, index, all) => all.findIndex((r) => r.currency === rate.currency) === index,
-  );
-  const missing = [...income.missing, ...expense.missing].filter(
-    (currency, index, all) => all.findIndex((c) => c.code === currency.code) === index,
-  );
+  const ratesUsed = uniqueBy([...income.ratesUsed, ...expense.ratesUsed], (r) => r.currency);
+  const missing = uniqueBy([...income.missing, ...expense.missing], (c) => c.code);
 
   return (
     <div className="flex basis-full flex-col gap-1">
@@ -75,9 +68,9 @@ export function PeriodTotals({ period, totals }: { period: Period; totals: Curre
             {t('totals.currencyLine', {
               currency: format.currency(total.currency),
               amounts: [
-                total.income.amount !== 0n &&
+                total.income.amount > 0n &&
                   t('transactions.list.income', { amount: isolate(format.money(total.income)) }),
-                total.expense.amount !== 0n &&
+                total.expense.amount > 0n &&
                   t('transactions.list.expense', {
                     amount: isolate(format.money(total.expense)),
                   }),

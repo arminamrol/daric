@@ -3,7 +3,7 @@ import type {
   ExchangeRateWire,
   UpdateExchangeRateInput,
 } from '@daric/core';
-import { currencyOf } from '@daric/core';
+import { currencyByCode } from '@daric/core';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useApi } from '../api/api';
 import { useSignedIn } from '../auth/session';
@@ -75,9 +75,9 @@ export function useDeleteExchangeRate(rateId: string) {
 export function useRateEquation() {
   const format = useFormatters();
   const { workspace } = useSignedIn();
-  const base = currencyOf(workspace.baseCurrency);
+  const base = currencyByCode(workspace.baseCurrency);
   return (rate: Pick<ExchangeRateWire, 'currency' | 'rate'>) => {
-    const currency = currencyOf(rate.currency);
+    const currency = currencyByCode(rate.currency);
     return {
       one: format.count(1),
       currency: format.currency(currency),

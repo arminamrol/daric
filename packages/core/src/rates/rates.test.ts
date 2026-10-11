@@ -81,6 +81,16 @@ describe('toBaseCurrency', () => {
     });
   });
 
+  it('rounds once, on the whole total, never per currency (ADR-0004)', () => {
+    const halves = [
+      { currency: 'USD', rate: '50', effectiveOn: '2026-01-01' },
+      { currency: 'EUR', rate: '50', effectiveOn: '2026-01-01' },
+    ];
+    // 0.01 USD and 0.01 EUR are half a rial each: one rial together, not two.
+    const result = toBaseCurrency([money(1n, USD), money(1n, EUR)], IRR, halves, '2026-10-11');
+    expect(result.total).toEqual(money(1n, IRR));
+  });
+
   it('converts into a Base Currency with decimals', () => {
     const toUsd = [{ currency: 'IRR', rate: '0.000001', effectiveOn: '2026-01-01' }];
     const result = toBaseCurrency([money(12_345_678n, IRR)], USD, toUsd, '2026-10-11');

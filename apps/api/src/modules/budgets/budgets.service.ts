@@ -10,8 +10,7 @@ import {
   budgetExpenses,
   budgetPeriodOf,
   budgetProgress,
-  budgetSpent,
-  currencyOf,
+  currencyByCode,
   dayOf,
   money,
   monthPeriodOfDay,
@@ -140,16 +139,15 @@ export class BudgetsService {
       const period = budgetPeriodOf(row.period, day, calendar);
       const scope = { budget: row, period, calendar, categories: workspaceCategories };
       const counted = budgetExpenses(scope, expenses);
-      let spent = budgetSpent(
-        scope,
-        counted.filter((t) => t.currency === row.currency),
-      );
+      let spent = counted
+        .filter((t) => t.currency === row.currency)
+        .reduce((sum, t) => sum + t.amount, 0n);
       let otherCurrency = counted.filter((t) => t.currency !== row.currency);
       let ratesUsed: BudgetProgressWire['ratesUsed'] = [];
       if (row.currency === baseCurrency) {
         const converted = toBaseCurrency(
-          counted.map((t) => money(t.amount, currencyOf(t.currency))),
-          currencyOf(baseCurrency),
+          counted.map((t) => money(t.amount, currencyByCode(t.currency))),
+          currencyByCode(baseCurrency),
           rates,
           rateDayOf(period, calendar, today),
         );

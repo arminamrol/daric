@@ -1,6 +1,7 @@
 import { z } from 'zod';
 import { budgetPeriods, budgetStates } from '../budgets';
 import { amountSchema } from '../money';
+import { rateUsedSchema } from './exchange-rate';
 import {
   idSchema,
   monthParamSchema,
@@ -26,7 +27,7 @@ export const budgetProgressSchema = z.object({
    * currency's rate on the Period's last day, or today while it runs. Only a
    * Budget in the current Base Currency converts.
    */
-  ratesUsed: z.array(z.object({ currency: z.string(), rate: z.string(), effectiveOn: z.string() })),
+  ratesUsed: z.array(rateUsedSchema),
   /**
    * Expenses that would count but are on Accounts of another currency with no
    * rate to convert them; they are left out of `spent`.

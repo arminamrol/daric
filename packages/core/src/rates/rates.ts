@@ -2,7 +2,8 @@ import { addDays, periodDays } from '../calendar';
 import type { CalendarSystem, IsoDay, Period } from '../calendar';
 import { toPersianDigits } from '../locale';
 import type { Digits } from '../locale';
-import { IRR, convert, money, toLatinDigits } from '../money';
+import { IRR, convertExactly, divRound, fitsInt64, money, toLatinDigits } from '../money';
+import type { ExactConversion } from '../money';
 import type { Currency, Money, MoneyDisplay } from '../money';
 
 /**
@@ -44,7 +45,7 @@ export interface BaseTotal<R extends ExchangeRate = ExchangeRate> {
 
 /**
  * Adds up `amounts` of any currencies in `base`, converting each currency's sum
- * at its rate in force on `day`. A currency with no rate that day is left out of
+ * at its rate in force on `day` and rounding the total once. A currency with no rate that day is left out of
  * the total and reported as missing, never guessed.
  */
 export function toBaseCurrency<R extends ExchangeRate>(
@@ -63,12 +64,13 @@ export function toBaseCurrency<R extends ExchangeRate>(
     a.currency.code.localeCompare(b.currency.code),
   );
 
-  let total = 0n;
+  // Every converted sum is kept exact and the total rounded once (ADR-0004).
+  const exact: ExactConversion[] = [];
   const ratesUsed: R[] = [];
   const missing: Currency[] = [];
   for (const sum of byCurrency) {
     if (sum.currency.code === base.code) {
-      total += sum.amount;
+      exact.push({ numerator: sum.amount, scale: 0 });
       continue;
     }
     if (sum.amount === 0n) continue;
@@ -77,9 +79,16 @@ export function toBaseCurrency<R extends ExchangeRate>(
       missing.push(sum.currency);
       continue;
     }
-    total += convert(sum, base, rate.rate).amount;
+    exact.push(convertExactly(sum, base, rate.rate));
     ratesUsed.push(rate);
   }
+  const scale = Math.max(0, ...exact.map((e) => e.scale));
+  const numerator = exact.reduce(
+    (acc, e) => acc + e.numerator * 10n ** BigInt(scale - e.scale),
+    0n,
+  );
+  const total = divRound(numerator, 10n ** BigInt(scale));
+  if (!fitsInt64(total)) throw new RangeError('Converted total does not fit a 64-bit integer');
   return { total: money(total, base), byCurrency, ratesUsed, missing };
 }
 

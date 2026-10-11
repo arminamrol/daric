@@ -12,7 +12,7 @@ import {
   nextOccurrence,
   monthPeriodOfDay,
   categoryTree,
-  currencyOf as currencyByCode,
+  currencyByCode,
   hasRole,
   money,
   rateDayOf,

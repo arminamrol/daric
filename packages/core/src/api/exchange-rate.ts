@@ -15,6 +15,13 @@ export const rateSchema = z
   .refine((rate) => /[1-9]/.test(rate), { message: 'A rate must be positive' })
   .transform(canonicalRate);
 
+/** A rate a total was converted at: its currency, rate and the day it took effect. */
+export const rateUsedSchema = z.object({
+  currency: z.string(),
+  rate: z.string(),
+  effectiveOn: isoDaySchema,
+});
+
 /** An Exchange Rate as the API returns it, into the Workspace's current Base Currency. */
 export const exchangeRateSchema = z.object({
   id: z.uuid(),

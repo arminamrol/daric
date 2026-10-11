@@ -1,5 +1,5 @@
 import { ApiError } from '@daric/api-client';
-import { currencies, currencyOf, parseDisplayDay, parseRate } from '@daric/core';
+import { currencies, currencyByCode, parseDisplayDay, parseRate } from '@daric/core';
 import type { ExchangeRateWire, ParseRateError } from '@daric/core';
 import type { PlainMessageKey } from '@daric/i18n';
 import { useId, useRef, useState } from 'react';
@@ -37,7 +37,7 @@ export function RateForm({ rate }: { rate?: ExchangeRateWire }) {
   const { displayCalendar } = me.preferences;
   const id = useId();
   const fieldId = (key: string) => `${id}-${key}`;
-  const base = currencyOf(workspace.baseCurrency);
+  const base = currencyByCode(workspace.baseCurrency);
   const choices = currencies.filter((c) => c.code !== base.code);
   const refs = {
     currency: useRef<HTMLSelectElement>(null),
@@ -46,7 +46,7 @@ export function RateForm({ rate }: { rate?: ExchangeRateWire }) {
   };
   const [code, setCode] = useState(rate?.currency ?? choices[0]?.code ?? '');
   const [text, setText] = useState(() =>
-    rate ? format.rate(rate.rate, currencyOf(rate.currency), base) : '',
+    rate ? format.rate(rate.rate, currencyByCode(rate.currency), base) : '',
   );
   const [day, setDay] = useState(() => format.day(rate?.effectiveOn ?? format.today(new Date())));
   const [errors, setErrors] = useState<Partial<Record<Field, PlainMessageKey>>>({});
@@ -55,6 +55,7 @@ export function RateForm({ rate }: { rate?: ExchangeRateWire }) {
   const update = useUpdateExchangeRate(rate?.id ?? '');
   const remove = useDeleteExchangeRate(rate?.id ?? '');
   const save = rate ? update : create;
+  const selected = choices.find((c) => c.code === code);
 
   function changed() {
     save.reset();
@@ -76,7 +77,7 @@ export function RateForm({ rate }: { rate?: ExchangeRateWire }) {
 
   function onSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
-    const currency = choices.find((c) => c.code === code);
+    const currency = selected;
     const parsed = currency
       ? parseRate(text, { currency, base, display: workspace.moneyDisplay })
       : undefined;
@@ -146,7 +147,6 @@ export function RateForm({ rate }: { rate?: ExchangeRateWire }) {
     );
   }
 
-  const selected = choices.find((c) => c.code === code);
   const titleId = fieldId('title');
   const deleteHintId = fieldId('delete-hint');
 

@@ -1,4 +1,4 @@
-import { currencyOf, hasRole, rateOn } from '@daric/core';
+import { currencyByCode, hasRole, rateOn } from '@daric/core';
 import type { ExchangeRateWire } from '@daric/core';
 import { isolate } from '@daric/i18n';
 import { useId } from 'react';
@@ -27,7 +27,7 @@ function CurrencyRates({
   return (
     <section aria-labelledby={titleId} className="flex flex-col gap-2">
       <h2 id={titleId} className="text-lg font-bold">
-        {format.currency(currencyOf(currency))}
+        {format.currency(currencyByCode(currency))}
       </h2>
       <ul className="flex flex-col divide-y divide-border rounded-xl border border-border bg-surface">
         {rates.map((rate) => {
@@ -40,7 +40,7 @@ function CurrencyRates({
                   <Link
                     to={`/rates/${rate.id}`}
                     aria-label={t('rates.edit', {
-                      currency: isolate(format.currency(currencyOf(currency))),
+                      currency: isolate(format.currency(currencyByCode(currency))),
                       day: isolate(day),
                     })}
                     className="font-medium tabular-nums underline-offset-4 hover:underline"
@@ -94,7 +94,7 @@ export function RatesPage() {
         )}
       </div>
       <p className="text-sm text-foreground-muted">
-        {t('rates.intro', { base: format.currency(currencyOf(workspace.baseCurrency)) })}
+        {t('rates.intro', { base: format.currency(currencyByCode(workspace.baseCurrency)) })}
       </p>
       {!canManage && <p className="text-sm text-foreground-muted">{t('rates.readOnly')}</p>}
       {rates.isPending ? (
