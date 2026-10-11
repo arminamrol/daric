@@ -129,7 +129,6 @@ export const createTransactionInputSchema = z.discriminatedUnion('type', [
   createTransferInputSchema,
 ]);
 export type CreateTransactionInput = z.infer<typeof createTransactionInputSchema>;
-export type CreateTransferInput = z.infer<typeof createTransferInputSchema>;
 
 const updateFields = {
   ...inputFields,

@@ -54,7 +54,7 @@ export function TransactionsPage() {
   const remove = useDeleteTransaction();
   const restore = useRestoreTransaction();
   // The Transaction just deleted, which can still be brought back.
-  const [deleted, setDeleted] = useState<string>();
+  const [deletedId, setDeletedId] = useState<string>();
 
   function setParam(name: string, value: string | undefined) {
     const next = new URLSearchParams(params);
@@ -177,7 +177,7 @@ export function TransactionsPage() {
             {t('transactions.list.deleteFailed')}
           </p>
         )}
-        {deleted && (
+        {deletedId && (
           <div
             role="status"
             className="flex flex-wrap items-center gap-3 rounded-md bg-surface-muted px-4 py-2"
@@ -189,7 +189,9 @@ export function TransactionsPage() {
             <button
               type="button"
               disabled={restore.isPending}
-              onClick={() => restore.mutate(deleted, { onSuccess: () => setDeleted(undefined) })}
+              onClick={() =>
+                restore.mutate(deletedId, { onSuccess: () => setDeletedId(undefined) })
+              }
               className="rounded-md border border-border px-3 py-1 text-sm font-medium disabled:opacity-60"
             >
               {t('transactions.list.undo')}
@@ -222,7 +224,7 @@ export function TransactionsPage() {
                 remove.mutate(transaction.id, {
                   onSuccess: () => {
                     restore.reset();
-                    setDeleted(transaction.id);
+                    setDeletedId(transaction.id);
                   },
                 }),
               busy: remove.isPending,

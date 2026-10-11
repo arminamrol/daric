@@ -243,17 +243,20 @@ export class TransactionsService {
    * destination Amount to store.
    */
   private async validate(input: TransactionInput, current?: Row): Promise<bigint | undefined> {
-    const account = await this.usableAccount(input.accountId, 'Account', current?.accountId);
+    // Either of its Accounts may stay archived, also when a Transfer swaps sides.
+    const keptAccounts = current ? [current.accountId, current.toAccountId] : [];
+    const account = await this.usableAccount(input.accountId, 'Account', keptAccounts);
     let toAmount: bigint | undefined;
     if (input.type === 'TRANSFER') {
-      toAmount = await this.transferredAmount(input, account.currency, current?.toAccountId);
+      toAmount = await this.transferredAmount(input, account.currency, keptAccounts);
     } else {
       const [category] = await scopedTx()
-        .select({ kind: categories.kind, archivedAt: categories.archivedAt })
+        .select({ id: categories.id, kind: categories.kind, archivedAt: categories.archivedAt })
         .from(categories)
         .where(eq(categories.id, input.categoryId));
       if (!category) throw new BadRequestException('Category not found');
-      if (category.archivedAt && input.categoryId !== current?.categoryId) {
+      // Compared as stored (lowercase): the input may spell the id in any case.
+      if (category.archivedAt && category.id !== current?.categoryId) {
         throw new BadRequestException('The Category is archived');
       }
       if (category.kind !== input.type) {
@@ -274,14 +277,18 @@ export class TransactionsService {
     return toAmount;
   }
 
-  /** An Account to put a Transaction on: active, or archived but the one it is on already. */
-  private async usableAccount(accountId: string, name: string, kept?: string | null) {
+  /** An Account to put a Transaction on: active, or archived but one it is on already. */
+  private async usableAccount(
+    accountId: string,
+    name: string,
+    kept: readonly (string | null)[] = [],
+  ) {
     const [account] = await scopedTx()
       .select({ id: accounts.id, currency: accounts.currency, archivedAt: accounts.archivedAt })
       .from(accounts)
       .where(eq(accounts.id, accountId));
     if (!account) throw new BadRequestException(`${name} not found`);
-    if (account.archivedAt && accountId !== kept) {
+    if (account.archivedAt && !kept.includes(account.id)) {
       throw new BadRequestException(`The ${name} is archived`);
     }
     return account;
@@ -294,7 +301,7 @@ export class TransactionsService {
   private async transferredAmount(
     input: Extract<TransactionInput, { type: 'TRANSFER' }>,
     currency: string,
-    kept?: string | null,
+    kept: readonly (string | null)[],
   ): Promise<bigint> {
     const destination = await this.usableAccount(input.toAccountId, 'destination Account', kept);
     if (destination.currency === currency) {

@@ -993,12 +993,22 @@ describe('Editing and deleting Transactions', () => {
       expense({ note: 'still here', labelIds: [travel.id], version: 1 }),
     );
     expect(noted.status).toBe(200);
+    // Ids in any case name the same things.
+    const shouted = await api.update(
+      recorded.id,
+      expense({
+        accountId: account.id.toUpperCase(),
+        categoryId: category.id.toUpperCase(),
+        version: 2,
+      }),
+    );
+    expect(shouted.status).toBe(200);
     for (const change of [
       { accountId: cash.id },
       { categoryId: otherCategory.id },
       { labelIds: [travel.id, otherLabel.id] },
     ]) {
-      expect((await api.update(recorded.id, expense({ ...change, version: 2 }))).status).toBe(400);
+      expect((await api.update(recorded.id, expense({ ...change, version: 3 }))).status).toBe(400);
     }
   });
 
@@ -1013,14 +1023,25 @@ describe('Editing and deleting Transactions', () => {
     expect(moved.body).not.toHaveProperty('categoryId');
     expect(await api.balance(cash.id)).toBe('250000');
 
-    const toDollars = { ...transfer, toAccountId: dollars.id, version: 2 };
+    // Swapping sides keeps an archived Account the Transfer is already on.
+    expect((await api.archive('accounts', cash.id)).status).toBe(200);
+    const swapped = await api.update(recorded.id, {
+      ...transfer,
+      accountId: cash.id,
+      toAccountId: account.id,
+      version: 2,
+    });
+    expect(swapped.status).toBe(200);
+    expect((await api.update(recorded.id, { ...transfer, version: 3 })).status).toBe(200);
+
+    const toDollars = { ...transfer, toAccountId: dollars.id, version: 4 };
     expect((await api.update(recorded.id, toDollars)).status).toBe(400);
     const crossed = await api.update(recorded.id, { ...toDollars, toAmount: '500' });
-    expect(crossed.body).toMatchObject({ toAccountId: dollars.id, toAmount: '500', version: 3 });
+    expect(crossed.body).toMatchObject({ toAccountId: dollars.id, toAmount: '500', version: 5 });
 
     const back = await api.update(
       recorded.id,
-      expense({ type: 'INCOME', categoryId: income.id, version: 3 }),
+      expense({ type: 'INCOME', categoryId: income.id, version: 5 }),
     );
     expect(back.status).toBe(200);
     expect(back.body).not.toHaveProperty('toAccountId');
