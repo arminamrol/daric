@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest';
 import {
   budgetSchema,
   createBudgetInputSchema,
-  listBudgetsQuerySchema,
+  progressMonthQuerySchema,
   updateBudgetInputSchema,
 } from './index';
 
@@ -57,17 +57,17 @@ describe('updateBudgetInputSchema', () => {
   });
 });
 
-describe('listBudgetsQuerySchema', () => {
+describe('progressMonthQuerySchema', () => {
   it('reads a month', () => {
-    expect(listBudgetsQuerySchema.parse({ month: '1405-07' })).toEqual({
+    expect(progressMonthQuerySchema.parse({ month: '1405-07' })).toEqual({
       month: { kind: 'month', year: 1405, month: 7 },
     });
-    expect(listBudgetsQuerySchema.parse({})).toEqual({});
+    expect(progressMonthQuerySchema.parse({})).toEqual({});
   });
 
   it('refuses a year or anything else', () => {
-    expect(listBudgetsQuerySchema.safeParse({ month: '1405' }).success).toBe(false);
-    expect(listBudgetsQuerySchema.safeParse({ month: '1405-13' }).success).toBe(false);
+    expect(progressMonthQuerySchema.safeParse({ month: '1405' }).success).toBe(false);
+    expect(progressMonthQuerySchema.safeParse({ month: '1405-13' }).success).toBe(false);
   });
 });
 

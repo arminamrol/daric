@@ -24,7 +24,7 @@ import {
   budgetSchema,
   type CreateBudgetInput,
   createBudgetInputSchema,
-  listBudgetsQuerySchema,
+  progressMonthQuerySchema,
   type UpdateBudgetInput,
   updateBudgetInputSchema,
 } from '@daric/core';
@@ -38,7 +38,7 @@ import { BUDGET_TAKEN, BudgetsService } from './budgets.service';
 class BudgetDto extends createZodDto(budgetSchema) {}
 class CreateBudgetDto extends createZodDto(createBudgetInputSchema) {}
 class UpdateBudgetDto extends createZodDto(updateBudgetInputSchema) {}
-class ListBudgetsQueryDto extends createZodDto(listBudgetsQuerySchema) {}
+class ProgressMonthQueryDto extends createZodDto(progressMonthQuerySchema) {}
 
 const monthQuery = ApiQuery({
   name: 'month',
@@ -63,7 +63,7 @@ export class BudgetsController {
   @ApiBadRequestResponse({ description: 'A malformed month' })
   list(
     @CurrentMembership() membership: Membership,
-    @Query(new ZodValidationPipe(ListBudgetsQueryDto)) query: ListBudgetsQueryDto,
+    @Query(new ZodValidationPipe(ProgressMonthQueryDto)) query: ProgressMonthQueryDto,
   ) {
     return this.budgets.list(membership, query.month);
   }
@@ -74,7 +74,7 @@ export class BudgetsController {
   get(
     @CurrentMembership() membership: Membership,
     @Param('budgetId') budgetId: string,
-    @Query(new ZodValidationPipe(ListBudgetsQueryDto)) query: ListBudgetsQueryDto,
+    @Query(new ZodValidationPipe(ProgressMonthQueryDto)) query: ProgressMonthQueryDto,
   ) {
     return this.budgets.get(membership, budgetId, query.month);
   }
@@ -89,7 +89,7 @@ export class BudgetsController {
     @CurrentMembership() membership: Membership,
     @CurrentUserId() userId: string,
     @ZodBody(CreateBudgetDto) body: CreateBudgetInput,
-    @Query(new ZodValidationPipe(ListBudgetsQueryDto)) query: ListBudgetsQueryDto,
+    @Query(new ZodValidationPipe(ProgressMonthQueryDto)) query: ProgressMonthQueryDto,
   ) {
     return this.budgets.create(membership, userId, body, query.month);
   }
@@ -105,7 +105,7 @@ export class BudgetsController {
     @CurrentUserId() userId: string,
     @Param('budgetId') budgetId: string,
     @ZodBody(UpdateBudgetDto) body: UpdateBudgetInput,
-    @Query(new ZodValidationPipe(ListBudgetsQueryDto)) query: ListBudgetsQueryDto,
+    @Query(new ZodValidationPipe(ProgressMonthQueryDto)) query: ProgressMonthQueryDto,
   ) {
     return this.budgets.update(membership, userId, budgetId, body, query.month);
   }

@@ -1,8 +1,7 @@
 import { z } from 'zod';
 import { budgetPeriods, budgetStates } from '../budgets';
 import { amountSchema } from '../money';
-import { notEmpty } from './shared';
-import { monthParamSchema, periodParamSchema, positiveAmountSchema } from './transaction';
+import { monthParamSchema, notEmpty, periodParamSchema, positiveAmountSchema } from './shared';
 
 /** How a Budget stands in one of its Periods. */
 export const budgetProgressSchema = z.object({
@@ -72,8 +71,11 @@ export const updateBudgetInputSchema = z
   .refine(...notEmpty);
 export type UpdateBudgetInput = z.infer<typeof updateBudgetInputSchema>;
 
-/** Which month to show progress for; yearly Budgets show the year holding it. Defaults to the current month. */
-export const listBudgetsQuerySchema = z.object({
+/**
+ * Which month every Budget read or write shows progress for; yearly Budgets
+ * show the year holding it. Defaults to the current month.
+ */
+export const progressMonthQuerySchema = z.object({
   month: monthParamSchema.exactOptional(),
 });
-export type ListBudgetsQuery = z.infer<typeof listBudgetsQuerySchema>;
+export type ProgressMonthQuery = z.infer<typeof progressMonthQuerySchema>;

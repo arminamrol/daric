@@ -46,7 +46,7 @@ export function budgetPeriodOf(
   return period === 'MONTHLY' ? { kind: 'month', year, month } : { kind: 'year', year };
 }
 
-/** What `budgetSpent` needs of a Transaction; a Transfer has no Category. */
+/** What `budgetExpenses` needs of a Transaction; a Transfer has no Category. */
 export interface BudgetTransaction {
   readonly type: AnyTransactionType;
   readonly categoryId?: string | null;

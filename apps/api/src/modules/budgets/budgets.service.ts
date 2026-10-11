@@ -10,6 +10,7 @@ import {
   budgetExpenses,
   budgetPeriodOf,
   budgetProgress,
+  budgetSpent,
   dayOf,
   monthPeriodOfDay,
   periodDays,
@@ -122,13 +123,10 @@ export class BudgetsService {
 
     return rows.map((row) => {
       const period = budgetPeriodOf(row.period, day, calendar);
-      const counted = budgetExpenses(
-        { budget: row, period, calendar, categories: workspaceCategories },
-        expenses,
-      );
-      const same = counted.filter((t) => t.currency === row.currency);
-      const spent = same.reduce((sum, t) => sum + t.amount, 0n);
-      const progress = budgetProgress(row.amount, spent);
+      const scope = { budget: row, period, calendar, categories: workspaceCategories };
+      const inCurrency = expenses.filter((t) => t.currency === row.currency);
+      const otherCurrency = expenses.filter((t) => t.currency !== row.currency);
+      const progress = budgetProgress(row.amount, budgetSpent(scope, inCurrency));
       return {
         ...row,
         amount: amountToWire(row.amount),
@@ -138,7 +136,7 @@ export class BudgetsService {
           remaining: amountToWire(progress.remaining),
           percent: progress.percent,
           state: progress.state,
-          otherCurrencyExpenses: counted.length - same.length,
+          otherCurrencyExpenses: budgetExpenses(scope, otherCurrency).length,
         },
       };
     });
@@ -224,13 +222,9 @@ export class BudgetsService {
   }
 
   async remove(membership: Membership, userId: string, budgetId: string): Promise<void> {
-    if (!isUuid(budgetId)) throw new NotFoundException();
+    await this.row(budgetId);
     const tx = scopedTx();
-    const deleted = await tx
-      .delete(budgets)
-      .where(eq(budgets.id, budgetId))
-      .returning({ id: budgets.id });
-    if (deleted.length === 0) throw new NotFoundException();
+    await tx.delete(budgets).where(eq(budgets.id, budgetId));
     await this.audit.record(tx, {
       action: 'budget.delete',
       actorUserId: userId,
