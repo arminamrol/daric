@@ -1,4 +1,5 @@
-import { IRR, parseAmount, parseDisplayDay, transactionTypes } from '@daric/core';
+import { ApiError, transactionConflict } from '@daric/api-client';
+import { IRR, money, parseAmount, parseDisplayDay, transactionTypes } from '@daric/core';
 import type {
   Account,
   AnyTransactionType,
@@ -7,6 +8,7 @@ import type {
   Currency,
   Label,
   ParseAmountError,
+  Transaction,
   TransactionType,
 } from '@daric/core';
 import type { PlainMessageKey } from '@daric/i18n';
@@ -20,7 +22,12 @@ import { CALENDAR_LABELS, CURRENCY_NAMES } from '../settings/labels';
 import { useFormatters } from '../settings/settings';
 import { ChoiceGroup } from '../ui/ChoiceGroup';
 import { categoryChoices } from './choices';
-import { readLastPicks, useRecordTransaction, writeLastPicks } from './transactions';
+import {
+  readLastPicks,
+  useRecordTransaction,
+  useUpdateTransaction,
+  writeLastPicks,
+} from './transactions';
 
 const inputClass =
   'w-full rounded-md border border-border bg-background px-3 py-2 text-foreground aria-invalid:border-danger';
@@ -41,6 +48,19 @@ const TRANSACTION_TYPE_LABELS: Record<AnyTransactionType, PlainMessageKey> = {
 /** Expense first: it is what people record most. */
 const TYPE_ORDER: readonly AnyTransactionType[] = ['EXPENSE', 'INCOME', 'TRANSFER'];
 
+/** What the form's fields hold. */
+interface Draft {
+  type: AnyTransactionType;
+  amount: string;
+  toAmount: string;
+  accountId: string | undefined;
+  toAccountId: string | undefined;
+  categoryIds: Partial<Record<TransactionType, string>>;
+  day: string;
+  note: string;
+  labelIds: readonly string[];
+}
+
 interface FieldErrors {
   amount?: PlainMessageKey | undefined;
   toAmount?: PlainMessageKey | undefined;
@@ -54,17 +74,27 @@ interface FieldErrors {
  * kept, and after each one is recorded the amounts and Labels are cleared and
  * the amount focused for the next. A Transfer between currencies asks for the
  * Amount received too; nothing is converted.
+ *
+ * Given a `transaction`, it edits that one instead, starting from its values.
+ * If it changed elsewhere meanwhile, the user picks the new copy or their own changes.
  */
 export function TransactionForm({
   accounts,
   categories,
   labels,
+  transaction,
+  onSaved,
 }: {
-  /** Active Accounts only; at least one. */
+  /**
+   * At least one active. Archived ones are offered only when the edited
+   * Transaction is on them; the same goes for Categories and Labels.
+   */
   accounts: readonly Account[];
   categories: readonly Category[];
-  /** Archived ones are left out of the picker. */
   labels: readonly Label[];
+  transaction?: Transaction;
+  /** Called once an edit is saved. */
+  onSaved?: () => void;
 }) {
   const { t } = useI18n();
   const format = useFormatters();
@@ -94,8 +124,27 @@ export function TransactionForm({
   const dayRef = useRef<HTMLInputElement>(null);
   const categoryRef = useRef<HTMLSelectElement>(null);
 
+  // The server copy an edit starts from: archived things it names may stay.
+  const [base, setBase] = useState(transaction);
+  const kept = useMemo(
+    () =>
+      new Set<string>(
+        base
+          ? [
+              base.accountId,
+              ...base.labelIds,
+              base.type === 'TRANSFER' ? base.toAccountId : base.categoryId,
+            ]
+          : [],
+      ),
+    [base],
+  );
+  const usable = <T extends { id: string; archived: boolean }>(list: readonly T[]) =>
+    list.filter((x) => !x.archived || kept.has(x.id));
+  const offered = usable(accounts);
+
   const choices = useMemo(() => {
-    const active = categories.filter((c) => !c.archived);
+    const active = categories.filter((c) => !c.archived || kept.has(c.id));
     return Object.fromEntries(
       transactionTypes.map((type) => [
         type,
@@ -105,38 +154,90 @@ export function TransactionForm({
         ),
       ]),
     ) as Record<TransactionType, ReturnType<typeof categoryChoices>>;
-  }, [categories, t]);
+  }, [categories, t, kept]);
 
-  const [last] = useState(() => readLastPicks(workspace.id));
-  const [type, setType] = useState<AnyTransactionType>('EXPENSE');
-  const [amount, setAmount] = useState('');
-  const [toAmount, setToAmount] = useState('');
-  const [accountId, setAccountId] = useState(() =>
-    accounts.some((a) => a.id === last.accountId) ? last.accountId : accounts[0]?.id,
-  );
-  const [toAccountId, setToAccountId] = useState(last.toAccountId);
-  const [pickedCategories, setPickedCategories] = useState(last.categoryIds ?? {});
-  const [day, setDay] = useState(() => format.day(format.today(new Date())));
-  const [note, setNote] = useState('');
-  const [labelIds, setLabelIds] = useState<readonly string[]>([]);
+  /** The form's fields holding a stored Transaction. */
+  function draftOf(from: Transaction): Draft {
+    const amountText = (amount: bigint, accountId: string) => {
+      const of = accounts.find((a) => a.id === accountId);
+      return format.money(money(amount, of ? currencyOf(of) : IRR), {
+        label: false,
+        grouping: false,
+      });
+    };
+    const transfer = from.type === 'TRANSFER';
+    return {
+      type: from.type,
+      amount: amountText(from.amount, from.accountId),
+      toAmount: transfer ? amountText(from.toAmount, from.toAccountId) : '',
+      accountId: from.accountId,
+      toAccountId: transfer ? from.toAccountId : undefined,
+      categoryIds: transfer ? {} : { [from.type]: from.categoryId },
+      day: format.day(from.occurredOn),
+      note: from.note ?? '',
+      labelIds: from.labelIds,
+    };
+  }
+
+  const [start] = useState((): Draft => {
+    if (transaction) return draftOf(transaction);
+    const last = readLastPicks(workspace.id);
+    return {
+      type: 'EXPENSE',
+      amount: '',
+      toAmount: '',
+      accountId: offered.some((a) => a.id === last.accountId) ? last.accountId : offered[0]?.id,
+      toAccountId: last.toAccountId,
+      categoryIds: last.categoryIds ?? {},
+      day: format.day(format.today(new Date())),
+      note: '',
+      labelIds: [],
+    };
+  });
+  const [type, setType] = useState(start.type);
+  const [amount, setAmount] = useState(start.amount);
+  const [toAmount, setToAmount] = useState(start.toAmount);
+  const [accountId, setAccountId] = useState(start.accountId);
+  const [toAccountId, setToAccountId] = useState(start.toAccountId);
+  const [pickedCategories, setPickedCategories] = useState(start.categoryIds);
+  const [day, setDay] = useState(start.day);
+  const [note, setNote] = useState(start.note);
+  const [labelIds, setLabelIds] = useState(start.labelIds);
   const [errors, setErrors] = useState<FieldErrors>({});
   const [saved, setSaved] = useState(false);
   // One id per draft: sending the same draft again (a retry) cannot record it twice.
   const draftId = useRef<string | null>(null);
   const record = useRecordTransaction();
+  const update = useUpdateTransaction(transaction?.id ?? '');
+  const save = transaction ? update : record;
+  // The newer copy an edit ran into; the user picks it or their own changes.
+  const conflict = transactionConflict(update.error);
+
+  function load(draft: Draft) {
+    setType(draft.type);
+    setAmount(draft.amount);
+    setToAmount(draft.toAmount);
+    setAccountId(draft.accountId);
+    setToAccountId(draft.toAccountId);
+    setPickedCategories((current) => ({ ...current, ...draft.categoryIds }));
+    setDay(draft.day);
+    setNote(draft.note);
+    setLabelIds(draft.labelIds);
+    setErrors({});
+  }
 
   useEffect(() => {
     amountRef.current?.focus();
   }, []);
 
-  const activeLabels = labels.filter((l) => !l.archived);
-  const account = accounts.find((a) => a.id === accountId) ?? accounts[0];
+  const activeLabels = usable(labels);
+  const account = offered.find((a) => a.id === accountId) ?? offered[0];
   const transfer = type === 'TRANSFER';
   const typeChoices = transfer ? [] : choices[type];
   const picked = transfer ? undefined : pickedCategories[type];
   const categoryId = typeChoices.some((c) => c.id === picked) ? picked : typeChoices[0]?.id;
   // A Transfer goes to another Account: never the one it leaves.
-  const destinations = accounts.filter((a) => a.id !== account?.id);
+  const destinations = offered.filter((a) => a.id !== account?.id);
   const toAccount = destinations.find((a) => a.id === toAccountId) ?? destinations[0];
   const currency = account ? currencyOf(account) : IRR;
   const toCurrency = toAccount ? currencyOf(toAccount) : currency;
@@ -157,11 +258,11 @@ export function TransactionForm({
     draftId.current = null;
     setSaved(false);
     // A save in flight must still finish: its success clears the form for the next one.
-    if (!record.isPending) record.reset();
+    if (!save.isPending) save.reset();
   }
 
-  function onSubmit(event: FormEvent<HTMLFormElement>) {
-    event.preventDefault();
+  /** The Transaction the fields describe, or undefined after showing what is wrong. */
+  function readInput(): CreateTransactionInput | undefined {
     const amountError = (parsed: ReturnType<typeof parseAmount>) =>
       !parsed.ok
         ? AMOUNT_ERRORS[parsed.error]
@@ -184,10 +285,11 @@ export function TransactionForm({
     if (!transfer && !categoryId) found.category = 'transactions.error.category';
     if (!occurredOn) found.day = 'transactions.error.day';
     setErrors(found);
-    if (found.amount) return amountRef.current?.focus();
-    if (found.toAmount) return toAmountRef.current?.focus();
-    if (found.category) return categoryRef.current?.focus();
-    if (found.day) return dayRef.current?.focus();
+    const focus = (ref: { current: HTMLElement | null }) => void ref.current?.focus();
+    if (found.amount) return focus(amountRef);
+    if (found.toAmount) return focus(toAmountRef);
+    if (found.category) return focus(categoryRef);
+    if (found.day) return focus(dayRef);
     if (!parsed.ok || !account || !occurredOn) return;
 
     const common = {
@@ -199,27 +301,41 @@ export function TransactionForm({
       // A Label archived since it was ticked is left off.
       labelIds: labelIds.filter((labelId) => activeLabels.some((l) => l.id === labelId)),
     };
-    let input: CreateTransactionInput;
     if (type === 'TRANSFER') {
       if (!toAccount) return;
-      input = {
+      return {
         ...common,
         type,
         toAccountId: toAccount.id,
         ...(parsedTo?.ok && { toAmount: parsedTo.money.amount }),
       };
-    } else {
-      if (!categoryId) return;
-      input = { ...common, type, categoryId };
     }
+    if (!categoryId) return;
+    return { ...common, type, categoryId };
+  }
+
+  /** Saves the edit as starting from `version`; a stale one comes back as a conflict. */
+  function saveEdit(input: CreateTransactionInput, version: number) {
+    const { id: _, ...fields } = input;
+    update.mutate({ ...fields, version }, { onSuccess: () => onSaved?.() });
+  }
+
+  function onSubmit(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    const input = readInput();
+    if (!input) return;
+    if (base) return saveEdit(input, base.version);
     // The destination is kept for the next Transfer, also while recording others.
-    const rememberedTo = transfer ? toAccount?.id : toAccountId;
+    const rememberedTo = transfer ? input.type === 'TRANSFER' && input.toAccountId : toAccountId;
     record.mutate(input, {
       onSuccess: () => {
         writeLastPicks(workspace.id, {
-          accountId: account.id,
+          accountId: input.accountId,
           ...(rememberedTo && { toAccountId: rememberedTo }),
-          categoryIds: transfer ? pickedCategories : { ...pickedCategories, [type]: categoryId },
+          categoryIds:
+            input.type === 'TRANSFER'
+              ? pickedCategories
+              : { ...pickedCategories, [input.type]: input.categoryId },
         });
         draftId.current = null;
         setAmount('');
@@ -238,7 +354,7 @@ export function TransactionForm({
   return (
     <section className="flex flex-col gap-4 rounded-xl border border-border bg-surface px-6 py-6">
       <h2 id={ids.title} className="text-lg font-bold">
-        {t('transactions.form.title')}
+        {t(transaction ? 'transactions.edit.title' : 'transactions.form.title')}
       </h2>
       <form
         aria-labelledby={ids.title}
@@ -249,7 +365,7 @@ export function TransactionForm({
         <ChoiceGroup<AnyTransactionType>
           legend={t('transactions.form.type')}
           hideLegend
-          choices={TYPE_ORDER.filter((value) => value !== 'TRANSFER' || accounts.length > 1).map(
+          choices={TYPE_ORDER.filter((value) => value !== 'TRANSFER' || offered.length > 1).map(
             (value) => ({ value, label: t(TRANSACTION_TYPE_LABELS[value]) }),
           )}
           value={type}
@@ -300,7 +416,7 @@ export function TransactionForm({
               }}
               className={inputClass}
             >
-              {accounts.map((a) => (
+              {offered.map((a) => (
                 <option key={a.id} value={a.id}>
                   {a.name}
                 </option>
@@ -468,18 +584,59 @@ export function TransactionForm({
             </div>
           </fieldset>
         )}
-        {record.isError && (
-          <p role="alert" className="rounded-md bg-surface-muted px-3 py-2 text-sm text-danger">
-            {t('transactions.form.failed')}
-          </p>
+        {conflict ? (
+          <div
+            role="alert"
+            className="flex flex-col gap-3 rounded-md bg-surface-muted px-3 py-3 text-sm"
+          >
+            <p>{t('transactions.edit.conflict')}</p>
+            <div className="flex flex-wrap gap-2">
+              <button
+                type="button"
+                onClick={() => {
+                  setBase(conflict);
+                  update.reset();
+                  load(draftOf(conflict));
+                }}
+                className="rounded-md border border-border px-3 py-1.5 font-medium"
+              >
+                {t('transactions.edit.keepTheirs')}
+              </button>
+              <button
+                type="button"
+                disabled={update.isPending}
+                onClick={() => {
+                  const input = readInput();
+                  if (!input) return;
+                  setBase(conflict);
+                  saveEdit(input, conflict.version);
+                }}
+                className="rounded-md border border-border px-3 py-1.5 font-medium disabled:opacity-60"
+              >
+                {t('transactions.edit.keepMine')}
+              </button>
+            </div>
+          </div>
+        ) : (
+          save.isError && (
+            <p role="alert" className="rounded-md bg-surface-muted px-3 py-2 text-sm text-danger">
+              {t(
+                !transaction
+                  ? 'transactions.form.failed'
+                  : save.error instanceof ApiError && save.error.status === 404
+                    ? 'transactions.edit.gone'
+                    : 'transactions.edit.failed',
+              )}
+            </p>
+          )
         )}
         <div className="flex flex-wrap items-center gap-3">
           <button
             type="submit"
-            disabled={record.isPending}
+            disabled={save.isPending}
             className="rounded-md bg-primary px-6 py-2 font-medium text-on-primary disabled:opacity-60"
           >
-            {t('transactions.form.submit')}
+            {t(transaction ? 'transactions.edit.submit' : 'transactions.form.submit')}
           </button>
           <p role="status" className="text-sm text-success">
             {saved ? t('transactions.form.saved') : ''}

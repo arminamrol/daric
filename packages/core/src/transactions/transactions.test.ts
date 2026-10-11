@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { IRR, USD, money } from '../money';
-import { balanceEffect, flowEffect, groupByMonth } from './transactions';
+import { balanceEffect, flowEffect, groupByMonth, mayChangeTransaction } from './transactions';
 
 describe('balanceEffect', () => {
   const asset = { id: 'a', class: 'ASSET' } as const;
@@ -131,5 +131,27 @@ describe('groupByMonth', () => {
 
   it('is empty for no Transactions', () => {
     expect(groupByMonth([], 'jalali', currencyOf)).toEqual([]);
+  });
+});
+
+describe('mayChangeTransaction', () => {
+  const me = '01900000-0000-7000-8000-000000000001';
+  const other = '01900000-0000-7000-8000-000000000002';
+
+  it('lets the Owner and Admins change any Transaction', () => {
+    for (const role of ['OWNER', 'ADMIN'] as const) {
+      expect(mayChangeTransaction(role, me, { createdBy: other })).toBe(true);
+      expect(mayChangeTransaction(role, me, { createdBy: null })).toBe(true);
+    }
+  });
+
+  it('lets a Member change only what they recorded', () => {
+    expect(mayChangeTransaction('MEMBER', me, { createdBy: me })).toBe(true);
+    expect(mayChangeTransaction('MEMBER', me, { createdBy: other })).toBe(false);
+    expect(mayChangeTransaction('MEMBER', me, { createdBy: null })).toBe(false);
+  });
+
+  it('lets a Viewer change nothing', () => {
+    expect(mayChangeTransaction('VIEWER', me, { createdBy: me })).toBe(false);
   });
 });

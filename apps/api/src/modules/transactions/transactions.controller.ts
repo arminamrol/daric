@@ -1,8 +1,21 @@
-import { Delete, Get, HttpStatus, Inject, Param, Post, Put, Query, Res } from '@nestjs/common';
+import {
+  Delete,
+  Get,
+  HttpCode,
+  HttpStatus,
+  Inject,
+  Param,
+  Post,
+  Put,
+  Query,
+  Res,
+} from '@nestjs/common';
 import {
   ApiBadRequestResponse,
   ApiConflictResponse,
   ApiCreatedResponse,
+  ApiForbiddenResponse,
+  ApiNoContentResponse,
   ApiNotFoundResponse,
   ApiOkResponse,
   ApiQuery,
@@ -14,6 +27,8 @@ import {
   MAX_LABELS_PER_TRANSACTION,
   listTransactionsQuerySchema,
   transactionSchema,
+  type UpdateTransactionInput,
+  updateTransactionInputSchema,
 } from '@daric/core';
 import type { Response } from 'express';
 import { createZodDto, ZodValidationPipe } from 'nestjs-zod';
@@ -25,11 +40,15 @@ import { TransactionsService } from './transactions.service';
 
 const TransactionDto = namedZodDto('TransactionDto', transactionSchema);
 const CreateTransactionDto = namedZodDto('CreateTransactionDto', createTransactionInputSchema);
+const UpdateTransactionDto = namedZodDto('UpdateTransactionDto', updateTransactionInputSchema);
 class ListTransactionsQueryDto extends createZodDto(listTransactionsQuerySchema) {}
 
 @ApiTags('transactions')
 @ApiNotFoundResponse({
   description: 'No such Workspace or Transaction, or the caller is not a Member',
+})
+@ApiForbiddenResponse({
+  description: 'Changing needs Member or above; a Member changes only Transactions they recorded',
 })
 @WorkspaceController('transactions')
 export class TransactionsController {
@@ -87,6 +106,50 @@ export class TransactionsController {
     const { created, transaction } = await this.transactions.create(membership, userId, body);
     if (!created) res.status(HttpStatus.OK);
     return transaction;
+  }
+
+  @Put(':transactionId')
+  @MinRole('MEMBER')
+  @ApiOkResponse({ type: TransactionDto })
+  @ApiBadRequestResponse({
+    description:
+      'Invalid input, or an Account, Category or Label it does not already name that is missing or archived, as on create',
+  })
+  @ApiConflictResponse({
+    description:
+      'The version is not the current one; the body carries the current copy as `transaction`',
+  })
+  update(
+    @CurrentMembership() membership: Membership,
+    @CurrentUserId() userId: string,
+    @Param('transactionId') transactionId: string,
+    @ZodBody(UpdateTransactionDto) body: UpdateTransactionInput,
+  ) {
+    return this.transactions.update(membership, userId, transactionId, body);
+  }
+
+  @Delete(':transactionId')
+  @MinRole('MEMBER')
+  @HttpCode(HttpStatus.NO_CONTENT)
+  @ApiNoContentResponse({ description: 'Deleted, also if it was already' })
+  remove(
+    @CurrentMembership() membership: Membership,
+    @CurrentUserId() userId: string,
+    @Param('transactionId') transactionId: string,
+  ) {
+    return this.transactions.remove(membership, userId, transactionId);
+  }
+
+  @Post(':transactionId/restore')
+  @MinRole('MEMBER')
+  @HttpCode(HttpStatus.OK)
+  @ApiOkResponse({ type: TransactionDto, description: 'Brought back, also if it was not deleted' })
+  restore(
+    @CurrentMembership() membership: Membership,
+    @CurrentUserId() userId: string,
+    @Param('transactionId') transactionId: string,
+  ) {
+    return this.transactions.restore(membership, userId, transactionId);
   }
 
   @Put(':transactionId/labels/:labelId')

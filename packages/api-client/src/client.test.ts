@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { ApiError, createApiClient } from './index';
+import { ApiError, createApiClient, transactionConflict } from './index';
 
 const user = { id: '01900000-0000-7000-8000-000000000000', email: 'sara@example.com' };
 const preferences = { displayCalendar: 'jalali', digits: 'persian', theme: 'system' } as const;
@@ -355,6 +355,62 @@ describe('api-client', () => {
       });
       expect(recorded.id).toBe(transaction.id);
       expect(sent[0]?.body).toEqual(input);
+    });
+
+    it('reads, edits, deletes and restores one', async () => {
+      const path = `${base}/${transaction.id}`;
+      const { client, sent } = fakeServer(
+        {
+          [`GET ${path}`]: () => ({ status: 200, body: transaction }),
+          [`PUT ${path}`]: () => ({ status: 200, body: { ...transaction, version: 2 } }),
+          [`DELETE ${path}`]: () => ({ status: 204 }),
+          [`POST ${path}/restore`]: () => ({ status: 200, body: { ...transaction, version: 4 } }),
+        },
+        { '__Host-daric_csrf': 'csrf-1' },
+      );
+      const { id, createdBy, labelIds, ...input } = transaction;
+      void id;
+      void createdBy;
+      void labelIds;
+      expect((await client.getTransaction(workspace.id, transaction.id)).amount).toBe(
+        9007199254740993n,
+      );
+      const edited = await client.updateTransaction(workspace.id, transaction.id, {
+        ...input,
+        amount: 1n,
+      });
+      expect(edited.version).toBe(2);
+      expect(await client.deleteTransaction(workspace.id, transaction.id)).toBeUndefined();
+      expect((await client.restoreTransaction(workspace.id, transaction.id)).version).toBe(4);
+      expect(sent.map((r) => [r.method, r.url, r.body])).toEqual([
+        ['GET', path, undefined],
+        ['PUT', path, { ...input, amount: '1' }],
+        ['DELETE', path, undefined],
+        ['POST', `${path}/restore`, undefined],
+      ]);
+    });
+
+    it('reads the current copy out of a stale edit', async () => {
+      const current = { ...transaction, amount: '5', version: 3 };
+      const { client } = fakeServer(
+        {
+          [`PUT ${base}/${transaction.id}`]: () => ({
+            status: 409,
+            body: { statusCode: 409, message: 'stale', transaction: current },
+          }),
+        },
+        { '__Host-daric_csrf': 'csrf-1' },
+      );
+      const { id, createdBy, labelIds, ...input } = transaction;
+      void id;
+      void createdBy;
+      void labelIds;
+      const error = await client
+        .updateTransaction(workspace.id, transaction.id, { ...input, amount: 1n })
+        .catch((e: unknown) => e);
+      expect(transactionConflict(error)).toMatchObject({ amount: 5n, version: 3 });
+      expect(transactionConflict(new ApiError(409, { message: 'id taken' }))).toBeUndefined();
+      expect(transactionConflict(new Error('offline'))).toBeUndefined();
     });
   });
 
