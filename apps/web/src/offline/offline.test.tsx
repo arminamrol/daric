@@ -307,8 +307,10 @@ describe('Keeping data on this device', () => {
     first.unmount();
 
     // The session lapses on the server; the next person logs in without ticking.
+    // The kept cache still names the old User until the API says otherwise.
     await fake.api.logout();
-    renderApp({ path: '/login', api: fake.api });
+    renderApp({ api: fake.api });
+    await screen.findByRole('heading', { name: 'ورود به دریک' });
     await logIn({ keepData: false });
     await vi.waitFor(async () => expect(await kept('queryCache')).toBeUndefined());
     expect(localStorage.getItem('daric.keepData')).toBeNull();
