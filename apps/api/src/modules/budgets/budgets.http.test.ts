@@ -48,6 +48,8 @@ function client(t: TestApp, user: User, workspaceId = user.workspaceId) {
     update: (id: string, body: unknown, query = MEHR) =>
       as('PATCH', `/budgets/${id}${query}`, body),
     remove: (id: string) => as('DELETE', `/budgets/${id}`),
+    rate: (body: unknown) => created('/exchange-rates', body),
+    settings: (body: unknown) => as('PATCH', '', body),
     account: (body: unknown = melli) => created('/accounts', body),
     category: (body: unknown = food) => created('/categories', body),
     label: (name: string) => created('/labels', { name }),
@@ -118,6 +120,7 @@ describe('Budgets', () => {
         remaining: '1000',
         percent: 0,
         state: 'ok',
+        ratesUsed: [],
         otherCurrencyExpenses: 0,
       },
     });
@@ -252,9 +255,52 @@ describe('Budgets', () => {
     expect(body.progress.spent).toBe('0');
   });
 
-  it('leave out Expenses in other currencies, and say how many', async () => {
+  it('convert Expenses in other currencies at the rate on the last day of the Period', async () => {
     const { api, account, category } = await setUp();
     const usd = await api.account(dollars);
+    const eur = await api.account({ ...dollars, name: 'Euros', currency: 'EUR' });
+    for (const [effectiveOn, rate] of [
+      ['2026-09-01', '900000'],
+      ['2026-09-20', '1000000'],
+      // After Shahrivar ends on 2026-09-22.
+      ['2026-09-25', '2000000'],
+    ]) {
+      await api.rate({ currency: 'USD', rate, effectiveOn });
+    }
+    const inShahrivar = { categoryId: category.id, occurredOn: IN_SHAHRIVAR };
+    await api.spend({ ...inShahrivar, accountId: account.id, amount: '100' });
+    // 0.05 USD at 1,000,000 rials.
+    await api.spend({ ...inShahrivar, accountId: usd.id, amount: '5' });
+    await api.spend({ ...inShahrivar, accountId: eur.id, amount: '7' });
+    const { body } = await api.create(
+      { categoryId: category.id, period: 'MONTHLY', amount: '1000000' },
+      '?month=1405-06',
+    );
+    expect(body.progress).toMatchObject({
+      spent: '50100',
+      ratesUsed: [{ currency: 'USD', rate: '1000000', effectiveOn: '2026-09-20' }],
+      otherCurrencyExpenses: 1,
+    });
+  });
+
+  it('leave out Expenses in other currencies with no rate, and say how many', async () => {
+    const { api, account, category } = await setUp();
+    const usd = await api.account(dollars);
+    await api.spend({ accountId: account.id, categoryId: category.id, amount: '100' });
+    await api.spend({ accountId: usd.id, categoryId: category.id, amount: '5' });
+    await api.spend({ accountId: usd.id, categoryId: category.id, amount: '6' });
+    const { body } = await api.create({
+      categoryId: category.id,
+      period: 'MONTHLY',
+      amount: '1000',
+    });
+    expect(body.progress).toMatchObject({ spent: '100', ratesUsed: [], otherCurrencyExpenses: 2 });
+  });
+
+  it('convert nothing into a Budget made in a former Base Currency', async () => {
+    const { api, account, category } = await setUp();
+    const usd = await api.account(dollars);
+    await api.rate({ currency: 'USD', rate: '1000000', effectiveOn: '2026-01-01' });
     await api.spend({ accountId: account.id, categoryId: category.id, amount: '100' });
     await api.spend({ accountId: usd.id, categoryId: category.id, amount: '5' });
     const { body } = await api.create({
@@ -262,7 +308,12 @@ describe('Budgets', () => {
       period: 'MONTHLY',
       amount: '1000',
     });
-    expect(body.progress).toMatchObject({ spent: '100', otherCurrencyExpenses: 1 });
+    await api.settings({ baseCurrency: 'EUR' });
+    expect((await api.get(body.id)).body.progress).toMatchObject({
+      spent: '100',
+      ratesUsed: [],
+      otherCurrencyExpenses: 1,
+    });
   });
 
   it('show the current month when none is asked for', async () => {

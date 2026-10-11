@@ -53,7 +53,7 @@ _Avoid_: Value, sum (when meaning a stored amount)
 The Workspace's currency into which everything is converted for totals.
 
 **Exchange Rate**:
-A manually entered rate from a currency to the Base Currency, effective from a date.
+A manually entered rate from a currency to the Base Currency, effective from a date until that currency's next rate. A total of a Period converts each currency at its rate on the Period's last day (today while the Period runs); a currency with no rate by then is left out of the total and flagged, never guessed. Rates entered against a former Base Currency are kept but not used.
 
 **Net Worth**:
 Sum of Asset Accounts minus sum of Liability Accounts, converted to Base Currency with the user's Exchange Rates (per-currency totals shown alongside).

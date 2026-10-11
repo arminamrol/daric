@@ -12,7 +12,11 @@ import {
   nextOccurrence,
   monthPeriodOfDay,
   categoryTree,
+  currencyOf as currencyByCode,
   hasRole,
+  money,
+  rateDayOf,
+  toBaseCurrency,
   mayChangeTransaction,
   periodDays,
   todayIn,
@@ -22,6 +26,7 @@ import type {
   Budget,
   BudgetPeriod,
   Category,
+  ExchangeRateWire,
   MonthPeriod,
   DueOccurrence,
   Label,
@@ -80,6 +85,8 @@ export function fakeApi({
   let nextBudgetId = 1;
   let rules: StoredRule[] = [];
   let nextRuleId = 1;
+  let rates: StoredRate[] = [];
+  let nextRateId = 1;
   /** Occurrences confirmed (with their Transaction) or skipped, by `ruleId|dueOn`. */
   const handled = new Map<string, { transactionId: string | null }>();
   /** Unreachable: every call fails as fetch does when the network is down. */
@@ -245,16 +252,75 @@ export function fakeApi({
       { budget, period, calendar: workspace.calendar, categories },
       live(),
     );
-    const currencyOf = (t: Transaction) => accounts.find((a) => a.id === t.accountId)?.currency;
-    const same = counted.filter((t) => currencyOf(t) === budget.currency);
-    const progress = budgetProgress(
-      budget.amount,
-      same.reduce((sum, t) => sum + t.amount, 0n),
-    );
+    const currencyOf = (t: Transaction) =>
+      accounts.find((a) => a.id === t.accountId)?.currency ?? 'IRR';
+    let spent = counted
+      .filter((t) => currencyOf(t) === budget.currency)
+      .reduce((sum, t) => sum + t.amount, 0n);
+    let other = counted.filter((t) => currencyOf(t) !== budget.currency);
+    let ratesUsed: Budget['progress']['ratesUsed'] = [];
+    if (budget.currency === workspace.baseCurrency) {
+      const converted = toBaseCurrency(
+        counted.map((t) => money(t.amount, currencyByCode(currencyOf(t)))),
+        currencyByCode(workspace.baseCurrency),
+        currentRates(),
+        rateDayOf(period, workspace.calendar, today()),
+      );
+      spent = converted.total.amount;
+      ratesUsed = converted.ratesUsed.map(({ currency, rate, effectiveOn }) => ({
+        currency,
+        rate,
+        effectiveOn,
+      }));
+      other = other.filter((t) => converted.missing.some((c) => c.code === currencyOf(t)));
+    }
+    const progress = budgetProgress(budget.amount, spent);
     return {
       ...budget,
-      progress: { ...progress, period, otherCurrencyExpenses: counted.length - same.length },
+      progress: { ...progress, period, ratesUsed, otherCurrencyExpenses: other.length },
     };
+  }
+
+  /** Puts an Exchange Rate straight into the Workspace, into its current Base Currency. */
+  function addRate(fields: Pick<StoredRate, 'currency' | 'rate' | 'effectiveOn'>): StoredRate {
+    const rate: StoredRate = {
+      id: `01900000-0000-7000-8d00-${String(nextRateId++).padStart(12, '0')}`,
+      baseCurrency: workspace.baseCurrency,
+      version: 1,
+      ...fields,
+    };
+    rates.push(rate);
+    return rate;
+  }
+
+  /** Rates into the current Base Currency, by currency, newest first, as the API lists them. */
+  function currentRates(): ExchangeRateWire[] {
+    return rates
+      .filter((r) => r.baseCurrency === workspace.baseCurrency)
+      .sort((a, b) =>
+        a.currency === b.currency
+          ? b.effectiveOn.localeCompare(a.effectiveOn)
+          : a.currency.localeCompare(b.currency),
+      )
+      .map(({ baseCurrency: _, ...rate }) => ({ ...rate }));
+  }
+
+  function findRate(rateId: string): StoredRate {
+    const rate = rates.find((r) => r.id === rateId && r.baseCurrency === workspace.baseCurrency);
+    if (!rate) throw new ApiError(404, { message: 'Not Found' });
+    return rate;
+  }
+
+  /** One rate per currency and day, as the API checks it. */
+  function assertRateFree(rate: StoredRate) {
+    const taken = rates.some(
+      (r) =>
+        r.id !== rate.id &&
+        r.baseCurrency === rate.baseCurrency &&
+        r.currency === rate.currency &&
+        r.effectiveOn === rate.effectiveOn,
+    );
+    if (taken) throw new ApiError(409, { message: 'The currency already has a rate on this day' });
   }
 
   function findBudget(budgetId: string): StoredBudget {
@@ -655,6 +721,33 @@ export function fakeApi({
       findBudget(budgetId);
       budgets = budgets.filter((b) => b.id !== budgetId);
     },
+    async listExchangeRates(workspaceId) {
+      inWorkspace(workspaceId);
+      return currentRates();
+    },
+    async createExchangeRate(workspaceId, input) {
+      inWorkspace(workspaceId, 'ADMIN');
+      if (input.currency === workspace.baseCurrency) {
+        throw new ApiError(400, { message: 'The Base Currency needs no rate' });
+      }
+      assertRateFree({ id: '', baseCurrency: workspace.baseCurrency, version: 1, ...input });
+      const { baseCurrency: _, ...rate } = addRate(input);
+      return { ...rate };
+    },
+    async updateExchangeRate(workspaceId, rateId, input) {
+      inWorkspace(workspaceId, 'ADMIN');
+      const current = findRate(rateId);
+      const updated = { ...current, ...input, version: current.version + 1 };
+      assertRateFree(updated);
+      rates = rates.map((r) => (r.id === rateId ? updated : r));
+      const { baseCurrency: _, ...rate } = updated;
+      return { ...rate };
+    },
+    async deleteExchangeRate(workspaceId, rateId) {
+      inWorkspace(workspaceId, 'ADMIN');
+      findRate(rateId);
+      rates = rates.filter((r) => r.id !== rateId);
+    },
     async listRecurringRules(workspaceId, { includeArchived = false } = {}) {
       inWorkspace(workspaceId);
       return rules.filter((r) => includeArchived || !r.archived).map(ruleWire);
@@ -759,6 +852,9 @@ export function fakeApi({
     addRule,
     /** As stored, archived ones included. */
     rules: () => rules,
+    addRate,
+    /** As stored, into any Base Currency. */
+    rates: () => rates,
     /** In the order recorded, deleted ones left out. */
     transactions: () => live(),
     /** Ids of those deleted softly. */
@@ -782,6 +878,9 @@ interface StoredBudget {
   currency: string;
   version: number;
 }
+
+/** An Exchange Rate as the fake keeps it, with the Base Currency it is into. */
+type StoredRate = ExchangeRateWire & { baseCurrency: string };
 
 /** A Recurring Rule as the fake keeps it; the next occurrence is worked out on every read. */
 type StoredRule = Omit<RecurringRule, 'nextDueOn'> & { createdBy: string | null };

@@ -8,6 +8,7 @@ import { Link } from 'react-router';
 import { currencyOf } from '../accounts/accounts';
 import { CategoryBadge } from '../categories/CategoryBadge';
 import { useI18n } from '../i18n/locale';
+import { useRateEquation } from '../rates/rates';
 import { useFormatters } from '../settings/settings';
 import { BUDGET_PERIOD_LABELS } from './labels';
 
@@ -40,6 +41,7 @@ export function BudgetCard({
 }) {
   const { t } = useI18n();
   const format = useFormatters();
+  const equation = useRateEquation();
   const nameId = useId();
   const { progress } = budget;
   const currency = currencyOf(budget);
@@ -108,6 +110,15 @@ export function BudgetCard({
           ? t('budgets.overBy', { amount: isolate(amount(-progress.remaining)) })
           : t('budgets.remaining', { amount: isolate(amount(progress.remaining)) })}
       </p>
+      {progress.ratesUsed.map((rate) => (
+        <p key={rate.currency} className="text-sm text-foreground-muted tabular-nums">
+          {t('budgets.rateUsed', {
+            currency: format.currency(currencyOf(rate)),
+            equation: isolate(t('rates.equation', equation(rate))),
+            day: isolate(format.day(rate.effectiveOn)),
+          })}
+        </p>
+      ))}
       {progress.otherCurrencyExpenses > 0 && (
         <p className="text-sm text-foreground-muted">{t('budgets.otherCurrency')}</p>
       )}

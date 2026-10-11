@@ -11,13 +11,23 @@ import {
   budgetPeriodOf,
   budgetProgress,
   budgetSpent,
+  currencyOf,
   dayOf,
+  money,
   monthPeriodOfDay,
   periodDays,
   periodParam,
+  rateDayOf,
   todayIn,
+  toBaseCurrency,
 } from '@daric/core';
-import type { BudgetWire, CreateBudgetInput, MonthPeriod, UpdateBudgetInput } from '@daric/core';
+import type {
+  BudgetProgressWire,
+  BudgetWire,
+  CreateBudgetInput,
+  MonthPeriod,
+  UpdateBudgetInput,
+} from '@daric/core';
 import { and, asc, eq, gte, isNull, lt, sql, type SQL } from 'drizzle-orm';
 import { isUniqueViolation } from '../../common/db-errors';
 import { isUuid, type Membership } from '../../common/request';
@@ -33,6 +43,7 @@ import {
 } from '../../db/schema';
 import { scopedTx } from '../../db/scope';
 import { AuditService } from '../audit/audit.service';
+import { ratesInto } from '../exchange-rates/exchange-rates.service';
 
 const columns = {
   id: budgets.id,
@@ -79,8 +90,10 @@ export class BudgetsService {
 
   /**
    * Each Budget with its progress in `month` (the current month by default), or
-   * in the year holding it for a yearly Budget. Only Expenses on Accounts of the
-   * Budget's currency count; the others are counted apart until Exchange Rates.
+   * in the year holding it for a yearly Budget. A Budget in the current Base
+   * Currency converts Expenses in other currencies at the rate on the Period's
+   * last day (or today); those with no rate, or on any Budget in a former Base
+   * Currency, are counted apart.
    */
   private async withProgress(
     membership: Membership,
@@ -89,8 +102,9 @@ export class BudgetsService {
   ): Promise<BudgetWire[]> {
     if (rows.length === 0) return [];
     const workspace = await this.workspace(membership.workspaceId);
-    const { calendar } = workspace;
-    const shown = month ?? monthPeriodOfDay(todayIn(new Date(), workspace.timezone), calendar);
+    const { calendar, baseCurrency } = workspace;
+    const today = todayIn(new Date(), workspace.timezone);
+    const shown = month ?? monthPeriodOfDay(today, calendar);
     const day = dayOf(calendar, { year: shown.year, month: shown.month, day: 1 });
     // The year holds the month, so one read serves monthly and yearly Budgets.
     const { from, until } = periodDays({ kind: 'year', year: shown.year }, calendar);
@@ -120,13 +134,31 @@ export class BudgetsService {
           lt(transactions.occurredOn, until),
         ),
       );
+    const rates = await ratesInto(baseCurrency);
 
     return rows.map((row) => {
       const period = budgetPeriodOf(row.period, day, calendar);
       const scope = { budget: row, period, calendar, categories: workspaceCategories };
-      const inCurrency = expenses.filter((t) => t.currency === row.currency);
-      const otherCurrency = expenses.filter((t) => t.currency !== row.currency);
-      const progress = budgetProgress(row.amount, budgetSpent(scope, inCurrency));
+      const counted = budgetExpenses(scope, expenses);
+      let spent = budgetSpent(
+        scope,
+        counted.filter((t) => t.currency === row.currency),
+      );
+      let otherCurrency = counted.filter((t) => t.currency !== row.currency);
+      let ratesUsed: BudgetProgressWire['ratesUsed'] = [];
+      if (row.currency === baseCurrency) {
+        const converted = toBaseCurrency(
+          counted.map((t) => money(t.amount, currencyOf(t.currency))),
+          currencyOf(baseCurrency),
+          rates,
+          rateDayOf(period, calendar, today),
+        );
+        spent = converted.total.amount;
+        ratesUsed = converted.ratesUsed;
+        const missing = new Set(converted.missing.map((c) => c.code));
+        otherCurrency = otherCurrency.filter((t) => missing.has(t.currency));
+      }
+      const progress = budgetProgress(row.amount, spent);
       return {
         ...row,
         amount: amountToWire(row.amount),
@@ -136,7 +168,8 @@ export class BudgetsService {
           remaining: amountToWire(progress.remaining),
           percent: progress.percent,
           state: progress.state,
-          otherCurrencyExpenses: budgetExpenses(scope, otherCurrency).length,
+          ratesUsed,
+          otherCurrencyExpenses: otherCurrency.length,
         },
       };
     });

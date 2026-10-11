@@ -331,6 +331,53 @@ describe('Recording a Transfer', () => {
 });
 
 describe('The Transaction list', () => {
+  it('adds every currency up in the Base Currency at the rate in force at month end, or today', async () => {
+    const { fake, melli, food } = setUp();
+    const dollars = fake.addAccount({ name: 'دلاری', currency: 'USD' });
+    fake.addRate({ currency: 'USD', rate: '1000000', effectiveOn: '2026-09-01' });
+    fake.addRate({ currency: 'USD', rate: '1050000', effectiveOn: '2026-10-01' });
+    // After today, 18 Mehr: not yet in force.
+    fake.addRate({ currency: 'USD', rate: '2000000', effectiveOn: '2026-10-15' });
+    const spend = (accountId: string, amount: bigint, occurredOn: string) =>
+      fake.addTransaction({ type: 'EXPENSE', accountId, categoryId: food.id, amount, occurredOn });
+    spend(melli.id, 300n, '2026-10-05');
+    spend(dollars.id, 1000n, '2026-10-02');
+    spend(dollars.id, 200n, '2026-09-10');
+    renderApp({ path: '/transactions', api: fake.api });
+
+    const mehr = within(await screen.findByRole('region', { name: 'مهر ۱۴۰۵' }));
+    // 10.00 USD at 1,050,000 rials, plus 300 rials.
+    expect(await mehr.findByText(expense('۱۰٬۵۰۰٬۳۰۰ ریال'))).toBeTruthy();
+    expect(
+      mehr.getByText(`با نرخ ${isolate(`۱ دلار = ۱٬۰۵۰٬۰۰۰ ریال`)}، از ${isolate('۱۴۰۵/۰۷/۰۹')}`),
+    ).toBeTruthy();
+    expect(mehr.getByText(`دلار: ${expense('۱۰٫۰۰ دلار')}`)).toBeTruthy();
+    expect(mehr.queryByText(/نرخی برای/)).toBeNull();
+    // Shahrivar ended on 2026-09-22, under the older rate.
+    const shahrivar = within(screen.getByRole('region', { name: 'شهریور ۱۴۰۵' }));
+    expect(shahrivar.getByText(expense('۲٬۰۰۰٬۰۰۰ ریال'))).toBeTruthy();
+  });
+
+  it('shows rates into IRR in tomans when the Workspace shows tomans', async () => {
+    const { fake, food } = setUp();
+    fake.workspace().moneyDisplay = 'toman';
+    const dollars = fake.addAccount({ name: 'دلاری', currency: 'USD' });
+    fake.addRate({ currency: 'USD', rate: '1050000', effectiveOn: '2026-10-01' });
+    fake.addTransaction({
+      type: 'EXPENSE',
+      accountId: dollars.id,
+      categoryId: food.id,
+      amount: 100n,
+      occurredOn: '2026-10-02',
+    });
+    renderApp({ path: '/transactions', api: fake.api });
+    const mehr = within(await screen.findByRole('region', { name: 'مهر ۱۴۰۵' }));
+    expect(await mehr.findByText(expense('۱۰۵٬۰۰۰ تومان'))).toBeTruthy();
+    expect(
+      mehr.getByText(`با نرخ ${isolate('۱ دلار = ۱۰۵٬۰۰۰ تومان')}، از ${isolate('۱۴۰۵/۰۷/۰۹')}`),
+    ).toBeTruthy();
+  });
+
   it('groups the year by month of the Workspace Calendar, newest first, with totals per currency', async () => {
     const { fake, melli, food, salary } = setUp();
     const dollars = fake.addAccount({ name: 'دلاری', currency: 'USD' });
@@ -379,9 +426,20 @@ describe('The Transaction list', () => {
       'شهریور ۱۴۰۵',
     ]);
     const mehr = within(months[0] as HTMLElement);
+    // No rate for the dollars yet: the Base Currency total leaves them out and says so.
     expect(mehr.getByText(income('۹٬۰۰۰ ریال'))).toBeTruthy();
     expect(mehr.getByText(expense('۳۰۰ ریال'))).toBeTruthy();
-    expect(mehr.getByText(expense('۱۲٫۵۰ دلار'))).toBeTruthy();
+    expect(
+      await mehr.findByText(`ریال: ${income('۹٬۰۰۰ ریال')}، ${expense('۳۰۰ ریال')}`),
+    ).toBeTruthy();
+    expect(mehr.getByText(`دلار: ${expense('۱۲٫۵۰ دلار')}`)).toBeTruthy();
+    expect(
+      mehr.getByText(`نرخی برای دلار تا ${isolate('۱۴۰۵/۰۷/۱۸')} نیست؛ در جمع نیامده است.`),
+    ).toBeTruthy();
+    expect(mehr.getByRole('link', { name: 'وارد کردن نرخ' })).toHaveProperty(
+      'pathname',
+      '/rates/new',
+    );
     expect(screen.queryByText('−۷ ریال')).toBeNull();
 
     await userEvent.click(screen.getByRole('link', { name: 'سال قبل' }));

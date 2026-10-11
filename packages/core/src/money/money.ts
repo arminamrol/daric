@@ -15,6 +15,13 @@ export function findCurrency(code: string): Currency | undefined {
   return currencies.find((c) => c.code === code);
 }
 
+/** The currency of `code`, which must be one Daric knows (as stored codes are). */
+export function currencyOf(code: string): Currency {
+  const currency = findCurrency(code);
+  if (!currency) throw new RangeError(`Unknown currency ${code}`);
+  return currency;
+}
+
 /** An Amount: an integer count of `currency`'s minor unit. */
 export interface Money {
   readonly amount: bigint;

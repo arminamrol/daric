@@ -9,8 +9,9 @@ import type {
 } from '../calendar';
 import { toPersianDigits } from '../locale';
 import type { Digits, Locale } from '../locale';
-import { formatMoney } from '../money';
-import type { FormatMoneyOptions, Money, MoneyDisplay } from '../money';
+import { currencyName, formatMoney } from '../money';
+import type { Currency, FormatMoneyOptions, Money, MoneyDisplay } from '../money';
+import { formatRate } from '../rates';
 
 /**
  * Everything that decides how money and dates look. The Workspace owns the
@@ -32,6 +33,10 @@ export interface DisplaySettings {
 
 export interface DisplayFormatters {
   money(m: Money, options?: Pick<FormatMoneyOptions, 'label' | 'grouping'>): string;
+  /** A currency's name; IRR by the Workspace's Rial/Toman display. */
+  currency(currency: Currency): string;
+  /** A stored rate of `currency` into `base` as typed: in tomans where Toman display asks. */
+  rate(rate: string, currency: Currency, base: Currency): string;
   date(instant: Date, options?: Pick<FormatDateOptions, 'style'>): string;
   /** A day with no time of day (a Transaction's), in the display calendar. */
   day(day: IsoDay, options?: Pick<FormatDateOptions, 'style'>): string;
@@ -57,6 +62,9 @@ export function displayFormatters(settings: DisplaySettings): DisplayFormatters 
   return {
     money: (m, options) =>
       formatMoney(m, { ...options, locale, digits, display: workspace.moneyDisplay }),
+    currency: (currency) => currencyName(currency, { locale, display: workspace.moneyDisplay }),
+    rate: (rate, currency, base) =>
+      formatRate(rate, { currency, base, digits, display: workspace.moneyDisplay }),
     date: (instant, options) =>
       formatDate(instant, {
         ...options,

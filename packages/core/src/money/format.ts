@@ -1,5 +1,5 @@
 import { IRR, displayDecimals } from './money';
-import type { Money, MoneyDisplay } from './money';
+import type { Currency, Money, MoneyDisplay } from './money';
 import { toPersianDigits } from '../locale';
 import type { Digits, Locale } from '../locale';
 
@@ -24,10 +24,18 @@ const SEPARATORS: Record<Digits, { group: string; decimal: string }> = {
   latin: { group: ',', decimal: '.' },
 };
 
+/** A currency's name as money shows it; IRR is named by its Rial/Toman display. */
+export function currencyName(
+  currency: Currency,
+  options: Pick<FormatMoneyOptions, 'locale' | 'display'>,
+): string {
+  const key = currency.code === IRR.code ? (options.display ?? 'rial') : currency.code;
+  return LABELS[options.locale][key] ?? currency.code;
+}
+
 /** Formats Money for display without converting it to a floating-point number. */
 export function formatMoney(m: Money, options: FormatMoneyOptions): string {
   const { locale, digits, display = 'rial', label = true, grouping = true } = options;
-  const isIrr = m.currency.code === IRR.code;
   const scale = displayDecimals(m.currency, display);
   const toman = scale !== m.currency.minorUnits;
   const { group, decimal } = SEPARATORS[digits];
@@ -47,6 +55,5 @@ export function formatMoney(m: Money, options: FormatMoneyOptions): string {
   if (negative) text = `-${text}`;
 
   if (!label) return text;
-  const key = isIrr ? display : m.currency.code;
-  return `${text} ${LABELS[locale][key] ?? m.currency.code}`;
+  return `${text} ${currencyName(m.currency, { locale, display })}`;
 }

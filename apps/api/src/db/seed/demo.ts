@@ -17,6 +17,7 @@ import {
   authIdentities,
   budgets,
   categories,
+  exchangeRates,
   labels,
   recurringOccurrences,
   recurringRules,
@@ -478,7 +479,8 @@ async function removeDemo(tx: Transaction): Promise<void> {
 
 /**
  * Creates the demo User (DEMO_EMAIL / DEMO_PASSWORD) with a Jalali Personal
- * Workspace: Accounts, the default Categories, Labels, Budgets, Recurring Rules, and Transactions and
+ * Workspace: Accounts, the default Categories, Labels, Budgets, Recurring Rules, dollar
+ * Exchange Rates, and Transactions and
  * Transfers from the start of the Jalali month MONTHS_BACK months before
  * `today` up to `today`. Replaces the demo User if they exist, so it can run any number
  * of times. Later features add their own entities here.
@@ -628,6 +630,18 @@ export async function seedDemo(
         : [],
     );
     await tx.insert(recurringOccurrences).values(confirmed);
+
+    // A dollar rate from the first day of each month, creeping up towards the
+    // 1,050,000 rials the demo buys dollars at.
+    await tx.insert(exchangeRates).values(
+      months.map((month, i) => ({
+        workspaceId,
+        currency: 'USD',
+        baseCurrency: 'IRR',
+        rate: String(1_050_000 - (months.length - 1 - i) * 12_500),
+        effectiveOn: dayOf('jalali', { ...month, day: 1 }),
+      })),
+    );
 
     return { userId: user.id, workspaceId };
   });
