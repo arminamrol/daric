@@ -1,7 +1,8 @@
 import { groupByMonth, IRR, money } from '@daric/core';
 import type { Account, Category, Label, MonthGroup, Transaction } from '@daric/core';
 import { isolate } from '@daric/i18n';
-import { ArrowLeftRight, Pencil, Trash2 } from 'lucide-react';
+import type { PlainMessageKey } from '@daric/i18n';
+import { ArrowLeftRight, CircleAlert, Clock, Pencil, Trash2 } from 'lucide-react';
 import { useId, useMemo } from 'react';
 import { Link } from 'react-router';
 import { currencyOf } from '../accounts/accounts';
@@ -10,6 +11,30 @@ import { useSignedIn } from '../auth/session';
 import { useI18n } from '../i18n/locale';
 import { useFormatters } from '../settings/settings';
 import { categoryChoices } from './choices';
+import type { SyncState } from './pending';
+
+const SYNC_LABELS = {
+  pending: 'transactions.list.pending',
+  conflict: 'transactions.list.conflict',
+  rejected: 'transactions.list.rejected',
+} as const satisfies Record<SyncState, PlainMessageKey>;
+
+/** Marks a Transaction whose change has not reached the API yet. */
+function SyncMark({ state }: { state: SyncState }) {
+  const { t } = useI18n();
+  const label = t(SYNC_LABELS[state]);
+  const Icon = state === 'pending' ? Clock : CircleAlert;
+  return (
+    <span
+      role="img"
+      aria-label={label}
+      title={label}
+      className={`shrink-0 ${state === 'pending' ? 'text-foreground-muted' : 'text-danger'}`}
+    >
+      <Icon aria-hidden="true" className="size-4" strokeWidth={2} />
+    </span>
+  );
+}
 
 /** Editing and deleting from the list, for the Transactions the viewer may change. */
 export interface ListActions {
@@ -28,6 +53,7 @@ function Month({
   categories,
   categoryLabels,
   labels,
+  states,
   actions,
 }: {
   group: MonthGroup<Transaction>;
@@ -35,6 +61,7 @@ function Month({
   categories: ReadonlyMap<string, Category>;
   categoryLabels: ReadonlyMap<string, string>;
   labels: readonly Label[];
+  states: ReadonlyMap<string, SyncState>;
   actions: ListActions | undefined;
 }) {
   const { t } = useI18n();
@@ -70,6 +97,7 @@ function Month({
           const amount = amountIn(transaction.amount, account);
           // In name order, as `labels` comes.
           const carried = labels.filter((l) => transaction.labelIds.includes(l.id));
+          const state = states.get(transaction.id);
           let badge, title, where, shown, tone;
           if (transaction.type === 'TRANSFER') {
             const to = accounts.get(transaction.toAccountId);
@@ -136,6 +164,7 @@ function Month({
                   </ul>
                 )}
               </div>
+              {state && <SyncMark state={state} />}
               <span className={`shrink-0 font-medium tabular-nums ${tone}`}>{shown}</span>
               {actions?.canChange(transaction) && (
                 <div className="flex shrink-0 gap-1">
@@ -177,6 +206,7 @@ export function TransactionList({
   accounts,
   categories,
   labels,
+  states = new Map(),
   actions,
 }: {
   transactions: readonly Transaction[];
@@ -185,6 +215,8 @@ export function TransactionList({
   categories: readonly Category[];
   /** By name, archived ones included. */
   labels: readonly Label[];
+  /** Of those whose change has not reached the API yet. */
+  states?: ReadonlyMap<string, SyncState>;
   /** Left out, the list only shows. */
   actions?: ListActions;
 }) {
@@ -213,6 +245,7 @@ export function TransactionList({
       categories={categoriesById}
       categoryLabels={categoryLabels}
       labels={labels}
+      states={states}
       actions={actions}
     />
   ));

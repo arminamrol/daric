@@ -61,6 +61,8 @@ export function fakeApi({
   const deleted = new Set<string>();
   let labels: Label[] = [];
   let nextLabelId = 1;
+  /** Unreachable: every call fails as fetch does when the network is down. */
+  let offline = false;
 
   function signedIn(): FakeUser {
     if (!current) throw new ApiError(401, { message: 'Unauthorized' });
@@ -239,7 +241,7 @@ export function fakeApi({
     );
   }
 
-  const api: ApiClient = {
+  const endpoints: ApiClient = {
     async register({ email, password }) {
       if (users.has(email)) throw new ApiError(409, { message: 'Email is already registered' });
       return session(addUser(email, password));
@@ -250,6 +252,9 @@ export function fakeApi({
         throw new ApiError(401, { message: 'Email or password is incorrect' });
       }
       return session(user);
+    },
+    async logout() {
+      current = undefined;
     },
     async me(): Promise<Me> {
       const user = signedIn();
@@ -457,8 +462,21 @@ export function fakeApi({
     },
   };
 
+  // Every call fails while offline, as fetch does, before reaching the fake server.
+  const api = Object.fromEntries(
+    Object.entries(endpoints).map(([name, call]: [string, (...args: never[]) => unknown]) => [
+      name,
+      (...args: never[]) => {
+        if (offline) return Promise.reject(new TypeError('Failed to fetch'));
+        return call(...args);
+      },
+    ]),
+  ) as unknown as ApiClient;
+
   return {
     api,
+    /** Cuts the network (or brings it back); see `goOffline` in `test/network`. */
+    setOffline: (value: boolean) => void (offline = value),
     addUser,
     addAccount,
     accounts: () => accounts,

@@ -4,8 +4,15 @@ import { useQuery } from '@tanstack/react-query';
 import { Navigate, Outlet } from 'react-router';
 import { useApi } from '../api/api';
 import { useI18n } from '../i18n/locale';
+import { storedFlag } from '../lib/storedFlag';
 
 export const ME_QUERY_KEY = ['me'] as const;
+
+/**
+ * Set when a logout could not reach the API: its session cookies are still
+ * valid. A login replaces them, so it clears this too.
+ */
+export const logoutPending = storedFlag('daric.logoutPending');
 
 /** The signed-in User and their Workspaces, or null when nobody is signed in. */
 export function useMe() {
@@ -13,6 +20,16 @@ export function useMe() {
   return useQuery({
     queryKey: ME_QUERY_KEY,
     queryFn: async (): Promise<Me | null> => {
+      // A logout made offline is finished first; until then nobody is signed in.
+      if (logoutPending.get()) {
+        try {
+          await api.logout();
+          logoutPending.set(false);
+        } catch {
+          // Still offline: try again next time.
+        }
+        return null;
+      }
       try {
         return await api.me();
       } catch (error) {
@@ -50,7 +67,8 @@ export function RequireSession() {
   const { t } = useI18n();
   const me = useMe();
   if (me.isPending) return <Loading />;
-  if (me.isError) {
+  // Who was signed in last time is enough offline: a failed refetch keeps it.
+  if (me.isError && me.data === undefined) {
     return (
       <p role="alert" className="text-center text-danger">
         {t('session.error')}

@@ -1,6 +1,9 @@
+import { LogOut } from 'lucide-react';
 import { NavLink, Outlet } from 'react-router';
+import { useLogout } from '../auth/logout';
 import { useMe } from '../auth/session';
 import { useI18n } from '../i18n/locale';
+import { SyncStatus } from '../transactions/SyncStatus';
 import { ThemeToggle } from '../theme/ThemeToggle';
 import { Logo } from './Logo';
 
@@ -10,6 +13,7 @@ const navLinkClass = ({ isActive }: { isActive: boolean }) =>
 export function Shell() {
   const { t } = useI18n();
   const signedIn = Boolean(useMe().data);
+  const logout = useLogout();
 
   return (
     <div className="flex min-h-dvh flex-col">
@@ -49,6 +53,18 @@ export function Shell() {
             </nav>
           )}
           <ThemeToggle />
+          {signedIn && (
+            <button
+              type="button"
+              disabled={logout.isPending}
+              onClick={() => logout.mutate()}
+              aria-label={t('nav.logout')}
+              title={t('nav.logout')}
+              className="inline-flex size-9 items-center justify-center rounded-md text-foreground-muted hover:bg-surface-muted hover:text-foreground disabled:opacity-60"
+            >
+              <LogOut aria-hidden="true" className="size-5" strokeWidth={2} />
+            </button>
+          )}
         </div>
       </header>
       <main
@@ -56,6 +72,7 @@ export function Shell() {
         tabIndex={-1}
         className="mx-auto w-full max-w-5xl flex-1 px-4 py-12 outline-none"
       >
+        {signedIn && <SyncStatus />}
         <Outlet />
       </main>
     </div>

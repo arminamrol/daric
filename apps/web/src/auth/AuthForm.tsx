@@ -8,7 +8,8 @@ import type { FormEvent } from 'react';
 import { Link, useNavigate } from 'react-router';
 import { useApi } from '../api/api';
 import { useI18n } from '../i18n/locale';
-import { ME_QUERY_KEY } from './session';
+import { useOfflineDevice } from '../offline/offline';
+import { logoutPending, ME_QUERY_KEY } from './session';
 
 type Mode = 'login' | 'signup';
 type Field = 'email' | 'password';
@@ -62,12 +63,17 @@ function failureMessage(mode: Mode, error: unknown): PlainMessageKey {
 const inputClass =
   'w-full rounded-md border border-border bg-background px-3 py-2 text-foreground aria-invalid:border-danger';
 
-/** The login and sign-up form; the server sets the session cookies, so success just goes home. */
+/**
+ * The login and sign-up form; the server sets the session cookies, so success
+ * just goes home. It asks whether this device keeps data for offline use: no
+ * unless ticked, since a shared browser would otherwise hold financial data.
+ */
 export function AuthForm({ mode }: { mode: Mode }) {
   const { t } = useI18n();
   const api = useApi();
   const queryClient = useQueryClient();
   const navigate = useNavigate();
+  const device = useOfflineDevice();
   const copy = COPY[mode];
   const id = useId();
   const ids = {
@@ -77,17 +83,25 @@ export function AuthForm({ mode }: { mode: Mode }) {
     password: `${id}-password`,
     passwordHint: `${id}-password-hint`,
     passwordError: `${id}-password-error`,
+    keepData: `${id}-keep-data`,
+    keepDataHint: `${id}-keep-data-hint`,
   };
   const emailRef = useRef<HTMLInputElement>(null);
   const passwordRef = useRef<HTMLInputElement>(null);
   const [errors, setErrors] = useState<FieldErrors>({});
 
   const submit = useMutation({
-    mutationFn: (input: LoginInput): Promise<Session> =>
+    mutationFn: ({
+      keepData: _,
+      ...input
+    }: LoginInput & { keepData: boolean }): Promise<Session> =>
       mode === 'signup' ? api.register(input) : api.login(input),
-    onSuccess: async () => {
-      // The cookies changed; ask the API who is signed in now.
-      queryClient.removeQueries({ queryKey: ME_QUERY_KEY });
+    onSuccess: async (_, { keepData }) => {
+      logoutPending.set(false);
+      await device.setKeep(keepData);
+      // The cookies changed; ask the API who is signed in now. Reset, not removed:
+      // the header keeps watching the same query and shows the signed-in nav.
+      await queryClient.resetQueries({ queryKey: ME_QUERY_KEY });
       await navigate('/', { replace: true });
     },
   });
@@ -100,7 +114,7 @@ export function AuthForm({ mode }: { mode: Mode }) {
     setErrors(found);
     if (found.email) return emailRef.current?.focus();
     if (found.password) return passwordRef.current?.focus();
-    submit.mutate(values);
+    submit.mutate({ ...values, keepData: data.get('keepData') === 'yes' });
   }
 
   const showHint = mode === 'signup';
@@ -167,6 +181,22 @@ export function AuthForm({ mode }: { mode: Mode }) {
               {t(errors.password)}
             </p>
           )}
+        </div>
+        <div className="flex flex-col gap-1">
+          <label htmlFor={ids.keepData} className="flex items-center gap-2 font-medium">
+            <input
+              id={ids.keepData}
+              name="keepData"
+              type="checkbox"
+              value="yes"
+              aria-describedby={ids.keepDataHint}
+              className="size-4"
+            />
+            {t('auth.keepData')}
+          </label>
+          <p id={ids.keepDataHint} className="text-sm text-foreground-muted">
+            {t('auth.keepDataHint')}
+          </p>
         </div>
         {submit.isError && (
           <p role="alert" className="rounded-md bg-surface-muted px-3 py-2 text-sm text-danger">
