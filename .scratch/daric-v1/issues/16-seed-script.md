@@ -4,8 +4,8 @@
 
 **Blocked by:** 12, 13
 
-**Status:** in-progress
+**Status:** done
 
-- [ ] Idempotent seed command documented in README
-- [ ] Data spans at least 6 months in the Jalali calendar with realistic amounts in rials
-- [ ] Later tickets extend the seed for their own entities
+- [x] Idempotent seed command documented in README
+- [x] Data spans at least 6 months in the Jalali calendar with realistic amounts in rials
+- [x] Later tickets extend the seed for their own entities

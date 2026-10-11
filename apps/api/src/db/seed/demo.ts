@@ -87,8 +87,8 @@ const demoLabels = {
 } as const;
 type LabelKey = keyof typeof demoLabels;
 
-/** What the generator plans before ids exist; Categories are named `KIND:name`. */
-type Planned = {
+/** A demo Transaction before ids exist; Categories are named `KIND:name`. */
+type Scripted = {
   day: IsoDay;
   account: AccountKey;
   amount: bigint;
@@ -100,7 +100,7 @@ type Planned = {
 );
 
 /** A small seeded generator (mulberry32), so the same day always seeds the same data. */
-function random(seed: number) {
+function seededRandom(seed: number) {
   let state = seed;
   const next = () => {
     state = (state + 0x6d2b79f5) | 0;
@@ -127,11 +127,15 @@ function demoMonths(today: IsoDay): MonthPeriod[] {
 }
 
 /** A household's month: salary, rent and bills, groceries, eating out, getting around. */
-function planMonth(month: MonthPeriod, index: number, rand: ReturnType<typeof random>): Planned[] {
+function scriptMonth(
+  month: MonthPeriod,
+  index: number,
+  rand: ReturnType<typeof seededRandom>,
+): Scripted[] {
   const name = MONTH_NAMES[month.month - 1] as string;
   const last = daysInMonth('jalali', month.year, month.month);
   const on = (day: number) => dayOf('jalali', { ...month, day: Math.min(day, last) });
-  const plan: Planned[] = [
+  const script: Scripted[] = [
     {
       day: on(1),
       type: 'INCOME',
@@ -149,13 +153,13 @@ function planMonth(month: MonthPeriod, index: number, rand: ReturnType<typeof ra
       note: `اجاره ${name}`,
       labels: ['essential'],
     },
-    { day: on(2), type: 'TRANSFER', account: 'mellat', to: 'saman', amount: 190_000_000n },
+    { day: on(2), type: 'TRANSFER', account: 'mellat', to: 'saman', amount: 170_000_000n },
     {
       day: on(2),
       type: 'TRANSFER',
       account: 'mellat',
       to: 'wallet',
-      amount: 18_000_000n,
+      amount: 15_000_000n,
       note: 'شارژ کیف پول',
     },
     {
@@ -217,7 +221,7 @@ function planMonth(month: MonthPeriod, index: number, rand: ReturnType<typeof ra
   ];
 
   for (const day of [4, 11, 18, 25]) {
-    plan.push({
+    script.push({
       day: on(day + rand.int(0, 2)),
       type: 'EXPENSE',
       account: 'saman',
@@ -227,7 +231,7 @@ function planMonth(month: MonthPeriod, index: number, rand: ReturnType<typeof ra
     });
   }
   for (let i = 0; i < 3; i++) {
-    plan.push({
+    script.push({
       day: on(rand.int(1, last)),
       type: 'EXPENSE',
       account: 'saman',
@@ -238,7 +242,7 @@ function planMonth(month: MonthPeriod, index: number, rand: ReturnType<typeof ra
     });
   }
   for (let i = 0; i < 6; i++) {
-    plan.push({
+    script.push({
       day: on(rand.int(1, last)),
       type: 'EXPENSE',
       account: 'wallet',
@@ -248,7 +252,7 @@ function planMonth(month: MonthPeriod, index: number, rand: ReturnType<typeof ra
     });
   }
   for (const day of [8, 22]) {
-    plan.push({
+    script.push({
       day: on(day),
       type: 'EXPENSE',
       account: 'cash',
@@ -258,7 +262,7 @@ function planMonth(month: MonthPeriod, index: number, rand: ReturnType<typeof ra
     });
   }
   for (let i = 0; i < 4; i++) {
-    plan.push({
+    script.push({
       day: on(rand.int(1, last)),
       type: 'EXPENSE',
       account: 'cash',
@@ -269,7 +273,7 @@ function planMonth(month: MonthPeriod, index: number, rand: ReturnType<typeof ra
   }
 
   if (index % 2 === 1) {
-    plan.push({
+    script.push({
       day: on(rand.int(15, 25)),
       type: 'INCOME',
       account: 'mellat',
@@ -279,7 +283,7 @@ function planMonth(month: MonthPeriod, index: number, rand: ReturnType<typeof ra
     });
   }
   if (rand.chance(0.5)) {
-    plan.push({
+    script.push({
       day: on(rand.int(1, last)),
       type: 'EXPENSE',
       account: 'saman',
@@ -289,7 +293,7 @@ function planMonth(month: MonthPeriod, index: number, rand: ReturnType<typeof ra
     });
   }
   if (rand.chance(0.6)) {
-    plan.push({
+    script.push({
       day: on(rand.int(1, last)),
       type: 'EXPENSE',
       account: 'saman',
@@ -301,7 +305,7 @@ function planMonth(month: MonthPeriod, index: number, rand: ReturnType<typeof ra
   }
   if (index % 3 === 1) {
     // Buys dollars at about 1,050,000 rials each.
-    plan.push({
+    script.push({
       day: on(rand.int(5, 20)),
       type: 'TRANSFER',
       account: 'mellat',
@@ -311,16 +315,16 @@ function planMonth(month: MonthPeriod, index: number, rand: ReturnType<typeof ra
       note: 'خرید ۲۰۰ دلار',
     });
   }
-  return plan;
+  return script;
 }
 
 /** Once-a-year events that fall inside the seeded months. */
-function planOneOffs(months: MonthPeriod[]): Planned[] {
-  const plan: Planned[] = [];
+function scriptOneOffs(months: MonthPeriod[]): Scripted[] {
+  const script: Scripted[] = [];
   for (const month of months) {
     const on = (day: number) => dayOf('jalali', { ...month, day });
     if (month.month === 1) {
-      plan.push(
+      script.push(
         {
           day: on(3),
           type: 'EXPENSE',
@@ -358,7 +362,7 @@ function planOneOffs(months: MonthPeriod[]): Planned[] {
       );
     }
     if (month.month === 6) {
-      plan.push({
+      script.push({
         day: on(20),
         type: 'EXPENSE',
         account: 'mellat',
@@ -369,7 +373,7 @@ function planOneOffs(months: MonthPeriod[]): Planned[] {
       });
     }
     if (month.month === 4) {
-      plan.push({
+      script.push({
         day: on(9),
         type: 'EXPENSE',
         account: 'mellat',
@@ -379,7 +383,12 @@ function planOneOffs(months: MonthPeriod[]): Planned[] {
       });
     }
   }
-  return plan;
+  return script;
+}
+
+/** A new id for each key of `items`. */
+function idsFor<K extends string>(items: Record<K, unknown>): Record<K, string> {
+  return Object.fromEntries(Object.keys(items).map((key) => [key, uuidv7()])) as Record<K, string>;
 }
 
 /** Removes the demo User and every Workspace they own, so a rerun starts clean. */
@@ -400,9 +409,9 @@ async function removeDemo(tx: Transaction): Promise<void> {
 /**
  * Creates the demo User (DEMO_EMAIL / DEMO_PASSWORD) with a Jalali Personal
  * Workspace: Accounts, the default Categories, Labels, and Transactions and
- * Transfers from the start of the Jalali month six months before `today` up
- * to `today`. Replaces the demo User if they exist, so it can run any number
- * of times. Later features add their own entities to the plan here.
+ * Transfers from the start of the Jalali month MONTHS_BACK months before
+ * `today` up to `today`. Replaces the demo User if they exist, so it can run any number
+ * of times. Later features add their own entities here.
  */
 export async function seedDemo(
   db: Database,
@@ -417,15 +426,23 @@ export async function seedDemo(
       .insert(authIdentities)
       .values({ userId: user.id, provider: 'PASSWORD', identifier: DEMO_EMAIL, secretHash });
     const workspace = one(
-      await tx.insert(workspaces).values({ type: 'PERSONAL', name: 'شخصی' }).returning(),
+      await tx
+        .insert(workspaces)
+        .values({
+          type: 'PERSONAL',
+          name: 'شخصی',
+          calendar: 'jalali',
+          timezone: 'Asia/Tehran',
+          baseCurrency: 'IRR',
+          moneyDisplay: 'rial',
+        })
+        .returning(),
     );
     const workspaceId = workspace.id;
     await tx.insert(workspaceMembers).values({ workspaceId, userId: user.id, role: 'OWNER' });
     await seedDefaultCategories(tx, workspaceId);
 
-    const accountIds = Object.fromEntries(
-      Object.keys(demoAccounts).map((key) => [key, uuidv7()]),
-    ) as Record<AccountKey, string>;
+    const accountIds = idsFor(demoAccounts);
     await tx.insert(accounts).values(
       Object.entries(demoAccounts).map(([key, { opening, ...account }]) => ({
         ...account,
@@ -435,9 +452,7 @@ export async function seedDemo(
       })),
     );
 
-    const labelIds = Object.fromEntries(
-      Object.keys(demoLabels).map((key) => [key, uuidv7()]),
-    ) as Record<LabelKey, string>;
+    const labelIds = idsFor(demoLabels);
     await tx.insert(labels).values(
       Object.entries(demoLabels).map(([key, label]) => ({
         ...label,
@@ -460,14 +475,17 @@ export async function seedDemo(
       return id;
     };
 
-    const rand = random(1405);
+    const rand = seededRandom(1405);
     const months = demoMonths(options.today);
-    const planned = [...months.flatMap((m, i) => planMonth(m, i, rand)), ...planOneOffs(months)]
+    const scripted = [
+      ...months.flatMap((m, i) => scriptMonth(m, i, rand)),
+      ...scriptOneOffs(months),
+    ]
       .filter((p) => p.day <= options.today)
-      // Stable, so ties keep their planned order and the same day seeds the same rows.
+      // Stable, so ties keep their scripted order and the same day seeds the same rows.
       .sort((a, b) => (a.day < b.day ? -1 : a.day > b.day ? 1 : 0));
 
-    const rows = planned.map((p) => {
+    const rows = scripted.map((p) => {
       const common = {
         id: uuidv7(),
         workspaceId,
@@ -483,7 +501,7 @@ export async function seedDemo(
         : { ...common, categoryId: categoryId(p.category) };
     });
     await tx.insert(transactions).values(rows);
-    const attached = planned.flatMap((p, i) =>
+    const attached = scripted.flatMap((p, i) =>
       (p.labels ?? []).map((label) => ({
         transactionId: (rows[i] as { id: string }).id,
         labelId: labelIds[label],

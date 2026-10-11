@@ -84,7 +84,7 @@ NestJS on Express with Drizzle over Postgres. Routes live under `/v1`; the OpenA
 
 ## Demo data
 
-`pnpm db:seed` creates a demo user, `demo@example.com` with password `daric-demo`, whose Personal Workspace (Jalali calendar, rials) holds Accounts, Categories, Labels, and Income, Expenses and Transfers from the start of the Jalali month six months ago up to today. Running it again deletes the demo user and their Workspace and seeds them afresh, dated from the new today; other users are untouched. It refuses to run with `NODE_ENV=production`.
+`pnpm db:seed` creates a demo user, `demo@example.com` with password `daric-demo`, whose Personal Workspace (Jalali calendar, rials) holds Accounts, Categories, Labels, and Income, Expenses and Transfers from the start of the Jalali month six months ago up to today. Running it again deletes the demo user and the Workspaces they own and seeds them afresh, dated from the new today; other users' Workspaces are untouched. It refuses to run with `NODE_ENV=production`.
 
 The seed lives in `apps/api/src/db/seed/demo.ts`. A feature that adds an entity (Budgets, Recurring Rules, …) adds demo rows for it there and extends `demo.http.test.ts`.
 

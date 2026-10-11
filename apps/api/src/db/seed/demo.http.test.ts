@@ -107,9 +107,8 @@ describe('demo seed', () => {
       expect(s.amount).toBeGreaterThanOrEqual(300_000_000n);
       expect(s.amount).toBeLessThanOrEqual(2_000_000_000n);
     }
-    // Rials are whole; nobody pays 1,234,567 rials, prices end in at least four zeros.
-    const irrRows = rows.filter((r) => r.amount >= 10_000n);
-    expect(irrRows.every((r) => r.amount % 10_000n === 0n)).toBe(true);
+    // Every demo Transaction leaves a rial Account; prices end in at least four zeros.
+    expect(rows.every((r) => r.amount % 10_000n === 0n)).toBe(true);
   });
 
   it('attaches Labels to some Transactions', async () => {
