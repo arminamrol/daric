@@ -105,25 +105,20 @@ export function fakeApi({
 
   /** The opening balance plus the Account's Transactions, as the API computes it. */
   function withBalance(account: Account): Account {
-    const effects = transactions
-      .filter((t) => t.accountId === account.id)
-      .map((t) => balanceEffect(t, account.class));
+    const effects = transactions.map((t) => balanceEffect(t, account));
     return { ...account, balance: effects.reduce((a, b) => a + b, account.openingBalance) };
   }
 
   /** Puts a Transaction straight into the Workspace, as if recorded earlier. */
-  function addTransaction(
-    fields: Partial<Transaction> &
-      Pick<Transaction, 'type' | 'accountId' | 'categoryId' | 'amount' | 'occurredOn'>,
-  ): Transaction {
-    const transaction: Transaction = {
+  function addTransaction(fields: TransactionDraft): Transaction {
+    const transaction = {
       id: uuidv7(),
       note: null,
       createdBy: current?.id ?? null,
       labelIds: [],
       version: 1,
       ...fields,
-    };
+    } as Transaction;
     transactions.push(transaction);
     return transaction;
   }
@@ -347,8 +342,12 @@ export function fakeApi({
         transactions.filter(
           (t) =>
             (!days || (t.occurredOn >= days.from && t.occurredOn < days.until)) &&
-            (!accountId || t.accountId === accountId) &&
-            (!categoryId || t.categoryId === categoryId || childIds.includes(t.categoryId)) &&
+            (!accountId ||
+              t.accountId === accountId ||
+              (t.type === 'TRANSFER' && t.toAccountId === accountId)) &&
+            (!categoryId ||
+              (t.type !== 'TRANSFER' &&
+                (t.categoryId === categoryId || childIds.includes(t.categoryId)))) &&
             (!labelId || t.labelIds.includes(labelId)),
         ),
       );
@@ -357,16 +356,29 @@ export function fakeApi({
       inWorkspace(workspaceId, 'MEMBER');
       const existing = transactions.find((t) => t.id === id);
       if (existing) return { ...existing };
-      const account = accounts.find((a) => a.id === input.accountId && !a.archived);
-      const category = categories.find((c) => c.id === input.categoryId && !c.archived);
-      if (!account || category?.kind !== input.type) {
-        throw new ApiError(400, { message: 'Bad Account or Category' });
-      }
+      const usable = (accountId: string) => accounts.find((a) => a.id === accountId && !a.archived);
+      const account = usable(input.accountId);
+      if (!account) throw new ApiError(400, { message: 'Bad Account' });
       const active = new Set(labels.filter((l) => !l.archived).map((l) => l.id));
       if (!input.labelIds.every((labelId) => active.has(labelId))) {
         throw new ApiError(400, { message: 'Bad Label' });
       }
       const labelIds = [...input.labelIds].sort();
+      if (input.type === 'TRANSFER') {
+        const to = usable(input.toAccountId);
+        if (!to || to.id === account.id) throw new ApiError(400, { message: 'Bad Account' });
+        const toAmount =
+          to.currency === account.currency ? (input.toAmount ?? input.amount) : input.toAmount;
+        if (
+          toAmount === undefined ||
+          (to.currency === account.currency && toAmount !== input.amount)
+        ) {
+          throw new ApiError(400, { message: 'Bad Amounts' });
+        }
+        return { ...addTransaction({ ...input, toAmount, labelIds, ...(id && { id }) }) };
+      }
+      const category = categories.find((c) => c.id === input.categoryId && !c.archived);
+      if (category?.kind !== input.type) throw new ApiError(400, { message: 'Bad Category' });
       return { ...addTransaction({ ...input, labelIds, ...(id && { id }) }) };
     },
     async updatePreferences(input) {
@@ -396,3 +408,12 @@ export function fakeApi({
   };
 }
 export type FakeApi = ReturnType<typeof fakeApi>;
+
+type Defaulted = 'id' | 'note' | 'createdBy' | 'labelIds' | 'version';
+
+type Draft<T> = T extends unknown
+  ? Omit<T, Defaulted> & Partial<Pick<T, Defaulted & keyof T>>
+  : never;
+
+/** A Transaction to put in, its bookkeeping fields optional. */
+type TransactionDraft = Draft<Transaction>;

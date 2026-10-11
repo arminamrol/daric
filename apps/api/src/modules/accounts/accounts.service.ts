@@ -1,12 +1,7 @@
 import { Inject, Injectable, NotFoundException } from '@nestjs/common';
-import { accountBalance, amountToWire, balanceEffect, money } from '@daric/core';
-import type {
-  AccountWire,
-  CreateAccountInput,
-  TransactionType,
-  UpdateAccountInput,
-} from '@daric/core';
-import { eq, isNull, sql, type SQL } from 'drizzle-orm';
+import { accountBalance, amountToWire, flowEffect, money } from '@daric/core';
+import type { AccountWire, CreateAccountInput, UpdateAccountInput } from '@daric/core';
+import { and, eq, isNull, sql, type SQL, type SQLWrapper } from 'drizzle-orm';
 import { isUuid, type Membership } from '../../common/request';
 import { one } from '../../db/client';
 import { accounts, currencies, transactions, workspaces } from '../../db/schema';
@@ -24,37 +19,59 @@ const columns = {
   archivedAt: accounts.archivedAt,
 };
 
-/** Each Account's Income and Expense totals, deleted Transactions left out. */
-function totalsByAccount() {
-  // `sum` of a bigint is a numeric, which arrives as a string.
-  const total = (type: TransactionType) =>
-    sql<string>`coalesce(sum(${transactions.amount}) FILTER (WHERE ${transactions.type} = ${type}), 0)`;
+// `sum` of a bigint is a numeric, which arrives as a string.
+const sumOf = (column: SQLWrapper, filter?: SQL) =>
+  filter
+    ? sql<string>`coalesce(sum(${column}) FILTER (WHERE ${filter}), 0)`
+    : sql<string>`coalesce(sum(${column}), 0)`;
+
+/**
+ * What flowed into and out of each Account as the Account of its Transactions,
+ * deleted ones left out: Income in, Expense and Transfers out.
+ */
+function flowsByAccount() {
   return scopedTx()
     .select({
       accountId: transactions.accountId,
-      income: total('INCOME').as('income'),
-      expense: total('EXPENSE').as('expense'),
+      inflow: sumOf(transactions.amount, sql`${transactions.type} = 'INCOME'`).as('inflow'),
+      outflow: sumOf(transactions.amount, sql`${transactions.type} IN ('EXPENSE', 'TRANSFER')`).as(
+        'outflow',
+      ),
     })
     .from(transactions)
     .where(isNull(transactions.deletedAt))
     .groupBy(transactions.accountId)
-    .as('totals');
+    .as('flows');
+}
+
+/** What Transfers put into each Account, deleted ones left out. */
+function transfersInByAccount() {
+  return scopedTx()
+    .select({
+      accountId: sql<string>`${transactions.toAccountId}`.as('to_account_id'),
+      transferredIn: sumOf(transactions.toAmount).as('transferred_in'),
+    })
+    .from(transactions)
+    .where(and(eq(transactions.type, 'TRANSFER'), isNull(transactions.deletedAt)))
+    .groupBy(transactions.toAccountId)
+    .as('transfers_in');
 }
 
 interface Row extends Omit<AccountWire, 'openingBalance' | 'balance' | 'archived'> {
   minorUnits: number;
   openingBalance: bigint;
   archivedAt: Date | null;
-  income: string | null;
-  expense: string | null;
+  inflow: string | null;
+  outflow: string | null;
+  transferredIn: string | null;
 }
 
 function toWire(row: Row): AccountWire {
-  const { minorUnits, archivedAt, income, expense, ...account } = row;
+  const { minorUnits, archivedAt, inflow, outflow, transferredIn, ...account } = row;
   const currency = { code: row.currency, minorUnits };
   const effects = [
-    balanceEffect({ type: 'INCOME', amount: BigInt(income ?? 0) }, row.class),
-    balanceEffect({ type: 'EXPENSE', amount: BigInt(expense ?? 0) }, row.class),
+    flowEffect('IN', BigInt(inflow ?? 0) + BigInt(transferredIn ?? 0), row.class),
+    flowEffect('OUT', BigInt(outflow ?? 0), row.class),
   ].map((amount) => money(amount, currency));
   const balance = accountBalance({ currency, openingBalance: row.openingBalance }, effects);
   return {
@@ -72,12 +89,19 @@ export class AccountsService {
   constructor(@Inject(AuditService) private readonly audit: AuditService) {}
 
   private select(where: SQL | undefined) {
-    const totals = totalsByAccount();
+    const flows = flowsByAccount();
+    const transfersIn = transfersInByAccount();
     return scopedTx()
-      .select({ ...columns, income: totals.income, expense: totals.expense })
+      .select({
+        ...columns,
+        inflow: flows.inflow,
+        outflow: flows.outflow,
+        transferredIn: transfersIn.transferredIn,
+      })
       .from(accounts)
       .innerJoin(currencies, eq(currencies.code, accounts.currency))
-      .leftJoin(totals, eq(totals.accountId, accounts.id))
+      .leftJoin(flows, eq(flows.accountId, accounts.id))
+      .leftJoin(transfersIn, eq(transfersIn.accountId, accounts.id))
       .where(where)
       .orderBy(accounts.createdAt, accounts.id);
   }

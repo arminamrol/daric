@@ -184,7 +184,7 @@ describe('Transactions', () => {
     ['a negative Amount', { amount: '-250000' }],
     ['a fractional Amount', { amount: '2.5' }],
     ['an Amount as a number', { amount: 250000 }],
-    ['a Transfer', { type: 'TRANSFER' }],
+    ['a Transfer with a Category and no destination', { type: 'TRANSFER' }],
     ['a day that does not exist', { occurredOn: '2026-02-30' }],
     ['a missing Account', { accountId: undefined }],
     ['an id that is not a UUIDv7', { id: randomUUID() }],
@@ -668,3 +668,212 @@ describe('Transactions with the app-layer membership checks removed', () => {
     expect(await storedTransactions(a.workspaceId)).toHaveLength(1);
   });
 });
+
+describe('Transfers', () => {
+  let t: TestApp;
+  beforeAll(async () => {
+    t = await startTestApp();
+  });
+  afterAll(() => t.close());
+
+  /** A fresh Owner with two IRR Accounts (Melli, Cash), a USD one and an Expense Category. */
+  async function setUp() {
+    const user = await registerUser(t.url);
+    const api = client(t, user);
+    const from = await api.account();
+    const to = await api.account({ ...melli, name: 'Cash', type: 'CASH', openingBalance: '0' });
+    const dollars = await api.account({
+      ...melli,
+      name: 'Dollars',
+      currency: 'USD',
+      openingBalance: '0',
+    });
+    const category = await api.category();
+    const transfer = (fields: Record<string, unknown> = {}) => ({
+      type: 'TRANSFER',
+      accountId: from.id,
+      toAccountId: to.id,
+      amount: '300000',
+      occurredOn: '2026-10-10',
+      ...fields,
+    });
+    return { user, api, from, to, dollars, category, transfer };
+  }
+
+  it('move money between two Accounts of one currency, updating both balances', async () => {
+    const { user, api, from, to, transfer } = await setUp();
+    const res = await api.record(transfer({ note: 'ATM' }));
+    expect(res.status).toBe(201);
+    expect(res.body).toEqual({
+      id: expect.any(String),
+      ...transfer(),
+      toAmount: '300000',
+      note: 'ATM',
+      createdBy: user.userId,
+      labelIds: [],
+      version: 1,
+    });
+    expect(await api.balance(from.id)).toBe('700000');
+    expect(await api.balance(to.id)).toBe('300000');
+    expect((await api.get(res.body.id)).body).toEqual(res.body);
+  });
+
+  it('take a destination Amount equal to the Amount between Accounts of one currency', async () => {
+    const { api, to, transfer } = await setUp();
+    expect((await api.record(transfer({ toAmount: '300000' }))).status).toBe(201);
+    expect((await api.record(transfer({ toAmount: '300001' }))).status).toBe(400);
+    expect(await api.balance(to.id)).toBe('300000');
+  });
+
+  it('move each Account by its own Amount between currencies, converting nothing', async () => {
+    const { user, api, from, dollars, transfer } = await setUp();
+    const across = transfer({ toAccountId: dollars.id });
+    expect((await api.record(across)).status).toBe(400);
+    expect(await storedTransactions(user.workspaceId)).toEqual([]);
+
+    const res = await api.record({ ...across, toAmount: '500' });
+    expect(res.status).toBe(201);
+    expect(res.body).toMatchObject({ amount: '300000', toAmount: '500' });
+    expect(await api.balance(from.id)).toBe('700000');
+    expect(await api.balance(dollars.id)).toBe('500');
+  });
+
+  it('lower what a Liability owes when paying it off, and raise it when drawing from it', async () => {
+    const { api, from, transfer } = await setUp();
+    const loan = await api.account({ ...card, currency: 'IRR', openingBalance: '500000' });
+    expect((await api.record(transfer({ toAccountId: loan.id, amount: '200000' }))).status).toBe(
+      201,
+    );
+    expect(await api.balance(loan.id)).toBe('300000');
+    expect(await api.balance(from.id)).toBe('800000');
+    const advance = transfer({ accountId: loan.id, toAccountId: from.id, amount: '50000' });
+    expect((await api.record(advance)).status).toBe(201);
+    expect(await api.balance(loan.id)).toBe('350000');
+    expect(await api.balance(from.id)).toBe('850000');
+  });
+
+  it.each([
+    ['the same Account on both sides', (s: TransferSetUp) => ({ toAccountId: s.from.id })],
+    ['a Category', (s: TransferSetUp) => ({ categoryId: s.category.id })],
+    ['no destination Account', () => ({ toAccountId: undefined })],
+    ['a zero destination Amount', () => ({ toAmount: '0' })],
+    ['a destination Account that does not exist', () => ({ toAccountId: randomUUID() })],
+  ])('reject %s', async (_, change) => {
+    const s = await setUp();
+    expect((await s.api.record(s.transfer(change(s)))).status).toBe(400);
+    expect(await storedTransactions(s.user.workspaceId)).toEqual([]);
+  });
+
+  it('reject an archived Account on either side', async () => {
+    const { user, api, from, to, transfer } = await setUp();
+    await api.archive('accounts', to.id);
+    expect((await api.record(transfer())).status).toBe(400);
+    expect((await api.record(transfer({ accountId: to.id, toAccountId: from.id }))).status).toBe(
+      400,
+    );
+    expect(await storedTransactions(user.workspaceId)).toEqual([]);
+  });
+
+  it("reject another Workspace's Account as the destination", async () => {
+    const a = await setUp();
+    const b = await setUp();
+    expect((await a.api.record(a.transfer({ toAccountId: b.to.id }))).status).toBe(400);
+    expect(await storedTransactions(a.user.workspaceId)).toEqual([]);
+    expect(await b.api.balance(b.to.id)).toBe('0');
+  });
+
+  it('record a Transfer once when the same id is sent twice, the destination Amount given or not', async () => {
+    const { user, api, to, transfer } = await setUp();
+    const id = uuidv7();
+    const first = await api.record(transfer({ id }));
+    expect(first.status).toBe(201);
+    const again = await api.record(transfer({ id, toAmount: '300000' }));
+    expect(again.status).toBe(200);
+    expect(again.body).toEqual(first.body);
+    expect((await api.record(transfer({ id }))).status).toBe(200);
+    expect((await api.record(transfer({ id, toAmount: '1' }))).status).toBe(409);
+    expect((await api.record(transfer({ id, toAccountId: (await api.account()).id }))).status).toBe(
+      409,
+    );
+    expect(await storedTransactions(user.workspaceId)).toHaveLength(1);
+    expect(await api.balance(to.id)).toBe('300000');
+  });
+
+  it('refuse an Expense replayed under the id of a Transfer', async () => {
+    const { api, from, category, transfer } = await setUp();
+    const id = uuidv7();
+    await api.record(transfer({ id }));
+    const expense = {
+      id,
+      type: 'EXPENSE',
+      accountId: from.id,
+      categoryId: category.id,
+      amount: '300000',
+      occurredOn: '2026-10-10',
+    };
+    expect((await api.record(expense)).status).toBe(409);
+  });
+
+  it('list a Transfer under either of its Accounts, never under a Category', async () => {
+    const { api, from, to, dollars, category, transfer } = await setUp();
+    const moved = (await api.record(transfer())).body.id;
+    const spent = (
+      await api.record({
+        type: 'EXPENSE',
+        accountId: from.id,
+        categoryId: category.id,
+        amount: '1000',
+        occurredOn: '2026-10-09',
+      })
+    ).body.id;
+    const ids = async (query = '') => (await api.list(query)).body.map((x: { id: string }) => x.id);
+    expect(await ids()).toEqual([moved, spent]);
+    expect(await ids(`?accountId=${from.id}`)).toEqual([moved, spent]);
+    expect(await ids(`?accountId=${to.id}`)).toEqual([moved]);
+    expect(await ids(`?accountId=${dollars.id}`)).toEqual([]);
+    expect(await ids(`?categoryId=${category.id}`)).toEqual([spent]);
+    expect(await ids('?period=1405-07')).toEqual([moved, spent]);
+  });
+
+  it('carry Labels like any Transaction', async () => {
+    const { api, transfer } = await setUp();
+    const savings = await api.label('Savings');
+    const res = await api.record(transfer({ labelIds: [savings.id] }));
+    expect(res.status).toBe(201);
+    expect(res.body.labelIds).toEqual([savings.id]);
+    expect((await api.list(`?labelId=${savings.id}`)).body).toEqual([res.body]);
+  });
+
+  it('leave a deleted Transfer out of both balances', async () => {
+    const { api, from, to, transfer } = await setUp();
+    const gone = (await api.record(transfer())).body.id;
+    await db.update(transactions).set({ deletedAt: new Date() }).where(eq(transactions.id, gone));
+    expect(await api.balance(from.id)).toBe('1000000');
+    expect(await api.balance(to.id)).toBe('0');
+  });
+
+  it('let the database refuse a Transfer without a destination or with a Category', async () => {
+    const { user, from, to, category } = await setUp();
+    const base = {
+      workspaceId: user.workspaceId,
+      type: 'TRANSFER' as const,
+      accountId: from.id,
+      amount: 1n,
+      occurredOn: '2026-10-10',
+    };
+    await expect(db.insert(transactions).values(base)).rejects.toThrow();
+    await expect(
+      db
+        .insert(transactions)
+        .values({ ...base, toAccountId: to.id, toAmount: 1n, categoryId: category.id }),
+    ).rejects.toThrow();
+    await expect(
+      db.insert(transactions).values({ ...base, toAccountId: from.id, toAmount: 1n }),
+    ).rejects.toThrow();
+  });
+});
+
+interface TransferSetUp {
+  from: { id: string };
+  category: { id: string };
+}

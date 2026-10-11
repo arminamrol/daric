@@ -1,5 +1,14 @@
 import { IRR, parseAmount, parseDisplayDay, transactionTypes } from '@daric/core';
-import type { Account, Category, Label, ParseAmountError, TransactionType } from '@daric/core';
+import type {
+  Account,
+  AnyTransactionType,
+  Category,
+  CreateTransactionInput,
+  Currency,
+  Label,
+  ParseAmountError,
+  TransactionType,
+} from '@daric/core';
 import type { PlainMessageKey } from '@daric/i18n';
 import { useEffect, useId, useMemo, useRef, useState } from 'react';
 import type { FormEvent } from 'react';
@@ -23,24 +32,28 @@ const AMOUNT_ERRORS: Record<ParseAmountError, PlainMessageKey> = {
   out_of_range: 'accounts.error.amountTooLarge',
 };
 
-const TRANSACTION_TYPE_LABELS: Record<TransactionType, PlainMessageKey> = {
+const TRANSACTION_TYPE_LABELS: Record<AnyTransactionType, PlainMessageKey> = {
   EXPENSE: 'transactions.type.EXPENSE',
   INCOME: 'transactions.type.INCOME',
+  TRANSFER: 'transactions.type.TRANSFER',
 };
 
 /** Expense first: it is what people record most. */
-const TYPE_ORDER: readonly TransactionType[] = ['EXPENSE', 'INCOME'];
+const TYPE_ORDER: readonly AnyTransactionType[] = ['EXPENSE', 'INCOME', 'TRANSFER'];
 
 interface FieldErrors {
-  amount?: PlainMessageKey;
+  amount?: PlainMessageKey | undefined;
+  toAmount?: PlainMessageKey | undefined;
   day?: PlainMessageKey;
   category?: PlainMessageKey;
 }
 
 /**
- * Fast entry of an Income or Expense: the amount comes first and Enter records
- * it. The Account and Categories last used on this device are kept, and after
- * each one is recorded the amount and Labels are cleared and the amount focused for the next.
+ * Fast entry of an Income, Expense or Transfer: the amount comes first and
+ * Enter records it. The Accounts and Categories last used on this device are
+ * kept, and after each one is recorded the amounts and Labels are cleared and
+ * the amount focused for the next. A Transfer between currencies asks for the
+ * Amount received too; nothing is converted.
  */
 export function TransactionForm({
   accounts,
@@ -64,6 +77,10 @@ export function TransactionForm({
     amountHint: `${id}-amount-hint`,
     amountError: `${id}-amount-error`,
     account: `${id}-account`,
+    toAccount: `${id}-to-account`,
+    toAmount: `${id}-to-amount`,
+    toAmountHint: `${id}-to-amount-hint`,
+    toAmountError: `${id}-to-amount-error`,
     category: `${id}-category`,
     categoryError: `${id}-category-error`,
     day: `${id}-day`,
@@ -73,6 +90,7 @@ export function TransactionForm({
     labels: `${id}-labels`,
   };
   const amountRef = useRef<HTMLInputElement>(null);
+  const toAmountRef = useRef<HTMLInputElement>(null);
   const dayRef = useRef<HTMLInputElement>(null);
   const categoryRef = useRef<HTMLSelectElement>(null);
 
@@ -90,11 +108,13 @@ export function TransactionForm({
   }, [categories, t]);
 
   const [last] = useState(() => readLastPicks(workspace.id));
-  const [type, setType] = useState<TransactionType>('EXPENSE');
+  const [type, setType] = useState<AnyTransactionType>('EXPENSE');
   const [amount, setAmount] = useState('');
+  const [toAmount, setToAmount] = useState('');
   const [accountId, setAccountId] = useState(() =>
     accounts.some((a) => a.id === last.accountId) ? last.accountId : accounts[0]?.id,
   );
+  const [toAccountId, setToAccountId] = useState(last.toAccountId);
   const [pickedCategories, setPickedCategories] = useState(last.categoryIds ?? {});
   const [day, setDay] = useState(() => format.day(format.today(new Date())));
   const [note, setNote] = useState('');
@@ -111,15 +131,27 @@ export function TransactionForm({
 
   const activeLabels = labels.filter((l) => !l.archived);
   const account = accounts.find((a) => a.id === accountId) ?? accounts[0];
-  const picked = pickedCategories[type];
-  const categoryId = choices[type].some((c) => c.id === picked) ? picked : choices[type][0]?.id;
+  const transfer = type === 'TRANSFER';
+  const typeChoices = transfer ? [] : choices[type];
+  const picked = transfer ? undefined : pickedCategories[type];
+  const categoryId = typeChoices.some((c) => c.id === picked) ? picked : typeChoices[0]?.id;
+  // A Transfer goes to another Account: never the one it leaves.
+  const destinations = accounts.filter((a) => a.id !== account?.id);
+  const toAccount = destinations.find((a) => a.id === toAccountId) ?? destinations[0];
   const currency = account ? currencyOf(account) : IRR;
-  const unitName =
-    currency.code === IRR.code
-      ? workspace.moneyDisplay === 'toman'
-        ? 'settings.workspace.moneyDisplay.toman'
-        : 'settings.workspace.moneyDisplay.rial'
-      : CURRENCY_NAMES[currency.code];
+  const toCurrency = toAccount ? currencyOf(toAccount) : currency;
+  // Of one currency both Amounts are the same; between currencies the user gives both.
+  const asksToAmount = transfer && toCurrency.code !== currency.code;
+
+  const unitOf = (of: Currency) => {
+    const name =
+      of.code === IRR.code
+        ? workspace.moneyDisplay === 'toman'
+          ? 'settings.workspace.moneyDisplay.toman'
+          : 'settings.workspace.moneyDisplay.rial'
+        : CURRENCY_NAMES[of.code];
+    return name ? t(name) : of.code;
+  };
 
   function changed() {
     draftId.current = null;
@@ -130,47 +162,74 @@ export function TransactionForm({
 
   function onSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
+    const amountError = (parsed: ReturnType<typeof parseAmount>) =>
+      !parsed.ok
+        ? AMOUNT_ERRORS[parsed.error]
+        : parsed.money.amount <= 0n
+          ? 'transactions.error.amountPositive'
+          : undefined;
     const parsed = parseAmount(amount, currency, { display: workspace.moneyDisplay });
+    const parsedTo = asksToAmount
+      ? parseAmount(toAmount, toCurrency, { display: workspace.moneyDisplay })
+      : undefined;
     const occurredOn = parseDisplayDay(day, displayCalendar);
     const found: FieldErrors = {};
-    if (!parsed.ok) found.amount = AMOUNT_ERRORS[parsed.error];
-    else if (parsed.money.amount <= 0n) found.amount = 'transactions.error.amountPositive';
-    if (!categoryId) found.category = 'transactions.error.category';
+    found.amount = amountError(parsed);
+    if (parsedTo) {
+      found.toAmount =
+        !parsedTo.ok && parsedTo.error === 'empty'
+          ? 'transactions.error.toAmountRequired'
+          : amountError(parsedTo);
+    }
+    if (!transfer && !categoryId) found.category = 'transactions.error.category';
     if (!occurredOn) found.day = 'transactions.error.day';
     setErrors(found);
     if (found.amount) return amountRef.current?.focus();
+    if (found.toAmount) return toAmountRef.current?.focus();
     if (found.category) return categoryRef.current?.focus();
     if (found.day) return dayRef.current?.focus();
-    if (!parsed.ok || !account || !categoryId || !occurredOn) return;
+    if (!parsed.ok || !account || !occurredOn) return;
 
-    draftId.current ??= uuidv7();
-    record.mutate(
-      {
-        id: draftId.current,
+    const common = {
+      id: (draftId.current ??= uuidv7()),
+      accountId: account.id,
+      amount: parsed.money.amount,
+      occurredOn,
+      note: note.trim() || null,
+      // A Label archived since it was ticked is left off.
+      labelIds: labelIds.filter((labelId) => activeLabels.some((l) => l.id === labelId)),
+    };
+    let input: CreateTransactionInput;
+    if (type === 'TRANSFER') {
+      if (!toAccount) return;
+      input = {
+        ...common,
         type,
-        accountId: account.id,
-        categoryId,
-        amount: parsed.money.amount,
-        occurredOn,
-        note: note.trim() || null,
-        // A Label archived since it was ticked is left off.
-        labelIds: labelIds.filter((labelId) => activeLabels.some((l) => l.id === labelId)),
+        toAccountId: toAccount.id,
+        ...(parsedTo?.ok && { toAmount: parsedTo.money.amount }),
+      };
+    } else {
+      if (!categoryId) return;
+      input = { ...common, type, categoryId };
+    }
+    // The destination is kept for the next Transfer, also while recording others.
+    const rememberedTo = transfer ? toAccount?.id : toAccountId;
+    record.mutate(input, {
+      onSuccess: () => {
+        writeLastPicks(workspace.id, {
+          accountId: account.id,
+          ...(rememberedTo && { toAccountId: rememberedTo }),
+          categoryIds: transfer ? pickedCategories : { ...pickedCategories, [type]: categoryId },
+        });
+        draftId.current = null;
+        setAmount('');
+        setToAmount('');
+        setNote('');
+        setLabelIds([]);
+        setSaved(true);
+        amountRef.current?.focus();
       },
-      {
-        onSuccess: () => {
-          writeLastPicks(workspace.id, {
-            accountId: account.id,
-            categoryIds: { ...pickedCategories, [type]: categoryId },
-          });
-          draftId.current = null;
-          setAmount('');
-          setNote('');
-          setLabelIds([]);
-          setSaved(true);
-          amountRef.current?.focus();
-        },
-      },
-    );
+    });
   }
 
   const describedBy = (...list: (string | false | undefined)[]) =>
@@ -187,10 +246,12 @@ export function TransactionForm({
         onSubmit={onSubmit}
         className="flex flex-col gap-4"
       >
-        <ChoiceGroup<TransactionType>
+        <ChoiceGroup<AnyTransactionType>
           legend={t('transactions.form.type')}
           hideLegend
-          choices={TYPE_ORDER.map((value) => ({ value, label: t(TRANSACTION_TYPE_LABELS[value]) }))}
+          choices={TYPE_ORDER.filter((value) => value !== 'TRANSFER' || accounts.length > 1).map(
+            (value) => ({ value, label: t(TRANSACTION_TYPE_LABELS[value]) }),
+          )}
           value={type}
           onChange={(value) => {
             changed();
@@ -217,7 +278,7 @@ export function TransactionForm({
             className={`${inputClass} text-lg tabular-nums`}
           />
           <p id={ids.amountHint} className="text-sm text-foreground-muted">
-            {t('transactions.form.amountHint', { unit: unitName ? t(unitName) : currency.code })}
+            {t('transactions.form.amountHint', { unit: unitOf(currency) })}
           </p>
           {errors.amount && (
             <p id={ids.amountError} className="text-sm text-danger">
@@ -228,7 +289,7 @@ export function TransactionForm({
         <div className="grid gap-4 sm:grid-cols-2">
           <div className="flex flex-col gap-1">
             <label htmlFor={ids.account} className="font-medium">
-              {t('transactions.form.account')}
+              {t(transfer ? 'transactions.form.fromAccount' : 'transactions.form.account')}
             </label>
             <select
               id={ids.account}
@@ -246,40 +307,98 @@ export function TransactionForm({
               ))}
             </select>
           </div>
-          <div className="flex flex-col gap-1">
-            <label htmlFor={ids.category} className="font-medium">
-              {t('transactions.form.category')}
-            </label>
-            {choices[type].length === 0 ? (
-              <p className="py-2 text-sm text-foreground-muted">
-                {t('transactions.form.noCategory')}
-              </p>
-            ) : (
+          {transfer ? (
+            <div className="flex flex-col gap-1">
+              <label htmlFor={ids.toAccount} className="font-medium">
+                {t('transactions.form.toAccount')}
+              </label>
               <select
-                ref={categoryRef}
-                id={ids.category}
-                value={categoryId}
+                id={ids.toAccount}
+                value={toAccount?.id}
                 onChange={(e) => {
                   changed();
-                  setPickedCategories((current) => ({ ...current, [type]: e.target.value }));
+                  setToAccountId(e.target.value);
                 }}
-                aria-invalid={errors.category ? true : undefined}
-                aria-describedby={describedBy(errors.category && ids.categoryError)}
                 className={inputClass}
               >
-                {choices[type].map((c) => (
-                  <option key={c.id} value={c.id}>
-                    {c.label}
+                {destinations.map((a) => (
+                  <option key={a.id} value={a.id}>
+                    {a.name}
                   </option>
                 ))}
               </select>
-            )}
-            {errors.category && (
-              <p id={ids.categoryError} className="text-sm text-danger">
-                {t(errors.category)}
+            </div>
+          ) : (
+            <div className="flex flex-col gap-1">
+              <label htmlFor={ids.category} className="font-medium">
+                {t('transactions.form.category')}
+              </label>
+              {typeChoices.length === 0 ? (
+                <p className="py-2 text-sm text-foreground-muted">
+                  {t('transactions.form.noCategory')}
+                </p>
+              ) : (
+                <select
+                  ref={categoryRef}
+                  id={ids.category}
+                  value={categoryId}
+                  onChange={(e) => {
+                    changed();
+                    if (!transfer) {
+                      setPickedCategories((current) => ({ ...current, [type]: e.target.value }));
+                    }
+                  }}
+                  aria-invalid={errors.category ? true : undefined}
+                  aria-describedby={describedBy(errors.category && ids.categoryError)}
+                  className={inputClass}
+                >
+                  {typeChoices.map((c) => (
+                    <option key={c.id} value={c.id}>
+                      {c.label}
+                    </option>
+                  ))}
+                </select>
+              )}
+              {errors.category && (
+                <p id={ids.categoryError} className="text-sm text-danger">
+                  {t(errors.category)}
+                </p>
+              )}
+            </div>
+          )}
+          {asksToAmount && (
+            <div className="flex flex-col gap-1">
+              <label htmlFor={ids.toAmount} className="font-medium">
+                {t('transactions.form.toAmount')}
+              </label>
+              <input
+                ref={toAmountRef}
+                id={ids.toAmount}
+                value={toAmount}
+                dir="ltr"
+                inputMode="decimal"
+                autoComplete="off"
+                onChange={(e) => {
+                  changed();
+                  setToAmount(e.target.value);
+                }}
+                aria-invalid={errors.toAmount ? true : undefined}
+                aria-describedby={describedBy(
+                  ids.toAmountHint,
+                  errors.toAmount && ids.toAmountError,
+                )}
+                className={`${inputClass} tabular-nums`}
+              />
+              <p id={ids.toAmountHint} className="text-sm text-foreground-muted">
+                {t('transactions.form.amountHint', { unit: unitOf(toCurrency) })}
               </p>
-            )}
-          </div>
+              {errors.toAmount && (
+                <p id={ids.toAmountError} className="text-sm text-danger">
+                  {t(errors.toAmount)}
+                </p>
+              )}
+            </div>
+          )}
           <div className="flex flex-col gap-1">
             <label htmlFor={ids.day} className="font-medium">
               {t('transactions.form.day')}

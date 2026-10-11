@@ -9,6 +9,7 @@ import {
   ApiTags,
 } from '@nestjs/swagger';
 import {
+  type CreateTransactionInput,
   createTransactionInputSchema,
   MAX_LABELS_PER_TRANSACTION,
   listTransactionsQuerySchema,
@@ -19,11 +20,11 @@ import { createZodDto, ZodValidationPipe } from 'nestjs-zod';
 import { CurrentMembership, CurrentUserId, type Membership } from '../../common/request';
 import { MinRole } from '../../common/workspace.guard';
 import { WorkspaceController } from '../../common/workspace-route';
-import { ZodBody } from '../../common/zod';
+import { namedZodDto, ZodBody } from '../../common/zod';
 import { TransactionsService } from './transactions.service';
 
-class TransactionDto extends createZodDto(transactionSchema) {}
-class CreateTransactionDto extends createZodDto(createTransactionInputSchema) {}
+const TransactionDto = namedZodDto('TransactionDto', transactionSchema);
+const CreateTransactionDto = namedZodDto('CreateTransactionDto', createTransactionInputSchema);
 class ListTransactionsQueryDto extends createZodDto(listTransactionsQuerySchema) {}
 
 @ApiTags('transactions')
@@ -40,7 +41,12 @@ export class TransactionsController {
     required: false,
     description: 'A month (`1405-07`) or year (`1405`) of the Workspace Calendar',
   })
-  @ApiQuery({ name: 'accountId', required: false, schema: { format: 'uuid' } })
+  @ApiQuery({
+    name: 'accountId',
+    required: false,
+    schema: { format: 'uuid' },
+    description: 'A Transfer matches either of its Accounts',
+  })
   @ApiQuery({
     name: 'categoryId',
     required: false,
@@ -69,13 +75,13 @@ export class TransactionsController {
   @ApiOkResponse({ type: TransactionDto, description: 'Already recorded under this id' })
   @ApiBadRequestResponse({
     description:
-      'Invalid input, an Account or Category that is missing, archived or of the other kind, or a Label that is missing or archived',
+      'Invalid input, an Account or Category that is missing, archived or of the other kind, a Label that is missing or archived, or Transfer Amounts that do not fit the Accounts’ currencies',
   })
   @ApiConflictResponse({ description: 'The id is already used by a different Transaction' })
   async create(
     @CurrentMembership() membership: Membership,
     @CurrentUserId() userId: string,
-    @ZodBody(CreateTransactionDto) body: CreateTransactionDto,
+    @ZodBody(CreateTransactionDto) body: CreateTransactionInput,
     @Res({ passthrough: true }) res: Response,
   ) {
     const { created, transaction } = await this.transactions.create(membership, userId, body);

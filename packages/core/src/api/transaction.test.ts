@@ -48,7 +48,8 @@ describe('createTransactionInputSchema', () => {
     ['a negative Amount', { amount: '-5' }],
     ['a fractional Amount', { amount: '1.5' }],
     ['an Amount as a JSON number', { amount: 100 }],
-    ['a Transfer', { type: 'TRANSFER' }],
+    ['a Transfer without a destination Account', { type: 'TRANSFER', categoryId: undefined }],
+    ['an unknown type', { type: 'REFUND' }],
     ['an id that is not a UUIDv7', { id: '01900000-0000-4000-8000-000000000001' }],
     ['a day that does not exist', { occurredOn: '2026-02-30' }],
     ['a day with a time', { occurredOn: '2026-10-10T10:00:00Z' }],
@@ -72,7 +73,65 @@ describe('createTransactionInputSchema', () => {
   });
 });
 
+describe('createTransactionInputSchema for a Transfer', () => {
+  const toAccountId = '01900000-0000-7000-a000-000000000002';
+  const transfer = {
+    type: 'TRANSFER',
+    accountId,
+    toAccountId,
+    amount: '100',
+    occurredOn: '2026-10-10',
+  };
+
+  it('takes a destination Account, leaving the destination Amount to the server when not given', () => {
+    expect(createTransactionInputSchema.parse(transfer)).toEqual({
+      ...transfer,
+      amount: 100n,
+      note: null,
+      labelIds: [],
+    });
+  });
+
+  it('takes a destination Amount for another currency', () => {
+    expect(createTransactionInputSchema.parse({ ...transfer, toAmount: '5000000' })).toMatchObject({
+      amount: 100n,
+      toAmount: 5000000n,
+    });
+  });
+
+  it.each([
+    ['the same Account twice', { toAccountId: accountId }],
+    ['the same Account twice in different case', { toAccountId: accountId.toUpperCase() }],
+    ['a missing destination Account', { toAccountId: undefined }],
+    ['a zero destination Amount', { toAmount: '0' }],
+    ['a Category', { categoryId }],
+  ])('rejects %s', (_, change) => {
+    expect(createTransactionInputSchema.safeParse({ ...transfer, ...change }).success).toBe(false);
+  });
+
+  it('rejects a destination Account on an Income or Expense', () => {
+    expect(createTransactionInputSchema.safeParse({ ...valid, toAccountId }).success).toBe(false);
+  });
+});
+
 describe('transactionSchema', () => {
+  it('reads a Transfer from the wire', () => {
+    const wire = {
+      id: '0199d0f0-0000-7000-8000-000000000002',
+      type: 'TRANSFER',
+      accountId,
+      toAccountId: '01900000-0000-7000-a000-000000000002',
+      amount: '100',
+      toAmount: '5000000',
+      occurredOn: '2026-10-10',
+      note: null,
+      createdBy: null,
+      labelIds: [],
+      version: 1,
+    };
+    expect(transactionSchema.parse(wire)).toEqual({ ...wire, amount: 100n, toAmount: 5000000n });
+  });
+
   it('reads a Transaction from the wire', () => {
     const wire = {
       ...valid,

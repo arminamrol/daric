@@ -44,6 +44,18 @@ describe('HTTP hardening', () => {
     });
     expect(res.body.paths['/v1/workspaces/{wsId}'].patch).toBeDefined();
   });
+
+  it('documents a union schema under its own name, one variant per type', async () => {
+    const res = await call(t.url, 'GET', '/v1/openapi.json');
+    const post = res.body.paths['/v1/workspaces/{wsId}/transactions'].post;
+    const body = post.requestBody.content['application/json'].schema.$ref;
+    const reply = post.responses['201'].content['application/json'].schema.$ref;
+    expect([body, reply]).toEqual([
+      '#/components/schemas/CreateTransactionDto',
+      '#/components/schemas/TransactionDto',
+    ]);
+    expect(res.body.components.schemas.TransactionDto.oneOf).toHaveLength(2);
+  });
 });
 
 describe('rate limiting', () => {

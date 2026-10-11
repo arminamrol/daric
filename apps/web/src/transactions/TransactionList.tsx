@@ -1,6 +1,7 @@
 import { groupByMonth, IRR, money } from '@daric/core';
 import type { Account, Category, Label, MonthGroup, Transaction } from '@daric/core';
 import { isolate } from '@daric/i18n';
+import { ArrowLeftRight } from 'lucide-react';
 import { useId, useMemo } from 'react';
 import { currencyOf } from '../accounts/accounts';
 import { CategoryBadge } from '../categories/CategoryBadge';
@@ -50,22 +51,55 @@ function Month({
       <ul className="flex flex-col divide-y divide-border rounded-xl border border-border bg-surface">
         {group.transactions.map((transaction) => {
           const account = accounts.get(transaction.accountId);
-          const category = categories.get(transaction.categoryId);
-          const amount = format.money(
-            money(transaction.amount, account ? currencyOf(account) : IRR),
-          );
-          const income = transaction.type === 'INCOME';
+          const amountIn = (amount: bigint, of: Account | undefined) =>
+            format.money(money(amount, of ? currencyOf(of) : IRR));
+          const amount = amountIn(transaction.amount, account);
           // In name order, as `labels` comes.
           const carried = labels.filter((l) => transaction.labelIds.includes(l.id));
+          let badge, title, where, shown, tone;
+          if (transaction.type === 'TRANSFER') {
+            const to = accounts.get(transaction.toAccountId);
+            const toAmount = amountIn(transaction.toAmount, to);
+            badge = (
+              <span
+                aria-hidden="true"
+                className="inline-flex size-7 shrink-0 items-center justify-center rounded-full bg-surface-muted text-foreground-muted"
+              >
+                <ArrowLeftRight className="size-4" strokeWidth={2} />
+              </span>
+            );
+            title = t('transactions.type.TRANSFER');
+            where = t('transactions.list.transferAccounts', {
+              from: isolate(account?.name ?? ''),
+              to: isolate(to?.name ?? ''),
+            });
+            // Neither Income nor Expense: no sign. Both Amounts when they are in different currencies.
+            shown =
+              !account || !to || account.currency === to.currency
+                ? amount
+                : t('transactions.list.transferAmounts', {
+                    amount: isolate(amount),
+                    toAmount: isolate(toAmount),
+                  });
+            tone = 'text-foreground-muted';
+          } else {
+            const category = categories.get(transaction.categoryId);
+            const income = transaction.type === 'INCOME';
+            badge = category && (
+              <CategoryBadge icon={category.icon} color={category.color} size="sm" />
+            );
+            title = categoryLabels.get(transaction.categoryId) ?? category?.name;
+            where = account && isolate(account.name);
+            shown = `${income ? '+' : '−'}${amount}`;
+            tone = income ? 'text-success' : '';
+          }
           return (
             <li key={transaction.id} className="flex items-center gap-3 px-4 py-3">
-              {category && <CategoryBadge icon={category.icon} color={category.color} size="sm" />}
+              {badge}
               <div className="me-auto flex min-w-0 flex-col">
-                <span className="font-medium">
-                  {categoryLabels.get(transaction.categoryId) ?? category?.name}
-                </span>
+                <span className="font-medium">{title}</span>
                 <span className="text-sm text-foreground-muted">
-                  {account && isolate(account.name)}
+                  {where}
                   {' · '}
                   {format.day(transaction.occurredOn)}
                 </span>
@@ -88,9 +122,7 @@ function Month({
                   </ul>
                 )}
               </div>
-              <span className={`shrink-0 font-medium tabular-nums ${income ? 'text-success' : ''}`}>
-                {`${income ? '+' : '−'}${amount}`}
-              </span>
+              <span className={`shrink-0 font-medium tabular-nums ${tone}`}>{shown}</span>
             </li>
           );
         })}
@@ -101,7 +133,8 @@ function Month({
 
 /**
  * Transactions grouped by month of the Workspace Calendar, newest first, each
- * month with its Income and Expense totals per currency.
+ * month with its Income and Expense totals per currency. Transfers are listed
+ * but left out of the totals.
  */
 export function TransactionList({
   transactions,

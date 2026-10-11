@@ -6,7 +6,12 @@ import {
   NotFoundException,
 } from '@nestjs/common';
 import { amountToWire, MAX_LABELS_PER_TRANSACTION, periodDays } from '@daric/core';
-import type { CreateTransactionInput, ListTransactionsQuery, TransactionWire } from '@daric/core';
+import type {
+  CreateTransactionInput,
+  CreateTransferInput,
+  ListTransactionsQuery,
+  TransactionWire,
+} from '@daric/core';
 import { and, desc, eq, gte, inArray, isNull, lt, or, sql, type SQL } from 'drizzle-orm';
 import { isUuid, type Membership } from '../../common/request';
 import {
@@ -26,6 +31,8 @@ const columns = {
   accountId: transactions.accountId,
   categoryId: transactions.categoryId,
   amount: transactions.amount,
+  toAccountId: transactions.toAccountId,
+  toAmount: transactions.toAmount,
   occurredOn: transactions.occurredOn,
   note: transactions.note,
   createdBy: transactions.createdBy,
@@ -44,11 +51,17 @@ type Row = Pick<typeof transactions.$inferSelect, Exclude<keyof typeof columns, 
 const ID_TAKEN = 'This id is already used by another Transaction';
 
 function toWire(row: Row): TransactionWire {
-  // Only Income and Expense are ever written here, each with a Category.
-  if (row.type === 'TRANSFER' || row.categoryId === null) {
-    throw new Error(`Transaction ${row.id} is not an Income or Expense`);
+  const { type, categoryId, toAccountId, toAmount, ...rest } = row;
+  const common = { ...rest, amount: amountToWire(row.amount) };
+  // The table's checks give a Transfer its destination and Income and Expense their Category.
+  if (type === 'TRANSFER') {
+    if (toAccountId === null || toAmount === null) {
+      throw new Error(`Transfer ${row.id} has no destination`);
+    }
+    return { ...common, type, toAccountId, toAmount: amountToWire(toAmount) };
   }
-  return { ...row, type: row.type, categoryId: row.categoryId, amount: amountToWire(row.amount) };
+  if (categoryId === null) throw new Error(`Transaction ${row.id} has no Category`);
+  return { ...common, type, categoryId };
 }
 
 /**
@@ -57,10 +70,16 @@ function toWire(row: Row): TransactionWire {
  * detached, a client still replaying its queued create gets the current copy.
  */
 function sameTransaction(row: Row, input: CreateTransactionInput): boolean {
+  const sameKind =
+    input.type === 'TRANSFER'
+      ? row.toAccountId === input.toAccountId &&
+        // Left out, the destination Amount of a same-currency Transfer is its Amount.
+        row.toAmount === (input.toAmount ?? input.amount)
+      : row.categoryId === input.categoryId;
   return (
     row.type === input.type &&
+    sameKind &&
     row.accountId === input.accountId &&
-    row.categoryId === input.categoryId &&
     row.amount === input.amount &&
     row.occurredOn === input.occurredOn &&
     row.note === input.note &&
@@ -94,7 +113,15 @@ export class TransactionsService {
       const { from, until } = periodDays(query.period, workspace.calendar);
       filters.push(gte(transactions.occurredOn, from), lt(transactions.occurredOn, until));
     }
-    if (query.accountId) filters.push(eq(transactions.accountId, query.accountId));
+    if (query.accountId) {
+      // A Transfer shows under both of its Accounts.
+      filters.push(
+        or(
+          eq(transactions.accountId, query.accountId),
+          eq(transactions.toAccountId, query.accountId),
+        ),
+      );
+    }
     if (query.categoryId) {
       // A parent Category includes its children.
       const children = scopedTx()
@@ -127,7 +154,7 @@ export class TransactionsService {
   }
 
   /**
-   * Records an Income or Expense. Sending the same id again answers with the
+   * Records an Income, Expense or Transfer. Sending the same id again answers with the
    * Transaction already recorded (`created: false`), even if it was deleted
    * since: a replayed create never brings a deleted Transaction back.
    */
@@ -149,12 +176,17 @@ export class TransactionsService {
       const replayed = await this.replayed(input.id, input);
       if (replayed) return { created: false, transaction: replayed };
     }
-    await this.assertUsable(input);
+    const toAmount = await this.validate(input);
 
     const { labelIds, ...fields } = input;
     const [inserted] = await tx
       .insert(transactions)
-      .values({ ...fields, workspaceId, createdBy: userId })
+      .values({
+        ...fields,
+        ...(toAmount !== undefined && { toAmount }),
+        workspaceId,
+        createdBy: userId,
+      })
       .onConflictDoNothing({ target: transactions.id })
       .returning({ id: transactions.id });
     if (!inserted) {
@@ -194,25 +226,25 @@ export class TransactionsService {
   }
 
   /**
-   * Throws a 400 unless the Account, Category and Labels exist and are active,
-   * and the Category fits the type.
+   * Throws a 400 unless the Accounts, Category and Labels exist and are
+   * active, and the Category fits the type. For a Transfer, answers the
+   * destination Amount to store.
    */
-  private async assertUsable(input: CreateTransactionInput) {
-    const [account] = await scopedTx()
-      .select({ archivedAt: accounts.archivedAt })
-      .from(accounts)
-      .where(eq(accounts.id, input.accountId));
-    if (!account) throw new BadRequestException('Account not found');
-    if (account.archivedAt) throw new BadRequestException('The Account is archived');
-
-    const [category] = await scopedTx()
-      .select({ kind: categories.kind, archivedAt: categories.archivedAt })
-      .from(categories)
-      .where(eq(categories.id, input.categoryId));
-    if (!category) throw new BadRequestException('Category not found');
-    if (category.archivedAt) throw new BadRequestException('The Category is archived');
-    if (category.kind !== input.type) {
-      throw new BadRequestException(`An ${input.type} needs an ${input.type} Category`);
+  private async validate(input: CreateTransactionInput): Promise<bigint | undefined> {
+    const account = await this.usableAccount(input.accountId, 'Account');
+    let toAmount: bigint | undefined;
+    if (input.type === 'TRANSFER') {
+      toAmount = await this.transferredAmount(input, account.currency);
+    } else {
+      const [category] = await scopedTx()
+        .select({ kind: categories.kind, archivedAt: categories.archivedAt })
+        .from(categories)
+        .where(eq(categories.id, input.categoryId));
+      if (!category) throw new BadRequestException('Category not found');
+      if (category.archivedAt) throw new BadRequestException('The Category is archived');
+      if (category.kind !== input.type) {
+        throw new BadRequestException(`An ${input.type} needs an ${input.type} Category`);
+      }
     }
 
     if (input.labelIds.length > 0) {
@@ -225,6 +257,35 @@ export class TransactionsService {
         throw new BadRequestException('A Label is archived');
       }
     }
+    return toAmount;
+  }
+
+  private async usableAccount(accountId: string, name: string) {
+    const [account] = await scopedTx()
+      .select({ id: accounts.id, currency: accounts.currency, archivedAt: accounts.archivedAt })
+      .from(accounts)
+      .where(eq(accounts.id, accountId));
+    if (!account) throw new BadRequestException(`${name} not found`);
+    if (account.archivedAt) throw new BadRequestException(`The ${name} is archived`);
+    return account;
+  }
+
+  /**
+   * What a Transfer puts into its destination Account. Nothing is converted:
+   * of one currency it is the Amount itself, between currencies the user gives it.
+   */
+  private async transferredAmount(input: CreateTransferInput, currency: string): Promise<bigint> {
+    const destination = await this.usableAccount(input.toAccountId, 'destination Account');
+    if (destination.currency === currency) {
+      if (input.toAmount !== undefined && input.toAmount !== input.amount) {
+        throw new BadRequestException('Between Accounts of one currency both Amounts are the same');
+      }
+      return input.amount;
+    }
+    if (input.toAmount === undefined) {
+      throw new BadRequestException('Between currencies the destination Amount is required');
+    }
+    return input.toAmount;
   }
 
   /**

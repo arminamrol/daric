@@ -9,14 +9,10 @@ export const isoDaySchema = z
   .string()
   .refine(isIsoDay, { message: 'Expected a day as YYYY-MM-DD' });
 
-/** A Transaction as the API returns it; its Amount is in its Account's currency. */
-export const transactionSchema = z.object({
+const transactionFields = {
   id: z.uuid(),
-  type: z.enum(transactionTypes),
   accountId: z.uuid(),
-  /** An Income Category for Income, an Expense Category for Expense. */
-  categoryId: z.uuid(),
-  /** Always positive; the type says which way the money went. */
+  /** Always positive, in its Account's currency; the type says which way the money went. */
   amount: amountSchema,
   /** The day it happened; the Workspace Calendar decides its Period. */
   occurredOn: isoDaySchema,
@@ -27,7 +23,35 @@ export const transactionSchema = z.object({
   labelIds: z.array(z.uuid()),
   /** Bumped on every change; edits must name the version they started from. */
   version: z.number().int(),
+};
+
+/** An Income or Expense as the API returns it. */
+export const incomeExpenseSchema = z.object({
+  ...transactionFields,
+  type: z.enum(transactionTypes),
+  /** An Income Category for Income, an Expense Category for Expense. */
+  categoryId: z.uuid(),
 });
+export type IncomeExpense = z.infer<typeof incomeExpenseSchema>;
+
+/**
+ * A Transfer as the API returns it: its Amount leaves its Account and its
+ * destination Amount, in the destination Account's currency, arrives in the
+ * other. Of one currency, the two Amounts are equal.
+ */
+export const transferSchema = z.object({
+  ...transactionFields,
+  type: z.literal('TRANSFER'),
+  toAccountId: z.uuid(),
+  toAmount: amountSchema,
+});
+export type Transfer = z.infer<typeof transferSchema>;
+
+/** A Transaction as the API returns it: an Income, Expense or Transfer. */
+export const transactionSchema = z.discriminatedUnion('type', [
+  incomeExpenseSchema,
+  transferSchema,
+]);
 export type Transaction = z.infer<typeof transactionSchema>;
 export type TransactionWire = z.input<typeof transactionSchema>;
 export const transactionListSchema = z.array(transactionSchema);
@@ -39,15 +63,9 @@ const positiveAmountSchema = amountSchema.refine((amount) => amount > 0n, {
   message: 'An Amount must be positive',
 });
 
-/**
- * Records an Income or Expense. A client may make the id itself (a UUIDv7) so
- * that sending the same Transaction twice records it once (ADR-0005).
- */
-export const createTransactionInputSchema = z.strictObject({
+const createFields = {
   id: z.uuidv7().exactOptional(),
-  type: z.enum(transactionTypes),
   accountId: z.uuid(),
-  categoryId: z.uuid(),
   amount: positiveAmountSchema,
   occurredOn: isoDaySchema,
   note: z
@@ -63,8 +81,40 @@ export const createTransactionInputSchema = z.strictObject({
     .max(MAX_LABELS_PER_TRANSACTION)
     .refine((ids) => new Set(ids).size === ids.length, { message: 'Label ids must be distinct' })
     .default([]),
+};
+
+const createIncomeExpenseInputSchema = z.strictObject({
+  ...createFields,
+  type: z.enum(transactionTypes),
+  categoryId: z.uuid(),
 });
+
+const createTransferInputSchema = z
+  .strictObject({
+    ...createFields,
+    type: z.literal('TRANSFER'),
+    toAccountId: z.uuid(),
+    /**
+     * In the destination Account's currency. Required between currencies;
+     * of one currency it may be left out and must otherwise equal `amount`.
+     */
+    toAmount: positiveAmountSchema.exactOptional(),
+  })
+  .refine((input) => input.accountId.toLowerCase() !== input.toAccountId.toLowerCase(), {
+    message: 'A Transfer moves money between two different Accounts',
+    path: ['toAccountId'],
+  });
+
+/**
+ * Records an Income, Expense or Transfer. A client may make the id itself (a
+ * UUIDv7) so that sending the same Transaction twice records it once (ADR-0005).
+ */
+export const createTransactionInputSchema = z.discriminatedUnion('type', [
+  createIncomeExpenseInputSchema,
+  createTransferInputSchema,
+]);
 export type CreateTransactionInput = z.infer<typeof createTransactionInputSchema>;
+export type CreateTransferInput = z.infer<typeof createTransferInputSchema>;
 
 // Year 0 does not exist on either calendar.
 const PERIOD_PARAM = /^(?!0000)(\d{4})(?:-(0[1-9]|1[0-2]))?$/;
