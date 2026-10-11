@@ -9,7 +9,7 @@ import { Link, useNavigate } from 'react-router';
 import { useApi } from '../api/api';
 import { useI18n } from '../i18n/locale';
 import { useOfflineDevice } from '../offline/offline';
-import { clearLogoutPending, ME_QUERY_KEY } from './session';
+import { logoutPending, ME_QUERY_KEY } from './session';
 
 type Mode = 'login' | 'signup';
 type Field = 'email' | 'password';
@@ -97,7 +97,7 @@ export function AuthForm({ mode }: { mode: Mode }) {
     }: LoginInput & { keepData: boolean }): Promise<Session> =>
       mode === 'signup' ? api.register(input) : api.login(input),
     onSuccess: async (_, { keepData }) => {
-      clearLogoutPending();
+      logoutPending.set(false);
       await device.setKeep(keepData);
       // The cookies changed; ask the API who is signed in now. Reset, not removed:
       // the header keeps watching the same query and shows the signed-in nav.

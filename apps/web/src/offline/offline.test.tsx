@@ -139,6 +139,29 @@ describe('Working offline', () => {
     await vi.waitFor(() => expect(fake.deletedTransactions()).toEqual([bread.id]));
   });
 
+  it('undoing an offline delete brings back the offline edit it replaced', async () => {
+    const { fake, bread } = setUp();
+    renderApp({ path: '/transactions', api: fake.api });
+    await screen.findByText('−۳۰۰ ریال');
+    goOffline(fake);
+    await userEvent.click((await row('−۳۰۰ ریال')).getByRole('link', { name: 'ویرایش' }));
+    const form = await editForm();
+    await userEvent.clear(amountField(form));
+    await userEvent.type(amountField(form), '400');
+    await userEvent.click(form.getByRole('button', { name: 'ذخیره' }));
+
+    await userEvent.click((await row('−۴۰۰ ریال')).getByRole('button', { name: 'حذف' }));
+    await screen.findByText('در این سال تراکنشی نیست.');
+    await userEvent.click(screen.getByRole('button', { name: 'برگرداندن' }));
+    expect((await row('−۴۰۰ ریال')).getByRole('img', { name: pendingMark })).toBeTruthy();
+
+    goOnline(fake);
+    await vi.waitFor(() =>
+      expect(fake.transactions()[0]).toMatchObject({ id: bread.id, amount: 400n, version: 2 }),
+    );
+    expect(fake.deletedTransactions()).toEqual([]);
+  });
+
   it('never sends a Transaction recorded and deleted while offline', async () => {
     const { fake } = setUp();
     renderApp({ path: '/transactions', api: fake.api });
@@ -274,6 +297,21 @@ describe('Keeping data on this device', () => {
     goOnline(fake);
     renderApp({ path: '/transactions', api: fake.api });
     await vi.waitFor(() => expect(fake.transactions()).toHaveLength(2));
+  });
+
+  it('is forgotten when a later login is not ticked, even without a logout in between', async () => {
+    const { fake } = setUp({ signedIn: false });
+    const first = renderApp({ path: '/login', api: fake.api });
+    await logIn({ keepData: true });
+    await vi.waitFor(async () => expect(await kept('queryCache')).toBeDefined());
+    first.unmount();
+
+    // The session lapses on the server; the next person logs in without ticking.
+    await fake.api.logout();
+    renderApp({ path: '/login', api: fake.api });
+    await logIn({ keepData: false });
+    await vi.waitFor(async () => expect(await kept('queryCache')).toBeUndefined());
+    expect(localStorage.getItem('daric.keepData')).toBeNull();
   });
 
   it('is wiped on logout, with what waits to be sent and the answer', async () => {

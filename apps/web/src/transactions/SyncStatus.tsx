@@ -1,7 +1,7 @@
 import { useSignedIn } from '../auth/session';
 import { useI18n } from '../i18n/locale';
-import { useDiscardChange, useSettleConflict } from '../transactions/transactions';
-import { useWaitingChanges } from './offline';
+import { useWaitingChanges } from '../offline/offline';
+import { useDiscardChange, useSettleConflict } from './transactions';
 
 const buttonClass = 'rounded-md border border-border px-3 py-1 text-sm font-medium';
 

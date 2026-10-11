@@ -4,36 +4,15 @@ import { useQuery } from '@tanstack/react-query';
 import { Navigate, Outlet } from 'react-router';
 import { useApi } from '../api/api';
 import { useI18n } from '../i18n/locale';
+import { storedFlag } from '../lib/storedFlag';
 
 export const ME_QUERY_KEY = ['me'] as const;
 
-/** Set when a logout could not reach the API: its session cookies are still valid. */
-const LOGOUT_PENDING_KEY = 'daric.logoutPending';
-
-export function markLogoutPending() {
-  try {
-    localStorage.setItem(LOGOUT_PENDING_KEY, 'yes');
-  } catch {
-    // Storage blocked: the session lasts until it expires.
-  }
-}
-
-function logoutPending(): boolean {
-  try {
-    return localStorage.getItem(LOGOUT_PENDING_KEY) === 'yes';
-  } catch {
-    return false;
-  }
-}
-
-/** A login replaces the old session, so a logout still owed is moot. */
-export function clearLogoutPending() {
-  try {
-    localStorage.removeItem(LOGOUT_PENDING_KEY);
-  } catch {
-    // Storage blocked: nothing was marked.
-  }
-}
+/**
+ * Set when a logout could not reach the API: its session cookies are still
+ * valid. A login replaces them, so it clears this too.
+ */
+export const logoutPending = storedFlag('daric.logoutPending');
 
 /** The signed-in User and their Workspaces, or null when nobody is signed in. */
 export function useMe() {
@@ -42,10 +21,10 @@ export function useMe() {
     queryKey: ME_QUERY_KEY,
     queryFn: async (): Promise<Me | null> => {
       // A logout made offline is finished first; until then nobody is signed in.
-      if (logoutPending()) {
+      if (logoutPending.get()) {
         try {
           await api.logout();
-          clearLogoutPending();
+          logoutPending.set(false);
         } catch {
           // Still offline: try again next time.
         }

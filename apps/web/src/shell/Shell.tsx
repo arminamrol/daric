@@ -3,7 +3,7 @@ import { NavLink, Outlet } from 'react-router';
 import { useLogout } from '../auth/logout';
 import { useMe } from '../auth/session';
 import { useI18n } from '../i18n/locale';
-import { SyncStatus } from '../offline/SyncStatus';
+import { SyncStatus } from '../transactions/SyncStatus';
 import { ThemeToggle } from '../theme/ThemeToggle';
 import { Logo } from './Logo';
 

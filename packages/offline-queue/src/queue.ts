@@ -27,7 +27,8 @@ export type Entry<P, S> = Change<P> &
 
 /** How the server answered one change. Throwing instead means try again later. */
 export type SendResult<S> =
-  | { status: 'done' }
+  /** `version` is the entity's server version after the change, when known. */
+  | { status: 'done'; version?: number }
   /** The edit started from a stale version; `current` is the server's copy. */
   | { status: 'conflict'; current: S; version: number }
   /** The entity was deleted on the server; deletes win, so the change is dropped. */
@@ -70,6 +71,8 @@ export interface OfflineQueue<P, S> {
   discard(scope: string, entityId: string): Promise<boolean>;
   /** The waiting changes, oldest first. The same array until they change. */
   entries(): readonly Entry<P, S>[];
+  /** One entity's waiting changes, oldest first, the one on its way included. */
+  entriesFor(scope: string, entityId: string): readonly Entry<P, S>[];
   subscribe(listener: () => void): () => void;
   /** Forgets every waiting change, here and in storage (logout). */
   clear(): Promise<void>;
@@ -227,7 +230,19 @@ export function createOfflineQueue<P, S>({
         // Deletes win: a delete waiting behind this change makes its conflict moot.
         if (result.status === 'done' || result.status === 'gone' || deleteWaits) {
           settled.set(entry.seq, { status: result.status === 'gone' ? 'gone' : 'synced' });
-          await commit(without);
+          // An edit queued while this one was on its way started from the same
+          // version; it builds on this one, so it moves up to the new version.
+          const version = result.status === 'done' ? result.version : undefined;
+          const from = entry.kind === 'update' ? entry.baseVersion : undefined;
+          await commit(
+            version === undefined || from === undefined
+              ? without
+              : without.map((e) =>
+                  same(e, scope, entityId) && e.kind === 'update' && e.baseVersion === from
+                    ? { ...e, baseVersion: version }
+                    : e,
+                ),
+          );
         } else {
           const state: EntryState<S> =
             result.status === 'conflict'
@@ -304,6 +319,7 @@ export function createOfflineQueue<P, S>({
       });
     },
     entries: () => list,
+    entriesFor: (scope, entityId) => list.filter((e) => same(e, scope, entityId)),
     subscribe(listener) {
       listeners.add(listener);
       return () => void listeners.delete(listener);

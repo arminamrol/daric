@@ -62,7 +62,7 @@ function fakeServer() {
           ...change.payload,
           version: current.version + 1,
         });
-        return { status: 'done' };
+        return { status: 'done', version: current.version + 1 };
       case 'delete':
         records.delete(change.entityId);
         deleted.add(change.entityId);
@@ -347,6 +347,32 @@ describe('offline queue', () => {
       expect(queue.entries()).toEqual([]);
       expect(server.records.has('a')).toBe(false);
     });
+  });
+
+  it('an edit made while the one before it is on its way builds on it, not against it', async () => {
+    const { server, queue } = setup();
+    await queue.submit(create('a', 'rent'));
+    const { arrived, release } = server.hold();
+    const first = queue.submit(update('a', 'one', 1));
+    await arrived;
+    const second = queue.submit(update('a', 'two', 1));
+    release();
+    expect(await first).toEqual({ status: 'synced' });
+    expect(await second).toEqual({ status: 'synced' });
+    expect(server.records.get('a')).toMatchObject({ name: 'two', version: 3 });
+  });
+
+  it("lists an entity's waiting changes, with whether they may have reached the server", async () => {
+    const { server, queue } = setup();
+    server.loseReplies(1);
+    await queue.submit(create('a', 'rent'));
+    server.goOffline();
+    await queue.submit(update('a', 'one', 1));
+    await queue.submit({ ...create('a', 'elsewhere'), scope: 'other' });
+    expect(queue.entriesFor('ws', 'a').map((e) => [e.kind, e.attempted])).toEqual([
+      ['create', true],
+      ['update', false],
+    ]);
   });
 
   it('drops an edit of something deleted on the server: deletes win', async () => {

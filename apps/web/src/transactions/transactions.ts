@@ -9,13 +9,12 @@ import type { Outcome } from '@daric/offline-queue';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useMemo } from 'react';
 import { v7 as uuidv7 } from 'uuid';
-import { useRefreshAccounts } from '../accounts/accounts';
 import { useApi } from '../api/api';
 import { useSignedIn } from '../auth/session';
 import { useCategories } from '../categories/categories';
 import { useOfflineDevice, useWaitingChanges } from '../offline/offline';
-import { transactionsKey } from './keys';
-import { withWaitingChanges } from './pending';
+import { refreshAfterChange, transactionsKey } from './keys';
+import { inputFromTransaction, withWaitingChanges } from './pending';
 import type { SyncState } from './pending';
 
 /** The edit started from a stale version; `current` is the server's copy. */
@@ -201,55 +200,41 @@ export function useDiscardChange() {
   return (transactionId: string) => queue.discard(workspace.id, transactionId);
 }
 
-/**
- * Member or above, a Member only their own. Answers whether the Transaction
- * was only ever on this device, so undoing it means recording it again.
- */
+/** What undoing a delete needs. */
+export interface Deleted {
+  /** As it was shown, edits still waiting included. */
+  transaction: Transaction;
+  /** Recorded on this device and never sent, so the delete cancelled it outright. */
+  unsent: boolean;
+  /** Recorded on this device, maybe not on the server yet: undoing records it again. */
+  local: boolean;
+  /** Edits were waiting for it: undoing sends them again. */
+  edited: boolean;
+}
+
+/** Member or above, a Member only their own. Gone at once; sent now or once back online. */
 export function useDeleteTransaction() {
   const { queue } = useOfflineDevice();
   const { workspace } = useSignedIn();
   const submit = useSubmit();
   return useMutation({
     networkMode: 'always',
-    mutationFn: async (transactionId: string) => {
-      const local = queue
-        .entries()
-        .some(
-          (e) =>
-            e.scope === workspace.id &&
-            e.entityId === transactionId &&
-            e.kind === 'create' &&
-            !e.attempted,
-        );
-      await submit({ kind: 'delete', scope: workspace.id, entityId: transactionId });
-      return { local };
+    mutationFn: async (transaction: Transaction): Promise<Deleted> => {
+      // The delete replaces what waits for the Transaction; remember it for an undo.
+      const waiting = queue.entriesFor(workspace.id, transaction.id);
+      const unsent = waiting.some((e) => e.kind === 'create' && !e.attempted);
+      const local = waiting.some((e) => e.kind === 'create');
+      const edited = waiting.some((e) => e.kind === 'update');
+      await submit({ kind: 'delete', scope: workspace.id, entityId: transaction.id });
+      return { transaction, unsent, local, edited };
     },
   });
 }
 
-/** What a stored Transaction is made of, to record it again. */
-function inputOf(transaction: Transaction): CreateTransactionInput {
-  const common = {
-    id: transaction.id,
-    accountId: transaction.accountId,
-    amount: transaction.amount,
-    occurredOn: transaction.occurredOn,
-    note: transaction.note,
-    labelIds: transaction.labelIds,
-  };
-  return transaction.type === 'TRANSFER'
-    ? {
-        ...common,
-        type: 'TRANSFER',
-        toAccountId: transaction.toAccountId,
-        toAmount: transaction.toAmount,
-      }
-    : { ...common, type: transaction.type, categoryId: transaction.categoryId };
-}
-
 /**
  * Brings back a deleted Transaction: the undo of a delete. A delete still
- * waiting on this device is just cancelled; restoring one the API has needs it online.
+ * waiting on this device is cancelled, and what it replaced is queued again;
+ * restoring one the API has deleted needs it online.
  */
 export function useRestoreTransaction() {
   const api = useApi();
@@ -257,28 +242,33 @@ export function useRestoreTransaction() {
   const { queue } = useOfflineDevice();
   const { workspace } = useSignedIn();
   const submit = useSubmit();
-  const refreshAccounts = useRefreshAccounts();
   return useMutation({
     networkMode: 'always',
-    mutationFn: async ({ transaction, local }: { transaction: Transaction; local: boolean }) => {
-      if (await queue.discard(workspace.id, transaction.id)) return;
-      if (local) {
-        await submit({
-          kind: 'create',
-          scope: workspace.id,
-          entityId: transaction.id,
-          payload: inputOf(transaction),
-        });
+    mutationFn: async ({ transaction, unsent, local, edited }: Deleted) => {
+      const scope = workspace.id;
+      const entityId = transaction.id;
+      const payload = inputFromTransaction(transaction);
+      if (unsent) {
+        await submit({ kind: 'create', scope, entityId, payload });
         return;
       }
-      await api.restoreTransaction(workspace.id, transaction.id);
-      await Promise.all([
-        queryClient.invalidateQueries({
-          queryKey: transactionsKey(workspace.id),
-          refetchType: 'all',
-        }),
-        refreshAccounts(),
-      ]);
+      if (await queue.discard(scope, entityId)) {
+        if (local) await submit({ kind: 'create', scope, entityId, payload });
+        else if (edited) {
+          await submit({
+            kind: 'update',
+            scope,
+            entityId,
+            payload,
+            baseVersion: transaction.version,
+          });
+        }
+        return;
+      }
+      // The delete is on its way or done: let it land first, or it would undo the restore.
+      await queue.replay();
+      await api.restoreTransaction(scope, entityId);
+      await refreshAfterChange(queryClient, scope);
     },
   });
 }

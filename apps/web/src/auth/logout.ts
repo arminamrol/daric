@@ -1,7 +1,7 @@
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { useApi } from '../api/api';
 import { useOfflineDevice } from '../offline/offline';
-import { markLogoutPending, ME_QUERY_KEY } from './session';
+import { logoutPending, ME_QUERY_KEY } from './session';
 
 /**
  * Ends this Signed-in Device and wipes what it kept: the waiting changes (after
@@ -20,7 +20,7 @@ export function useLogout() {
         await api.logout();
       } catch (error) {
         // Offline: the API is told on the next visit, which starts signed out.
-        markLogoutPending();
+        logoutPending.set(true);
         throw error;
       } finally {
         await device.wipe();

@@ -9,40 +9,25 @@ import {
 import type { KeyValueStore, OfflineQueue, QueueStorage } from '@daric/offline-queue';
 import { dehydrate, hydrate } from '@tanstack/react-query';
 import type { DehydratedState, QueryClient } from '@tanstack/react-query';
-import { accountsKey } from '../accounts/accounts';
-import { transactionsKey } from '../transactions/keys';
+import { storedFlag } from '../lib/storedFlag';
+import { refreshAfterChange } from '../transactions/keys';
 import { transactionTransport } from './transport';
 
 export type TransactionQueue = OfflineQueue<CreateTransactionInput, Transaction>;
 
 /** Whether this browser is an Offline Device; asked at login, off unless the user says yes. */
-const KEEP_KEY = 'daric.keepData';
+const keepFlag = storedFlag('daric.keepData');
 /** Device-local picks that name Workspace data, wiped with it. */
 const LAST_PICKS_PREFIX = 'daric.lastPicks.';
 const CACHE_KEY = 'queryCache';
 /** Bumped when the cached shapes change, so an old cache is not restored. */
 const CACHE_VERSION = 1;
+/** How often waiting changes are retried while online, after the server failed them. */
+const RETRY_EVERY = 30_000;
 
 interface SavedCache {
   version: number;
   state: DehydratedState;
-}
-
-function readKeep(): boolean {
-  try {
-    return localStorage.getItem(KEEP_KEY) === 'yes';
-  } catch {
-    return false;
-  }
-}
-
-function writeKeep(keep: boolean) {
-  try {
-    if (keep) localStorage.setItem(KEEP_KEY, 'yes');
-    else localStorage.removeItem(KEEP_KEY);
-  } catch {
-    // Storage blocked: nothing is kept anyway.
-  }
 }
 
 function forgetLastPicks() {
@@ -81,17 +66,14 @@ export interface OfflineDevice {
 export function createOfflineDevice({
   api,
   queryClient,
-  database = 'daric',
 }: {
   api: ApiClient;
   queryClient: QueryClient;
-  /** The IndexedDB database to keep data in. */
-  database?: string;
 }): OfflineDevice {
-  let keep = readKeep();
+  let keep = keepFlag.get();
   // Opened only once something is kept or wiped: not every browser has IndexedDB.
   let store: KeyValueStore | undefined;
-  const db = () => (store ??= keyValueStore(database));
+  const db = () => (store ??= keyValueStore('daric'));
 
   const memory = memoryStorage<CreateTransactionInput, Transaction>();
   const persistent = (): QueueStorage<CreateTransactionInput, Transaction> =>
@@ -108,13 +90,7 @@ export function createOfflineDevice({
   const queue = createOfflineQueue({
     storage,
     transport: transactionTransport(api, (workspaceId) =>
-      Promise.all([
-        queryClient.invalidateQueries({
-          queryKey: transactionsKey(workspaceId),
-          refetchType: 'all',
-        }),
-        queryClient.invalidateQueries({ queryKey: accountsKey(workspaceId), refetchType: 'all' }),
-      ]),
+      refreshAfterChange(queryClient, workspaceId),
     ),
     isOnline: () => navigator.onLine,
   });
@@ -140,15 +116,30 @@ export function createOfflineDevice({
   }
   queryClient.getQueryCache().subscribe(save);
 
+  /** Deletes what IndexedDB holds, once a save under way has finished. */
+  async function forgetKept() {
+    await saving;
+    if (typeof indexedDB === 'undefined') return;
+    try {
+      await persistent().clear();
+      await db().delete(CACHE_KEY);
+    } catch {
+      // IndexedDB unavailable: nothing was kept there.
+    }
+  }
+
   return {
     queue,
     keeps: () => keep,
     async setKeep(next) {
       keep = next;
-      writeKeep(next);
+      keepFlag.set(next);
       if (next) {
         await persistent().write(queue.entries());
         save();
+      } else {
+        // An earlier "yes" whose logout never came (the session lapsed): forget what it kept.
+        await forgetKept();
       }
     },
     async restore() {
@@ -164,22 +155,21 @@ export function createOfflineDevice({
       const replay = () => void queue.replay();
       replay();
       window.addEventListener('online', replay);
-      return () => window.removeEventListener('online', replay);
+      // The server may have failed a change (busy, down) while the browser stayed online.
+      const retry = setInterval(() => {
+        if (queue.entries().length > 0) replay();
+      }, RETRY_EVERY);
+      return () => {
+        window.removeEventListener('online', replay);
+        clearInterval(retry);
+      };
     },
     async wipe() {
       keep = false;
-      writeKeep(false);
+      keepFlag.set(false);
       forgetLastPicks();
       await queue.clear();
-      await saving;
-      if (typeof indexedDB !== 'undefined') {
-        try {
-          await persistent().clear();
-          await db().delete(CACHE_KEY);
-        } catch {
-          // IndexedDB unavailable: nothing was kept there.
-        }
-      }
+      await forgetKept();
     },
   };
 }

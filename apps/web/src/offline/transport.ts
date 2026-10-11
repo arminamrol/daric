@@ -27,11 +27,11 @@ export function transactionTransport(
           break;
         case 'update': {
           const { id: _, ...fields } = change.payload;
-          await api.updateTransaction(change.scope, change.entityId, {
+          const saved = await api.updateTransaction(change.scope, change.entityId, {
             ...fields,
             version: change.baseVersion,
           });
-          break;
+          return { status: 'done', version: saved.version };
         }
         case 'delete':
           await api.deleteTransaction(change.scope, change.entityId);

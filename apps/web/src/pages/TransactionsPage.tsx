@@ -1,5 +1,4 @@
 import { hasRole, mayChangeTransaction } from '@daric/core';
-import type { Transaction } from '@daric/core';
 import { useId, useState } from 'react';
 import { Link, useSearchParams } from 'react-router';
 import { useAccounts } from '../accounts/accounts';
@@ -14,6 +13,7 @@ import { TransactionList } from '../transactions/TransactionList';
 import {
   useDeleteTransaction,
   useRestoreTransaction,
+  type Deleted,
   useTransactions,
 } from '../transactions/transactions';
 
@@ -55,7 +55,7 @@ export function TransactionsPage() {
   const remove = useDeleteTransaction();
   const restore = useRestoreTransaction();
   // The Transaction just deleted, which can still be brought back.
-  const [deleted, setDeleted] = useState<{ transaction: Transaction; local: boolean }>();
+  const [deleted, setDeleted] = useState<Deleted>();
 
   function setParam(name: string, value: string | undefined) {
     const next = new URLSearchParams(params);
@@ -221,10 +221,10 @@ export function TransactionsPage() {
               canChange: (transaction) =>
                 mayChangeTransaction(workspace.role, me.user.id, transaction),
               onDelete: (transaction) =>
-                remove.mutate(transaction.id, {
-                  onSuccess: ({ local }) => {
+                remove.mutate(transaction, {
+                  onSuccess: (gone) => {
                     restore.reset();
-                    setDeleted({ transaction, local });
+                    setDeleted(gone);
                   },
                 }),
               busy: remove.isPending,

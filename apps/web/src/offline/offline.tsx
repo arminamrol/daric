@@ -7,7 +7,7 @@ import { useApi } from '../api/api';
 import { createOfflineDevice } from './device';
 import type { OfflineDevice } from './device';
 
-export type TransactionEntry = Entry<CreateTransactionInput, Transaction>;
+export type QueuedTransactionChange = Entry<CreateTransactionInput, Transaction>;
 
 const OfflineContext = createContext<OfflineDevice | null>(null);
 
@@ -46,7 +46,7 @@ export function useOfflineDevice(): OfflineDevice {
 }
 
 /** The Transaction changes of a Workspace still waiting to reach the API, oldest first. */
-export function useWaitingChanges(workspaceId: string): readonly TransactionEntry[] {
+export function useWaitingChanges(workspaceId: string): readonly QueuedTransactionChange[] {
   const { queue } = useOfflineDevice();
   const entries = useSyncExternalStore(queue.subscribe, queue.entries);
   return useMemo(() => entries.filter((e) => e.scope === workspaceId), [entries, workspaceId]);

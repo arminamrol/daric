@@ -6,7 +6,7 @@ import type {
   ListTransactionsQuery,
   Transaction,
 } from '@daric/core';
-import type { TransactionEntry } from '../offline/offline';
+import type { QueuedTransactionChange } from '../offline/offline';
 
 /** Where a change shown before the API has it stands: on its way, or waiting for the user. */
 export type SyncState = 'pending' | 'conflict' | 'rejected';
@@ -34,6 +34,26 @@ export function transactionFromInput(
         toAmount: input.toAmount ?? input.amount,
       }
     : { ...common, type: input.type, categoryId: input.categoryId };
+}
+
+/** What a stored Transaction is made of: the reverse of `transactionFromInput`. */
+export function inputFromTransaction(transaction: Transaction): CreateTransactionInput {
+  const common = {
+    id: transaction.id,
+    accountId: transaction.accountId,
+    amount: transaction.amount,
+    occurredOn: transaction.occurredOn,
+    note: transaction.note,
+    labelIds: transaction.labelIds,
+  };
+  return transaction.type === 'TRANSFER'
+    ? {
+        ...common,
+        type: 'TRANSFER',
+        toAccountId: transaction.toAccountId,
+        toAmount: transaction.toAmount,
+      }
+    : { ...common, type: transaction.type, categoryId: transaction.categoryId };
 }
 
 /** Whether `transaction` belongs in a list with `filters`, as the API decides. */
@@ -70,7 +90,7 @@ function matches(
  */
 export function withWaitingChanges(
   list: readonly Transaction[],
-  entries: readonly TransactionEntry[],
+  entries: readonly QueuedTransactionChange[],
   context: {
     filters: ListTransactionsQuery;
     calendar: CalendarSystem;
