@@ -99,6 +99,29 @@ describe('demo seed', () => {
     expect(rows.length).toBeGreaterThan(150);
   });
 
+  it('sets Budgets, monthly and yearly, one narrowed to a Label, in different states', async () => {
+    const token = await login();
+    const res = await call(
+      t.url,
+      'GET',
+      `/v1/workspaces/${seeded.workspaceId}/budgets?month=1405-07`,
+      {
+        token,
+      },
+    );
+    expect(res.status).toBe(200);
+    const list = res.body as unknown as {
+      period: string;
+      labelId: string | null;
+      progress: { state: string };
+    }[];
+    expect(list.length).toBeGreaterThanOrEqual(4);
+    expect(new Set(list.map((b) => b.period))).toEqual(new Set(['MONTHLY', 'YEARLY']));
+    expect(list.some((b) => b.labelId !== null)).toBe(true);
+    // On 1405/07/19 the demo is under, near and over its limits.
+    expect(new Set(list.map((b) => b.progress.state))).toEqual(new Set(['ok', 'warning', 'over']));
+  });
+
   it('uses rial amounts in the range of a Tehran household', async () => {
     const rows = await demoTransactions(seeded.workspaceId);
     const salaries = rows.filter((r) => r.type === 'INCOME' && r.note?.startsWith('حقوق'));

@@ -1,4 +1,5 @@
 import {
+  type BudgetPeriod,
   dayOf,
   daysInMonth,
   type IsoDay,
@@ -14,6 +15,7 @@ import { type Database, type Transaction, one } from '../client';
 import {
   accounts,
   authIdentities,
+  budgets,
   categories,
   labels,
   transactionLabels,
@@ -86,6 +88,20 @@ const demoLabels = {
   nowruz: { name: 'سفر نوروز', controllable: false },
 } as const;
 type LabelKey = keyof typeof demoLabels;
+
+/** Demo Budgets in rials; Categories are named as in `Scripted`. */
+const demoBudgets: {
+  category: string;
+  label?: LabelKey;
+  period: BudgetPeriod;
+  amount: bigint;
+}[] = [
+  { category: 'EXPENSE:خوراک', period: 'MONTHLY', amount: 120_000_000n },
+  { category: 'EXPENSE:خوراک', label: 'eatingOut', period: 'MONTHLY', amount: 9_000_000n },
+  { category: 'EXPENSE:رفت‌وآمد', period: 'MONTHLY', amount: 15_000_000n },
+  { category: 'EXPENSE:قبض‌ها', period: 'MONTHLY', amount: 15_000_000n },
+  { category: 'EXPENSE:تفریح و سفر', period: 'YEARLY', amount: 200_000_000n },
+];
 
 /** A demo Transaction before ids exist; Categories are named `KIND:name`. */
 type Scripted = {
@@ -408,7 +424,7 @@ async function removeDemo(tx: Transaction): Promise<void> {
 
 /**
  * Creates the demo User (DEMO_EMAIL / DEMO_PASSWORD) with a Jalali Personal
- * Workspace: Accounts, the default Categories, Labels, and Transactions and
+ * Workspace: Accounts, the default Categories, Labels, Budgets, and Transactions and
  * Transfers from the start of the Jalali month MONTHS_BACK months before
  * `today` up to `today`. Replaces the demo User if they exist, so it can run any number
  * of times. Later features add their own entities here.
@@ -509,6 +525,17 @@ export async function seedDemo(
       })),
     );
     if (attached.length > 0) await tx.insert(transactionLabels).values(attached);
+
+    await tx.insert(budgets).values(
+      demoBudgets.map((b) => ({
+        workspaceId,
+        categoryId: categoryId(b.category),
+        labelId: b.label ? labelIds[b.label] : null,
+        period: b.period,
+        amount: b.amount,
+        currency: 'IRR',
+      })),
+    );
 
     return { userId: user.id, workspaceId };
   });

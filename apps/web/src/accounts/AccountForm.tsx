@@ -7,20 +7,14 @@ import {
   money,
   parseAmount,
 } from '@daric/core';
-import type {
-  Account,
-  AccountClass,
-  AccountType,
-  MoneyDisplay,
-  ParseAmountError,
-} from '@daric/core';
+import type { Account, AccountClass, AccountType, ParseAmountError } from '@daric/core';
 import type { PlainMessageKey } from '@daric/i18n';
 import { useId, useRef, useState } from 'react';
 import type { FormEvent } from 'react';
 import { useNavigate } from 'react-router';
 import { useSignedIn } from '../auth/session';
 import { useI18n } from '../i18n/locale';
-import { CURRENCY_NAMES } from '../settings/labels';
+import { CURRENCY_NAMES, MONEY_DISPLAY_UNITS } from '../settings/labels';
 import { useFormatters } from '../settings/settings';
 import { ChoiceGroup } from '../ui/ChoiceGroup';
 import { currencyOf, useCreateAccount, useUpdateAccount } from './accounts';
@@ -33,12 +27,6 @@ const AMOUNT_ERRORS: Record<Exclude<ParseAmountError, 'empty'>, PlainMessageKey>
   invalid: 'accounts.error.amountInvalid',
   too_many_decimals: 'accounts.error.amountTooPrecise',
   out_of_range: 'accounts.error.amountTooLarge',
-};
-
-/** What IRR is typed in. */
-const MONEY_DISPLAY_UNITS: Record<MoneyDisplay, PlainMessageKey> = {
-  rial: 'settings.workspace.moneyDisplay.rial',
-  toman: 'settings.workspace.moneyDisplay.toman',
 };
 
 interface Draft {

@@ -2,10 +2,14 @@ import {
   type Account,
   accountListSchema,
   accountSchema,
+  type Budget,
+  budgetListSchema,
+  budgetSchema,
   type Category,
   categoryListSchema,
   categorySchema,
   type CreateAccountInput,
+  type CreateBudgetInput,
   type CreateCategoryInput,
   type CreateLabelInput,
   type CreateTransactionInput,
@@ -26,7 +30,9 @@ import {
   type Transaction,
   transactionListSchema,
   transactionSchema,
+  type MonthPeriod,
   type UpdateAccountInput,
+  type UpdateBudgetInput,
   type UpdateCategoryInput,
   type UpdateLabelInput,
   type UpdateTransactionInput,
@@ -107,6 +113,17 @@ export interface ApiClient {
   createLabel(workspaceId: string, input: CreateLabelInput): Promise<Label>;
   /** Owner or Admin only; also flags, archives and unarchives. */
   updateLabel(workspaceId: string, labelId: string, input: UpdateLabelInput): Promise<Label>;
+  /**
+   * Oldest first, each with its progress in `month` (the current month of the
+   * Workspace Calendar by default), or in the year holding it for a yearly Budget.
+   */
+  listBudgets(workspaceId: string, options?: { month?: MonthPeriod }): Promise<Budget[]>;
+  /** Owner or Admin only. The limit is in the Workspace's Base Currency. */
+  createBudget(workspaceId: string, input: CreateBudgetInput): Promise<Budget>;
+  /** Owner or Admin only. */
+  updateBudget(workspaceId: string, budgetId: string, input: UpdateBudgetInput): Promise<Budget>;
+  /** Owner or Admin only. */
+  deleteBudget(workspaceId: string, budgetId: string): Promise<void>;
   /** Newest first. A Period is of the Workspace Calendar; a parent Category includes its children. */
   listTransactions(workspaceId: string, filters?: ListTransactionsQuery): Promise<Transaction[]>;
   /** One that is not deleted. */
@@ -274,7 +291,27 @@ export function createApiClient(options: ApiClientOptions = {}): ApiClient {
         labelSchema,
         input,
       ),
+    listBudgets: (workspaceId, { month } = {}) =>
+      request(
+        'GET',
+        `${budgetsPath(workspaceId)}${month ? `?month=${periodParam(month)}` : ''}`,
+        budgetListSchema,
+      ),
+    createBudget: (workspaceId, input) =>
+      request('POST', budgetsPath(workspaceId), budgetSchema, input),
+    updateBudget: (workspaceId, budgetId, input) =>
+      request('PATCH', budgetPath(workspaceId, budgetId), budgetSchema, input),
+    deleteBudget: (workspaceId, budgetId) =>
+      request('DELETE', budgetPath(workspaceId, budgetId), noContent),
   };
+}
+
+function budgetsPath(workspaceId: string): string {
+  return `/v1/workspaces/${encodeURIComponent(workspaceId)}/budgets`;
+}
+
+function budgetPath(workspaceId: string, budgetId: string) {
+  return `${budgetsPath(workspaceId)}/${encodeURIComponent(budgetId)}`;
 }
 
 function transactionPath(workspaceId: string, transactionId: string) {
