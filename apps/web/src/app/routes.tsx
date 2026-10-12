@@ -18,6 +18,7 @@ import { RateFormPage } from '../pages/RateFormPage';
 import { RatesPage } from '../pages/RatesPage';
 import { RecurringFormPage } from '../pages/RecurringFormPage';
 import { RecurringPage } from '../pages/RecurringPage';
+import { ReportsPage } from '../pages/ReportsPage';
 import { SettingsPage } from '../pages/SettingsPage';
 import { SignupPage } from '../pages/SignupPage';
 import { TransactionEditPage } from '../pages/TransactionEditPage';
@@ -43,6 +44,7 @@ export const routes: RouteObject[] = [
           { path: 'projection', element: <ProjectionPage /> },
           { path: 'projection/planned/new', element: <PlannedItemFormPage /> },
           { path: 'projection/planned/:itemId', element: <PlannedItemFormPage /> },
+          { path: 'reports', element: <ReportsPage /> },
           { path: 'categories', element: <CategoriesPage /> },
           { path: 'categories/new', element: <CategoryFormPage /> },
           { path: 'categories/:categoryId', element: <CategoryFormPage /> },

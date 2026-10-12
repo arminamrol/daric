@@ -60,6 +60,9 @@ import {
   type NetWorthReport,
   type ProjectionReport,
   type ProjectionMode,
+  type Period,
+  type Report,
+  reportSchema,
   projectionSchema,
   type ProjectionSettings,
   projectionSettingsSchema,
@@ -204,6 +207,11 @@ export interface ApiClient {
     options?: { mode?: ProjectionMode },
   ): Promise<ProjectionReport>;
   getProjectionSettings(workspaceId: string): Promise<ProjectionSettings>;
+  /**
+   * The report of a month or year (the current month by default): totals,
+   * Category and Label breakdowns and the trend, in the Base Currency.
+   */
+  getReport(workspaceId: string, options?: { period?: Period }): Promise<Report>;
   /** Owner or Admin only. */
   updateProjectionSettings(
     workspaceId: string,
@@ -463,6 +471,12 @@ export function createApiClient(options: ApiClientOptions = {}): ApiClient {
         'GET',
         `${projectionPath(workspaceId)}${mode ? `?mode=${mode}` : ''}`,
         projectionSchema,
+      ),
+    getReport: (workspaceId, { period } = {}) =>
+      request(
+        'GET',
+        `/v1/workspaces/${encodeURIComponent(workspaceId)}/reports${period ? `?period=${periodParam(period)}` : ''}`,
+        reportSchema,
       ),
     getProjectionSettings: (workspaceId) =>
       request('GET', `${projectionPath(workspaceId)}/settings`, projectionSettingsSchema),

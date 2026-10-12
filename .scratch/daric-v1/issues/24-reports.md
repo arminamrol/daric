@@ -4,7 +4,7 @@
 
 **Blocked by:** 12, 19
 
-**Status:** ready-for-agent
+**Status:** in-progress
 
 - [ ] core report functions (summary, breakdowns, trend) per Period
 - [ ] Reports API and web pages with Recharts and accessible tables

@@ -651,6 +651,52 @@ describe('api-client', () => {
     });
   });
 
+  describe('Reports', () => {
+    const path = `/v1/workspaces/${workspace.id}/reports`;
+    const report = {
+      period: '1405-07',
+      from: '2026-09-23',
+      to: '2026-10-22',
+      rateDay: '2026-10-09',
+      baseCurrency: 'IRR',
+      income: '5000',
+      expense: '7000',
+      net: '-2000',
+      categories: [
+        {
+          categoryId: '01900000-0000-7000-8000-0000000000c1',
+          type: 'EXPENSE',
+          total: '7000',
+          own: '7000',
+          share: 100,
+          children: [],
+        },
+      ],
+      labels: [],
+      unlabeled: { income: '5000', expense: '7000' },
+      ratesUsed: [],
+      missing: [],
+      trend: [{ month: '1405-07', income: '5000', expense: '7000', net: '-2000', missing: [] }],
+    };
+
+    it('reads a Period’s report with amounts as bigints and periods parsed', async () => {
+      const { client, sent } = fakeServer({
+        [`GET ${path}`]: (req) => ({
+          status: 200,
+          body: req.url.endsWith('?period=1405') ? { ...report, period: '1405' } : report,
+        }),
+      });
+      const read = await client.getReport(workspace.id);
+      expect(read.net).toBe(-2000n);
+      expect(read.period).toEqual({ kind: 'month', year: 1405, month: 7 });
+      expect(read.trend[0]?.month).toEqual({ kind: 'month', year: 1405, month: 7 });
+      expect(read.categories[0]?.total).toBe(7000n);
+      const year = await client.getReport(workspace.id, { period: { kind: 'year', year: 1405 } });
+      expect(year.period).toEqual({ kind: 'year', year: 1405 });
+      expect(sent.map((r) => r.url)).toEqual([path, `${path}?period=1405`]);
+    });
+  });
+
   describe('Recurring Rules', () => {
     const rule = {
       id: '01900000-0000-7000-8000-0000000000e1',

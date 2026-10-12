@@ -34,6 +34,8 @@ const ui: [SemanticColor, SemanticColor][] = [
   ['focus', 'background'],
   ['focus', 'surface'],
   ['focus', 'surfaceMuted'],
+  ['chartIncome', 'surface'],
+  ['chartExpense', 'surface'],
 ];
 
 describe('contrast helper', () => {

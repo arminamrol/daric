@@ -2,7 +2,7 @@ import { addDays, calendarDateOf, daysInMonth, periodDays, previousPeriod } from
 import type { CalendarSystem, IsoDay, MonthPeriod } from '../calendar';
 import { divRound, money } from '../money';
 import type { Currency, Money } from '../money';
-import { rateDayOf, toBaseCurrency } from '../rates';
+import { RateConverter, rateDayOf } from '../rates';
 import type { ExchangeRate } from '../rates';
 import { occurrencesBetween } from '../recurring';
 import type { RecurrenceSchedule } from '../recurring';
@@ -186,27 +186,6 @@ function addFigures(a: ProjectionFigures, b: ProjectionFigures): ProjectionFigur
   };
 }
 
-/** Converts Amounts into the Base Currency, keeping the rates it used and the currencies it lacked. */
-class Converter<R extends ExchangeRate> {
-  readonly ratesUsed = new Map<string, R>();
-  readonly missing = new Set<string>();
-
-  constructor(
-    private readonly base: Currency,
-    private readonly rates: readonly R[],
-  ) {}
-
-  convert(amounts: readonly Money[], day: IsoDay): bigint {
-    if (amounts.length === 0) return 0n;
-    const result = toBaseCurrency(amounts, this.base, this.rates, day);
-    for (const rate of result.ratesUsed) {
-      this.ratesUsed.set(`${rate.currency}|${rate.effectiveOn}`, rate);
-    }
-    for (const currency of result.missing) this.missing.add(currency.code);
-    return result.total.amount;
-  }
-}
-
 function push<K, V>(map: Map<K, V[]>, key: K, value: V): void {
   const list = map.get(key);
   if (list) list.push(value);
@@ -300,7 +279,7 @@ export function projectYear<R extends ExchangeRate>(input: ProjectionInput<R>): 
     months[m]?.push(t.amount);
   }
 
-  const converter = new Converter(input.base, input.rates);
+  const converter = new RateConverter(input.base, input.rates);
   const tomorrow = addDays(today, 1);
   const planned: PlannedAssumption[] = [];
   const plannedByCategory = new Map<string, bigint>();
