@@ -6,6 +6,7 @@ import { Link } from 'react-router';
 import { ACCOUNT_GROUP_LABELS } from '../accounts/labels';
 import { useSignedIn } from '../auth/session';
 import { useI18n } from '../i18n/locale';
+import { NetWorthHistory } from '../net-worth/NetWorthHistory';
 import { useNetWorth } from '../net-worth/net-worth';
 import { RateNotes } from '../rates/RateNotes';
 import { useFormatters } from '../settings/settings';
@@ -176,6 +177,7 @@ export function NetWorthPage() {
       ) : (
         <Breakdown netWorth={netWorth.data} />
       )}
+      <NetWorthHistory />
     </div>
   );
 }

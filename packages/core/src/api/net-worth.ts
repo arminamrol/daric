@@ -51,3 +51,38 @@ export const netWorthSchema = z.object({
 });
 export type NetWorthWire = z.input<typeof netWorthSchema>;
 export type NetWorthReport = z.infer<typeof netWorthSchema>;
+
+/** AUTO: taken at a Workspace-Calendar month end; MANUAL: asked for by a Member. */
+export const snapshotKinds = ['AUTO', 'MANUAL'] as const;
+export type SnapshotKind = (typeof snapshotKinds)[number];
+
+/**
+ * A Net Worth Snapshot in a history: its totals on `day`, in the Base Currency
+ * of the time. An AUTO one is of a month's last day; a MANUAL one is today's
+ * Net Worth as it was shown when it was taken.
+ */
+export const netWorthSnapshotSummarySchema = z.object({
+  id: z.uuid(),
+  kind: z.enum(snapshotKinds),
+  day: isoDaySchema,
+  takenAt: z.iso.datetime(),
+  baseCurrency: z.string(),
+  total: amountSchema,
+  assets: amountSchema,
+  liabilities: amountSchema,
+  missing: z.array(z.string()),
+});
+export type NetWorthSnapshotSummaryWire = z.input<typeof netWorthSnapshotSummarySchema>;
+export type NetWorthSnapshotSummary = z.infer<typeof netWorthSnapshotSummarySchema>;
+
+/** Oldest first. */
+export const netWorthHistorySchema = z.array(netWorthSnapshotSummarySchema);
+
+/** A Net Worth Snapshot with the breakdown it stored. */
+export const netWorthSnapshotSchema = netWorthSchema.extend({
+  id: z.uuid(),
+  kind: z.enum(snapshotKinds),
+  takenAt: z.iso.datetime(),
+});
+export type NetWorthSnapshotWire = z.input<typeof netWorthSnapshotSchema>;
+export type NetWorthSnapshot = z.infer<typeof netWorthSnapshotSchema>;

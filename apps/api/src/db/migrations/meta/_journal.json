@@ -85,6 +85,13 @@
       "when": 1791787197120,
       "tag": "0011_account_valuations",
       "breakpoints": true
+    },
+    {
+      "idx": 12,
+      "version": "7",
+      "when": 1791794291188,
+      "tag": "0012_net_worth_snapshots",
+      "breakpoints": true
     }
   ]
 }

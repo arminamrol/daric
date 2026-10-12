@@ -84,7 +84,7 @@ NestJS on Express with Drizzle over Postgres. Routes live under `/v1`; the OpenA
 
 ## Demo data
 
-`pnpm db:seed` creates a demo user, `demo@example.com` with password `daric-demo`, whose Personal Workspace (Jalali calendar, rials) holds Accounts, Categories, Labels, Budgets, Recurring Rules (this month’s rent waiting as a Due Occurrence), a dollar Exchange Rate from the first of each month, gold coins with a Valuation on the first of each month, and Income, Expenses and Transfers from the start of the Jalali month six months ago up to today. Running it again deletes the demo user and the Workspaces they own and seeds them afresh, dated from the new today; other users' Workspaces are untouched. It refuses to run with `NODE_ENV=production`.
+`pnpm db:seed` creates a demo user, `demo@example.com` with password `daric-demo`, whose Personal Workspace (Jalali calendar, rials) holds Accounts, Categories, Labels, Budgets, Recurring Rules (this month’s rent waiting as a Due Occurrence), a dollar Exchange Rate from the first of each month, gold coins with a Valuation on the first of each month, a month-end Net Worth Snapshot of each month that has ended, and Income, Expenses and Transfers from the start of the Jalali month six months ago up to today. Running it again deletes the demo user and the Workspaces they own and seeds them afresh, dated from the new today; other users' Workspaces are untouched. It refuses to run with `NODE_ENV=production`.
 
 The seed lives in `apps/api/src/db/seed/demo.ts`. A feature that adds an entity (Budgets, Recurring Rules, …) adds demo rows for it there and extends `demo.http.test.ts`.
 
@@ -92,27 +92,28 @@ The seed lives in `apps/api/src/db/seed/demo.ts`. A feature that adds an entity 
 
 All variables live in `.env` (copied from [`.env.example`](.env.example), git-ignored).
 
-| Variable                     | Default                                       | Used by        | Purpose                                   |
-| ---------------------------- | --------------------------------------------- | -------------- | ----------------------------------------- |
-| `POSTGRES_USER`              | `daric`                                       | Docker Compose | Postgres superuser created on first start |
-| `POSTGRES_PASSWORD`          | `daric`                                       | Docker Compose | Its password                              |
-| `POSTGRES_DB`                | `daric`                                       | Docker Compose | Database created on first start           |
-| `POSTGRES_PORT`              | `5432`                                        | Docker Compose | Host port Postgres is published on        |
-| `DATABASE_URL`               | `postgres://daric:daric@localhost:5432/daric` | API            | Connection string; must match the above   |
-| `MAILPIT_SMTP_PORT`          | `1025`                                        | Docker Compose | Host port of Mailpit's SMTP server        |
-| `MAILPIT_UI_PORT`            | `8025`                                        | Docker Compose | Host port of Mailpit's web inbox          |
-| `SMTP_HOST`                  | `localhost`                                   | API            | SMTP server for outgoing mail             |
-| `SMTP_PORT`                  | `1025`                                        | API            | Its port                                  |
-| `MAIL_FROM`                  | `Daric <no-reply@daric.local>`                | API            | Sender address on outgoing mail           |
-| `PORT`                       | `3000`                                        | API            | Port the API listens on                   |
-| `JWT_SECRET`                 | (dev placeholder)                             | API            | Signs access tokens; 32+ characters       |
-| `ACCESS_TOKEN_TTL_SECONDS`   | `900`                                         | API            | Access token lifetime                     |
-| `REFRESH_TOKEN_TTL_SECONDS`  | `2592000`                                     | API            | Refresh token lifetime                    |
-| `CORS_ORIGINS`               | `http://localhost:5173`                       | API            | Comma-separated allowed browser origins   |
-| `RATE_LIMIT_PER_MINUTE`      | `120`                                         | API            | Requests per minute per client            |
-| `AUTH_RATE_LIMIT_PER_MINUTE` | `10`                                          | API            | Same, for login and registration          |
-| `TRUST_PROXY`                | `0`                                           | API            | Reverse proxies in front of the API       |
-| `LOG_LEVEL`                  | `info`                                        | API            | Pino log level                            |
+| Variable                        | Default                                       | Used by        | Purpose                                   |
+| ------------------------------- | --------------------------------------------- | -------------- | ----------------------------------------- |
+| `POSTGRES_USER`                 | `daric`                                       | Docker Compose | Postgres superuser created on first start |
+| `POSTGRES_PASSWORD`             | `daric`                                       | Docker Compose | Its password                              |
+| `POSTGRES_DB`                   | `daric`                                       | Docker Compose | Database created on first start           |
+| `POSTGRES_PORT`                 | `5432`                                        | Docker Compose | Host port Postgres is published on        |
+| `DATABASE_URL`                  | `postgres://daric:daric@localhost:5432/daric` | API            | Connection string; must match the above   |
+| `MAILPIT_SMTP_PORT`             | `1025`                                        | Docker Compose | Host port of Mailpit's SMTP server        |
+| `MAILPIT_UI_PORT`               | `8025`                                        | Docker Compose | Host port of Mailpit's web inbox          |
+| `SMTP_HOST`                     | `localhost`                                   | API            | SMTP server for outgoing mail             |
+| `SMTP_PORT`                     | `1025`                                        | API            | Its port                                  |
+| `MAIL_FROM`                     | `Daric <no-reply@daric.local>`                | API            | Sender address on outgoing mail           |
+| `PORT`                          | `3000`                                        | API            | Port the API listens on                   |
+| `JWT_SECRET`                    | (dev placeholder)                             | API            | Signs access tokens; 32+ characters       |
+| `ACCESS_TOKEN_TTL_SECONDS`      | `900`                                         | API            | Access token lifetime                     |
+| `REFRESH_TOKEN_TTL_SECONDS`     | `2592000`                                     | API            | Refresh token lifetime                    |
+| `CORS_ORIGINS`                  | `http://localhost:5173`                       | API            | Comma-separated allowed browser origins   |
+| `RATE_LIMIT_PER_MINUTE`         | `120`                                         | API            | Requests per minute per client            |
+| `AUTH_RATE_LIMIT_PER_MINUTE`    | `10`                                          | API            | Same, for login and registration          |
+| `TRUST_PROXY`                   | `0`                                           | API            | Reverse proxies in front of the API       |
+| `SNAPSHOT_JOB_INTERVAL_MINUTES` | `60`                                          | API            | Month-end Net Worth Snapshot job; 0 = off |
+| `LOG_LEVEL`                     | `info`                                        | API            | Pino log level                            |
 
 Postgres credentials only apply when its volume is first created; after changing them run `docker compose --project-directory . -f docker/compose.yml down -v` (this deletes local data).
 

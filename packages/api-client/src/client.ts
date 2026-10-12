@@ -58,7 +58,11 @@ import {
   type AccountValuation,
   type CreateValuationInput,
   type NetWorthReport,
+  netWorthHistorySchema,
   netWorthSchema,
+  type NetWorthSnapshot,
+  netWorthSnapshotSchema,
+  type NetWorthSnapshotSummary,
   type UpdateValuationInput,
   valuationListSchema,
   valuationSchema,
@@ -178,6 +182,11 @@ export interface ApiClient {
   deleteValuation(workspaceId: string, accountId: string, valuationId: string): Promise<void>;
   /** Net Worth today in the Base Currency, by currency and by Account. */
   getNetWorth(workspaceId: string): Promise<NetWorthReport>;
+  /** Every Net Worth Snapshot, oldest first. */
+  listNetWorthSnapshots(workspaceId: string): Promise<NetWorthSnapshotSummary[]>;
+  /** Stores today's Net Worth as a MANUAL snapshot. */
+  takeNetWorthSnapshot(workspaceId: string): Promise<NetWorthSnapshot>;
+  getNetWorthSnapshot(workspaceId: string, snapshotId: string): Promise<NetWorthSnapshot>;
   /** Oldest first. Archived rules are left out unless `includeArchived`. */
   listRecurringRules(
     workspaceId: string,
@@ -405,6 +414,16 @@ export function createApiClient(options: ApiClientOptions = {}): ApiClient {
       request('DELETE', valuationPath(workspaceId, accountId, valuationId), noContent),
     getNetWorth: (workspaceId) =>
       request('GET', `/v1/workspaces/${encodeURIComponent(workspaceId)}/net-worth`, netWorthSchema),
+    listNetWorthSnapshots: (workspaceId) =>
+      request('GET', snapshotsPath(workspaceId), netWorthHistorySchema),
+    takeNetWorthSnapshot: (workspaceId) =>
+      request('POST', snapshotsPath(workspaceId), netWorthSnapshotSchema),
+    getNetWorthSnapshot: (workspaceId, snapshotId) =>
+      request(
+        'GET',
+        `${snapshotsPath(workspaceId)}/${encodeURIComponent(snapshotId)}`,
+        netWorthSnapshotSchema,
+      ),
     listRecurringRules: (workspaceId, { includeArchived = false } = {}) =>
       request(
         'GET',
@@ -432,6 +451,10 @@ export function createApiClient(options: ApiClientOptions = {}): ApiClient {
     skipOccurrence: (workspaceId, ruleId, dueOn) =>
       request('POST', `${occurrencePath(workspaceId, ruleId, dueOn)}/skip`, noContent),
   };
+}
+
+function snapshotsPath(workspaceId: string): string {
+  return `/v1/workspaces/${encodeURIComponent(workspaceId)}/net-worth/snapshots`;
 }
 
 function valuationsPath(workspaceId: string, accountId: string): string {

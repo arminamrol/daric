@@ -24,6 +24,8 @@ export function testConfig(overrides: Record<string, string> = {}): Config {
     AUTH_RATE_LIMIT_PER_MINUTE: '1000',
     RATE_LIMIT_PER_MINUTE: '10000',
     LOG_LEVEL: 'silent',
+    // Tests run the month-end job themselves, with the time they need.
+    SNAPSHOT_JOB_INTERVAL_MINUTES: '0',
     ...overrides,
   });
 }

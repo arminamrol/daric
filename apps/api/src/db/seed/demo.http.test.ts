@@ -1,10 +1,10 @@
-import { calendarDateOf, monthPeriodOfDay } from '@daric/core';
+import { calendarDateOf, dueAutoSnapshotDays, monthPeriodOfDay } from '@daric/core';
 import { asc, count, eq, inArray } from 'drizzle-orm';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { call, registerUser, startTestApp, type TestApp } from '../../test/app';
 import { testDatabase } from '../../test/db';
 import { one } from '../client';
-import { transactionLabels, transactions, users, workspaceMembers } from '../schema';
+import { transactionLabels, transactions, users, workspaceMembers, workspaces } from '../schema';
 import { DEMO_EMAIL, DEMO_PASSWORD, seedDemo } from './demo';
 
 const { db, pool } = testDatabase();
@@ -165,6 +165,27 @@ describe('demo seed', () => {
       expect.objectContaining({ name: 'سکهٔ طلا', value: '1800000000', valuedOn: '2026-09-23' }),
     );
     expect(BigInt(res.body.total)).toBeGreaterThan(0n);
+  });
+
+  it('dates the Workspace from the first demo month, so the month-end job snapshots each ended month', async () => {
+    // Not by running the job: it covers every Workspace, those of tests running alongside too.
+    const { createdAt } = one(
+      await db
+        .select({ createdAt: workspaces.createdAt })
+        .from(workspaces)
+        .where(eq(workspaces.id, seeded.workspaceId)),
+    );
+    const tehran = { calendar: 'jalali', timeZone: 'Asia/Tehran' } as const;
+    // On 1 Aban 1405, when Mehr has ended: Farvardin through Mehr.
+    expect(dueAutoSnapshotDays(tehran, new Date('2026-10-23T00:00:00Z'), { createdAt })).toEqual([
+      '2026-04-20',
+      '2026-05-21',
+      '2026-06-21',
+      '2026-07-22',
+      '2026-08-22',
+      '2026-09-22',
+      '2026-10-22',
+    ]);
   });
 
   it('uses rial amounts in the range of a Tehran household', async () => {
