@@ -2,6 +2,7 @@ import { ApiError, type ApiClient } from '@daric/api-client';
 import {
   accountValue,
   amountToWire,
+  controllableSpending,
   netWorth,
   netWorthSchema,
   balanceEffect,
@@ -1133,6 +1134,13 @@ export function fakeApi({
       };
       const report = periodReport({ ...input, period: reported, categories });
       const trend = trendReport({ ...input, months });
+      const controllable = controllableSpending({
+        ...input,
+        period: reported,
+        categories,
+        months,
+        controllableLabelIds: labels.filter((l) => l.controllable).map((l) => l.id),
+      });
       const wire = (amount: bigint) => amountToWire(amount);
       // Through the schema, as the client reads the API's answer.
       return reportSchema.parse({
@@ -1169,6 +1177,16 @@ export function fakeApi({
           expense: wire(point.expense),
           net: wire(point.net),
         })),
+        controllable: {
+          ...controllable,
+          expense: wire(controllable.expense),
+          labels: controllable.labels.map((line) => ({ ...line, expense: wire(line.expense) })),
+          trend: controllable.trend.map((point) => ({
+            month: periodParam(point.month),
+            expense: wire(point.expense),
+          })),
+          monthlyAverage: wire(controllable.monthlyAverage),
+        },
       });
     },
     async getProjectionSettings(workspaceId) {

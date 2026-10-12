@@ -15,6 +15,7 @@ import { useCategories } from '../categories/categories';
 import { useI18n } from '../i18n/locale';
 import { useLabels } from '../labels/labels';
 import { RateNotes } from '../rates/RateNotes';
+import { ControllableSpending } from '../reports/ControllableSpending';
 import { useReport } from '../reports/reports';
 import { useFormatters } from '../settings/settings';
 
@@ -378,8 +379,8 @@ function LabelBreakdown({ report, labels }: { report: Report; labels: readonly L
 /**
  * `/reports` (`?period=1405-07` for a month, `?period=1405` for a year; the
  * current month by default): the Period's Income, Expense and net, the trend
- * of the months up to it, and Category and Label breakdowns, in the Base
- * Currency. Every Member sees them.
+ * of the months up to it, Category and Label breakdowns, and spending under
+ * Controllable Labels with a savings slider, in the Base Currency. Every Member sees them.
  */
 export function ReportsPage() {
   const { t } = useI18n();
@@ -431,6 +432,7 @@ export function ReportsPage() {
               <LabelBreakdown report={report.data} labels={labels.data} />
             </>
           )}
+          <ControllableSpending report={report.data} labels={labels.data} />
         </>
       )}
     </div>

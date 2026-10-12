@@ -4,7 +4,7 @@
 
 **Blocked by:** 24
 
-**Status:** ready-for-agent
+**Status:** in-progress
 
 - [ ] core functions for controllable totals, trend and savings estimate (monthly and yearly)
 - [ ] Web view with slider; numbers computed in core only
