@@ -129,6 +129,14 @@ describe('Net Worth Snapshots', () => {
     ]);
   });
 
+  it('can be run for one Workspace only', async () => {
+    const a = await setUp();
+    const b = await setUp();
+    await netWorth.takeDueAutoSnapshots(KHORDAD_FIRST_MINUTE, { workspaceId: a.user.workspaceId });
+    expect(await autoDays(a.user.workspaceId)).toEqual(['2026-04-20', '2026-05-21']);
+    expect(await autoDays(b.user.workspaceId)).toEqual([]);
+  });
+
   it('takes nothing for a Workspace created after `now`', async () => {
     const user = await registerUser(t.url);
     await netWorth.takeDueAutoSnapshots(KHORDAD_FIRST_MINUTE);

@@ -132,7 +132,7 @@ export function NetWorthHistory() {
       ) : (
         <div className="flex flex-col gap-3 rounded-xl border border-border bg-surface px-4 py-4">
           <Suspense fallback={<div className="h-64 w-full" />}>
-            <HistoryChart snapshots={snapshots} />
+            <HistoryChart snapshots={snapshots} baseCurrency={workspace.baseCurrency} />
           </Suspense>
           <details>
             <summary className="cursor-pointer text-sm font-medium">

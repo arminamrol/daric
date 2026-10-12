@@ -16,7 +16,8 @@ import { useI18n } from '../i18n/locale';
 import { useFormatters } from '../settings/settings';
 
 interface Point {
-  index: number;
+  /** The day, as milliseconds since the epoch, so the axis spaces snapshots by time. */
+  x: number;
   total: number;
   snapshot: NetWorthSnapshotSummary;
 }
@@ -43,27 +44,36 @@ function ChartTooltip({ active, payload }: TooltipContentProps<ValueType, NameTy
  * The snapshots' totals over time, loaded on its own as Recharts is large; drawn
  * only, the table beside it carries the numbers.
  */
-export default function HistoryChart({ snapshots }: { snapshots: NetWorthSnapshotSummary[] }) {
+export default function HistoryChart({
+  snapshots,
+  baseCurrency,
+}: {
+  snapshots: NetWorthSnapshotSummary[];
+  baseCurrency: string;
+}) {
   const { t, dir } = useI18n();
   const format = useFormatters();
-  const base = currencyByCode(snapshots[0]?.baseCurrency ?? 'IRR');
-  const points: Point[] = snapshots.map((snapshot, index) => ({
-    index,
+  const base = currencyByCode(baseCurrency);
+  // A number only places the point; every figure shown comes from the bigint.
+  const points: Point[] = snapshots.map((snapshot) => ({
+    x: Date.parse(snapshot.day),
     total: Number(snapshot.total),
     snapshot,
   }));
-  const dayAt = (index: number) => {
-    const snapshot = snapshots[index];
-    return snapshot ? format.day(snapshot.day) : '';
-  };
+  const dayAt = (x: number) => format.day(new Date(x).toISOString().slice(0, 10));
+  // Ticks on the month ends, or on every snapshot if there are only manual ones.
+  const autos = points.filter((p) => p.snapshot.kind === 'AUTO');
+  const ticks = (autos.length > 0 ? autos : points).map((p) => p.x);
+  const first = points[0];
+  const last = points[points.length - 1];
   const rtl = dir === 'rtl';
 
   return (
     <div
       role="img"
       aria-label={t('netWorth.chart', {
-        from: isolate(dayAt(0)),
-        to: isolate(dayAt(snapshots.length - 1)),
+        from: isolate(first ? format.day(first.snapshot.day) : ''),
+        to: isolate(last ? format.day(last.snapshot.day) : ''),
         base: format.currency(base),
       })}
       className="h-64 w-full"
@@ -73,13 +83,19 @@ export default function HistoryChart({ snapshots }: { snapshots: NetWorthSnapsho
         height="100%"
         initialDimension={{ width: 600, height: 256 }}
       >
-        <LineChart data={points} margin={{ top: 8, bottom: 8, left: 8, right: 8 }}>
+        <LineChart
+          data={points}
+          margin={{ top: 8, bottom: 8, left: 8, right: 8 }}
+          // The table beside the chart is the keyboard and screen-reader view.
+          accessibilityLayer={false}
+        >
           <CartesianGrid stroke="var(--color-border)" vertical={false} />
           <XAxis
-            dataKey="index"
+            dataKey="x"
             type="number"
+            scale="time"
             domain={['dataMin', 'dataMax']}
-            allowDecimals={false}
+            ticks={ticks}
             reversed={rtl}
             tickFormatter={dayAt}
             tick={{ fill: 'var(--color-foreground-muted)', fontSize: 12 }}

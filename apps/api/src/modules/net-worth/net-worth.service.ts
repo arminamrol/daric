@@ -54,18 +54,8 @@ function toSummary(
 }
 
 function toSnapshot(row: SnapshotRow): NetWorthSnapshotWire {
-  const { id, kind, day, createdAt, baseCurrency, total, assets, liabilities, breakdown } = row;
-  return {
-    id,
-    kind,
-    day,
-    takenAt: createdAt.toISOString(),
-    baseCurrency,
-    total: amountToWire(total),
-    assets: amountToWire(assets),
-    liabilities: amountToWire(liabilities),
-    ...breakdown,
-  };
+  const { workspaceId: _, breakdown, ...summary } = row;
+  return { ...toSummary({ ...summary, missing: breakdown.missing }), ...breakdown };
 }
 
 @Injectable()
@@ -92,7 +82,7 @@ export class NetWorthService {
    */
   async get(membership: Membership): Promise<NetWorthWire> {
     const workspace = await this.workspace(membership.workspaceId);
-    return this.on(todayIn(new Date(), workspace.timezone), workspace.baseCurrency);
+    return this.netWorthOn(todayIn(new Date(), workspace.timezone), workspace.baseCurrency);
   }
 
   /**
@@ -100,7 +90,11 @@ export class NetWorthService {
    * `balancesOn`, balances count only Transactions on or before that day;
    * otherwise every Transaction, as Accounts show them.
    */
-  private async on(day: IsoDay, baseCurrency: string, balancesOn?: IsoDay): Promise<NetWorthWire> {
+  private async netWorthOn(
+    day: IsoDay,
+    baseCurrency: string,
+    balancesOn?: IsoDay,
+  ): Promise<NetWorthWire> {
     const base = currencyByCode(baseCurrency);
     const accounts = await this.accounts.list({
       includeArchived: true,
@@ -214,19 +208,20 @@ export class NetWorthService {
   }
 
   /**
-   * Takes the AUTO snapshots due at `now` in every Workspace: one of the last
+   * Takes the AUTO snapshots due at `now` in every Workspace (or `only` one): one of the last
    * day of each Workspace-Calendar month that has ended, as of that day, with
    * balances counting only Transactions up to it. Safe to run again and from
    * several processes at once: a month that has its snapshot is not taken
    * again. Returns how many were taken; throws after trying every Workspace
    * if any failed.
    */
-  async takeDueAutoSnapshots(now: Date): Promise<number> {
+  async takeDueAutoSnapshots(now: Date, only?: { workspaceId: string }): Promise<number> {
     // Outside any request: read every Workspace past row-level security, then
     // work in each one scoped as one of its Members, an Owner first.
     const all = await this.db
       .select({ id: workspaces.id, createdAt: workspaces.createdAt })
       .from(workspaces)
+      .where(only && eq(workspaces.id, only.workspaceId))
       .orderBy(workspaces.createdAt);
     const members = await this.db
       .select({ workspaceId: workspaceMembers.workspaceId, userId: workspaceMembers.userId })
@@ -281,7 +276,7 @@ export class NetWorthService {
     });
     let taken = 0;
     for (const day of days) {
-      const figure = await this.on(day, workspace.baseCurrency, day);
+      const figure = await this.netWorthOn(day, workspace.baseCurrency, day);
       if (await this.store(workspaceId, 'AUTO', figure)) taken += 1;
     }
     return taken;

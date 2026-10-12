@@ -13,10 +13,11 @@ if (process.env['NODE_ENV'] === 'production') throw new Error('Refusing to seed 
 const { db, pool } = createDatabase(url);
 try {
   const now = new Date();
-  await seedDemo(db, { today: todayIn(now, 'Asia/Tehran') });
-  // What the API's month-end job would do on its next run: the demo's past months' snapshots.
+  const { workspaceId } = await seedDemo(db, { today: todayIn(now, 'Asia/Tehran') });
+  // What the API's month-end job would do on its next run, for the demo Workspace only.
   const audit = new AuditService();
-  await new NetWorthService(db, new AccountsService(audit), audit).takeDueAutoSnapshots(now);
+  const netWorth = new NetWorthService(db, new AccountsService(audit), audit);
+  await netWorth.takeDueAutoSnapshots(now, { workspaceId });
   console.warn(`Demo data seeded. Log in as ${DEMO_EMAIL} (password in README).`);
 } finally {
   await pool.end();

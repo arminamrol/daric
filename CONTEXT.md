@@ -59,7 +59,7 @@ A manually entered rate from a currency to the Base Currency, effective from a d
 Sum of Asset Accounts minus sum of Liability Accounts, converted to Base Currency with the user's Exchange Rates (per-currency totals shown alongside).
 
 **Net Worth Snapshot**:
-A stored Net Worth figure at a moment, kept to draw history.
+A stored Net Worth figure on a day, with its breakdown, kept to draw history; never changed once taken. Automatic ones are taken of each Workspace-Calendar month's last day once it has ended in the Workspace's timezone, at most one per day; manual ones store today's Net Worth as shown, whenever a Member asks.
 
 ### Activity
 
