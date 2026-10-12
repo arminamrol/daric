@@ -1,5 +1,5 @@
-import type { UpdateProjectionSettingsInput } from '@daric/core';
-import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import type { ProjectionMode, UpdateProjectionSettingsInput } from '@daric/core';
+import { keepPreviousData, useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useApi } from '../api/api';
 import { useSignedIn } from '../auth/session';
 
@@ -7,16 +7,17 @@ import { useSignedIn } from '../auth/session';
 export const projectionKey = (workspaceId: string) => ['projection', workspaceId] as const;
 
 /**
- * The Automatic Projection of the current year, worked out by the API.
- * Transactions, rules and rates all feed it, so it is read afresh every time
- * the screen opens.
+ * The Projection of the current year in `mode` (the Workspace's when left
+ * out), worked out by the API. Transactions, rules, rates and Planned Items
+ * all feed it, so it is read afresh every time the screen opens.
  */
-export function useProjection() {
+export function useProjection(mode?: ProjectionMode) {
   const api = useApi();
   const { workspace } = useSignedIn();
   return useQuery({
-    queryKey: [...projectionKey(workspace.id), 'report', workspace.baseCurrency],
-    queryFn: () => api.getProjection(workspace.id),
+    queryKey: [...projectionKey(workspace.id), 'report', workspace.baseCurrency, mode ?? null],
+    queryFn: () => api.getProjection(workspace.id, mode ? { mode } : {}),
+    placeholderData: keepPreviousData,
   });
 }
 

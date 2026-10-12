@@ -13,6 +13,7 @@ import {
 } from '@daric/core';
 import type {
   ProjectionFigures,
+  ProjectionMode,
   ProjectionSettings,
   ProjectionWire,
   UpdateProjectionSettingsInput,
@@ -21,6 +22,7 @@ import { and, asc, eq, gte, isNull, lte, min, ne, sql } from 'drizzle-orm';
 import type { Membership } from '../../common/request';
 import {
   accounts,
+  plannedItems,
   projectionSettings,
   recurringOccurrences,
   recurringRules,
@@ -30,6 +32,7 @@ import {
 import { scopedTx } from '../../db/scope';
 import { AuditService } from '../audit/audit.service';
 import { ratesInto } from '../exchange-rates/exchange-rates.service';
+import { plannedItemColumns } from './planned-items.service';
 
 function figuresToWire(f: ProjectionFigures) {
   return {
@@ -37,6 +40,7 @@ function figuresToWire(f: ProjectionFigures) {
     average: amountToWire(f.average),
     variable: amountToWire(f.variable),
     recurring: amountToWire(f.recurring),
+    planned: amountToWire(f.planned),
     projected: amountToWire(f.projected),
   };
 }
@@ -52,10 +56,11 @@ export class ProjectionService {
     const [row] = await scopedTx()
       .select({
         trailingMonths: projectionSettings.trailingMonths,
+        mode: projectionSettings.mode,
         version: projectionSettings.version,
       })
       .from(projectionSettings);
-    return row ?? { trailingMonths: DEFAULT_TRAILING_MONTHS, version: 0 };
+    return row ?? { trailingMonths: DEFAULT_TRAILING_MONTHS, mode: 'AUTOMATIC', version: 0 };
   }
 
   async updateSettings(
@@ -82,11 +87,12 @@ export class ProjectionService {
   }
 
   /**
-   * The Automatic Projection of the current Workspace-Calendar year, from the
-   * Transactions up to today, the Trailing Average and active Recurring Rules,
-   * in the Base Currency.
+   * The Projection of the current Workspace-Calendar year in `mode` (the
+   * Workspace's setting by default), from the Transactions up to today, the
+   * Trailing Average, active Recurring Rules and Planned Items, in the Base
+   * Currency.
    */
-  async get(membership: Membership): Promise<ProjectionWire> {
+  async get(membership: Membership, asked?: ProjectionMode): Promise<ProjectionWire> {
     const tx = scopedTx();
     const [workspace] = await tx
       .select({
@@ -100,7 +106,9 @@ export class ProjectionService {
     if (!workspace) throw new NotFoundException();
     const { calendar, baseCurrency } = workspace;
     const today = todayIn(new Date(), workspace.timezone);
-    const { trailingMonths } = await this.settings();
+    const settings = await this.settings();
+    const { trailingMonths } = settings;
+    const mode = asked ?? settings.mode;
 
     // Read from the earlier of the year's start and the window's first month.
     const thisMonth = monthPeriodOfDay(today, calendar);
@@ -154,9 +162,14 @@ export class ProjectionService {
       .where(isNull(recurringRules.archivedAt))
       .orderBy(asc(recurringRules.createdAt), asc(recurringRules.id));
 
+    const planned = await tx
+      .select(plannedItemColumns)
+      .from(plannedItems)
+      .orderBy(asc(plannedItems.createdAt), asc(plannedItems.id));
     const projection = projectYear({
       calendar,
       today,
+      mode,
       trailingMonths,
       base: currencyByCode(baseCurrency),
       rates: await ratesInto(baseCurrency),
@@ -168,10 +181,15 @@ export class ProjectionService {
         ...rule,
         amount: money(rule.amount, currencyByCode(rule.currency)),
       })),
+      plannedItems: planned.map((item) => ({
+        ...item,
+        amount: money(item.amount, currencyByCode(item.currency)),
+      })),
       historyFrom: first?.day ?? null,
     });
 
     return {
+      mode: projection.mode,
       year: projection.year,
       today: projection.today,
       yearEnd: projection.yearEnd,
@@ -187,6 +205,7 @@ export class ProjectionService {
         ...figuresToWire(c),
       })),
       recurring: projection.recurring.map((r) => ({ ...r, total: amountToWire(r.total) })),
+      planned: projection.planned.map((p) => ({ ...p, total: amountToWire(p.total) })),
       ratesUsed: projection.ratesUsed,
       missing: projection.missing,
       warnings: projection.warnings,

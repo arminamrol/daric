@@ -12,6 +12,7 @@ import { LabelsPage } from '../pages/LabelsPage';
 import { LoginPage } from '../pages/LoginPage';
 import { NetWorthPage } from '../pages/NetWorthPage';
 import { NotFoundPage } from '../pages/NotFoundPage';
+import { PlannedItemFormPage } from '../pages/PlannedItemFormPage';
 import { ProjectionPage } from '../pages/ProjectionPage';
 import { RateFormPage } from '../pages/RateFormPage';
 import { RatesPage } from '../pages/RatesPage';
@@ -40,6 +41,8 @@ export const routes: RouteObject[] = [
           { path: 'accounts/:accountId/valuations', element: <ValuationsPage /> },
           { path: 'net-worth', element: <NetWorthPage /> },
           { path: 'projection', element: <ProjectionPage /> },
+          { path: 'projection/planned/new', element: <PlannedItemFormPage /> },
+          { path: 'projection/planned/:itemId', element: <PlannedItemFormPage /> },
           { path: 'categories', element: <CategoriesPage /> },
           { path: 'categories/new', element: <CategoryFormPage /> },
           { path: 'categories/:categoryId', element: <CategoryFormPage /> },

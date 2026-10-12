@@ -1,6 +1,6 @@
 import { screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
-import { dayOf, toPersianDigits } from '@daric/core';
+import { dayOf, formatDay, toPersianDigits } from '@daric/core';
 import { isolate } from '@daric/i18n';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { fakeApi } from '../test/fake-api';
@@ -23,11 +23,22 @@ const mt = (millions: number) => BigInt(Math.round(millions * 10)) * 1_000_000n;
 const rial = (amount: bigint) =>
   `${toPersianDigits(amount.toString().replace(/\B(?=(\d{3})+(?!\d))/g, '٬'))} ریال`;
 
+/** A day as the app shows it: Jalali, Persian digits. */
+const shownDay = (day: string) =>
+  formatDay(day, { calendar: 'jalali', locale: 'fa', digits: 'persian' });
+
 const signedIn = (options: Parameters<typeof fakeApi>[0] = {}) =>
   fakeApi({ signedInAs: 'sara@example.com', ...options });
 
-/** The plan's worked example: rent, a subscription and salary repeat; groceries and a side job vary. */
-async function workedExample(options: Parameters<typeof fakeApi>[0] = {}) {
+/**
+ * The plan's worked example: rent, a subscription and salary repeat; groceries
+ * and a side job vary. With `installments`, 8 of each window month's 38/42/40
+ * of groceries are a loan's installments instead.
+ */
+async function workedExample(
+  options: Parameters<typeof fakeApi>[0] = {},
+  { installments = false } = {},
+) {
   const fake = signedIn(options);
   const workspaceId = fake.workspace().id;
   const account = fake.addAccount({ name: 'ملی' });
@@ -67,9 +78,14 @@ async function workedExample(options: Parameters<typeof fakeApi>[0] = {}) {
       labelIds: [],
     });
   // Groceries: Tir 38, Mordad 42, Shahrivar 40, and 125 outside the window.
-  add('EXPENSE', groceries.id, j(1405, 4, 10), mt(38));
-  add('EXPENSE', groceries.id, j(1405, 5, 5), mt(42));
-  add('EXPENSE', groceries.id, j(1405, 6, 31), mt(40));
+  const installment = fake.addCategory({ name: 'قسط' });
+  const loan = installments ? mt(8) : 0n;
+  add('EXPENSE', groceries.id, j(1405, 4, 10), mt(38) - loan);
+  add('EXPENSE', groceries.id, j(1405, 5, 5), mt(42) - loan);
+  add('EXPENSE', groceries.id, j(1405, 6, 31), mt(40) - loan);
+  if (installments) {
+    for (const m of [4, 5, 6]) add('EXPENSE', installment.id, j(1405, m, 10), loan);
+  }
   add('EXPENSE', groceries.id, j(1405, 1, 15), mt(110));
   add('EXPENSE', groceries.id, j(1405, 7, 17), mt(15));
   // Side income: Tir 10, Mordad 30, Shahrivar 20, and 60 in Farvardin.
@@ -77,8 +93,83 @@ async function workedExample(options: Parameters<typeof fakeApi>[0] = {}) {
   add('INCOME', side.id, j(1405, 5, 2), mt(30));
   add('INCOME', side.id, j(1405, 6, 2), mt(20));
   add('INCOME', side.id, j(1405, 1, 2), mt(60));
-  return { fake, account, groceries };
+  return { fake, account, groceries, rent, installment, salary };
 }
+
+/** The plan's Planned Items: rent 25 and installments 8 a month, insurance 15 once, salary 80 a month. */
+function addPlan(
+  fake: ReturnType<typeof signedIn>,
+  { rent, installment, salary }: Record<'rent' | 'installment' | 'salary', { id: string }>,
+) {
+  fake.addPlannedItem({
+    name: 'اجاره',
+    kind: 'FIXED_MONTHLY',
+    type: 'EXPENSE',
+    categoryId: rent.id,
+    amount: mt(25),
+    startOn: j(1405, 1, 1),
+  });
+  fake.addPlannedItem({
+    name: 'قسط وام',
+    kind: 'FIXED_MONTHLY',
+    type: 'EXPENSE',
+    categoryId: installment.id,
+    amount: mt(8),
+    startOn: j(1405, 1, 10),
+  });
+  fake.addPlannedItem({
+    name: 'بیمهٔ خودرو',
+    kind: 'ONE_OFF',
+    type: 'EXPENSE',
+    amount: mt(15),
+    startOn: j(1405, 9, 1),
+  });
+  fake.addPlannedItem({
+    name: 'حقوق',
+    kind: 'FIXED_MONTHLY',
+    type: 'INCOME',
+    categoryId: salary.id,
+    amount: mt(80),
+    startOn: j(1405, 1, 25),
+  });
+}
+
+async function withPlannedItems() {
+  const example = await workedExample({}, { installments: true });
+  addPlan(example.fake, example);
+  return example;
+}
+
+/**
+ * For Viewers, who cannot confirm occurrences: the Planned Items alone, with
+ * the subscription's rule (0.5 × 6 = 3) in a Category none of them plans for.
+ */
+function viewerWithPlan() {
+  const fake = signedIn({ role: 'VIEWER' });
+  const account = fake.addAccount({ name: 'ملی' });
+  const subscriptions = fake.addCategory({ name: 'اشتراک' });
+  fake.addRule({
+    name: 'اشتراک فیلم',
+    type: 'EXPENSE',
+    accountId: account.id,
+    categoryId: subscriptions.id,
+    amount: mt(0.5),
+    startOn: j(1405, 7, 20),
+  });
+  addPlan(fake, {
+    rent: fake.addCategory({ name: 'اجاره' }),
+    installment: fake.addCategory({ name: 'قسط' }),
+    salary: fake.addCategory({ name: 'حقوق', kind: 'INCOME' }),
+  });
+  return fake;
+}
+
+const totalsOf = async (type: 'هزینه' | 'درآمد') =>
+  within(
+    within(await screen.findByRole('region', { name: 'جمع' })).getByRole('article', {
+      name: type,
+    }),
+  );
 
 describe('Projection', () => {
   it('is reachable from the header', async () => {
@@ -212,5 +303,183 @@ describe('Projection', () => {
     const panel = within(await screen.findByRole('region', { name: 'فرض‌ها' }));
     expect(await panel.findByText('میانگین از ۳ ماه گذشته گرفته می‌شود.')).toBeTruthy();
     expect(panel.queryByRole('combobox')).toBeNull();
+  });
+
+  it('switches to Manual: Expense 600 and Income 1,080 million tomans, kept for the Workspace', async () => {
+    const { fake } = await withPlannedItems();
+    renderApp({ path: '/projection', api: fake.api });
+
+    expect(await screen.findByRole('radio', { name: 'خودکار' })).toHaveProperty('checked', true);
+    await userEvent.click(screen.getByRole('radio', { name: 'دستی' }));
+
+    const expense = await totalsOf('هزینه');
+    expect(await expense.findByText(rial(mt(600)))).toBeTruthy();
+    expect(expense.getByText(rial(mt(180)))).toBeTruthy();
+    expect(expense.queryByText('تکرارشونده‌ها')).toBeNull();
+    const income = await totalsOf('درآمد');
+    expect(income.getByText(rial(mt(1080)))).toBeTruthy();
+    expect(screen.getByText('آنچه تا امروز گذشته، به‌اضافهٔ اقلام برنامه‌ریزی‌شده.')).toBeTruthy();
+    await waitFor(() => expect(fake.projectionSettings().mode).toBe('MANUAL'));
+
+    const panel = within(screen.getByRole('region', { name: 'فرض‌ها' }));
+    expect(panel.queryByRole('list', { name: 'میانگین ماهانه به تفکیک دسته' })).toBeNull();
+    expect(panel.queryByRole('combobox')).toBeNull();
+    const planned = within(panel.getByRole('list', { name: 'اقلام برنامه‌ریزی‌شده تا پایان سال' }));
+    expect(planned.getByRole('listitem', { name: 'قسط وام' }).textContent).toContain(
+      `۵ بار، جمع ${isolate(rial(mt(40)))}`,
+    );
+    expect(planned.getByRole('listitem', { name: 'بیمهٔ خودرو' }).textContent).toContain(
+      'بدون دسته',
+    );
+    const expenses = within(screen.getByRole('region', { name: 'هزینه به تفکیک دسته' }));
+    expect(
+      expenses
+        .getByRole('listitem', { name: 'اجاره' })
+        .textContent?.includes(
+          `تا امروز ${isolate(rial(mt(175)))}، برنامه‌ریزی‌شده ${isolate(rial(mt(125)))}`,
+        ),
+    ).toBe(true);
+    expect(expenses.getByRole('listitem', { name: 'بدون دسته' }).textContent).toContain(
+      rial(mt(15)),
+    );
+  });
+
+  it('projects Combined by Precedence: Expense 776.87 and Income 1,188.67 million tomans', async () => {
+    const { fake } = await withPlannedItems();
+    renderApp({ path: '/projection', api: fake.api });
+
+    await userEvent.click(await screen.findByRole('radio', { name: 'ترکیبی' }));
+    const expense = await totalsOf('هزینه');
+    expect(await expense.findByText(rial(7_768_666_667n))).toBeTruthy();
+    const income = await totalsOf('درآمد');
+    expect(income.getByText(rial(11_886_666_667n))).toBeTruthy();
+    const panel = within(screen.getByRole('region', { name: 'فرض‌ها' }));
+    // Rent's and salary's rules give way to their Planned Items; the subscription's stays.
+    const rules = within(panel.getByRole('list', { name: 'تکرارشونده‌ها تا پایان سال' }));
+    expect(rules.getAllByRole('listitem').map((li) => li.getAttribute('aria-label'))).toEqual([
+      'اشتراک فیلم',
+    ]);
+    const averages = within(panel.getByRole('list', { name: 'میانگین ماهانه به تفکیک دسته' }));
+    expect(averages.getAllByRole('listitem').map((li) => li.textContent)).toEqual([
+      `خوراک${rial(mt(32))}`,
+      `کار جانبی${rial(mt(20))}`,
+    ]);
+  });
+
+  it('opens in the Workspace’s mode, and lets a Viewer look at another without keeping it', async () => {
+    const fake = viewerWithPlan();
+    fake.setProjectionMode('MANUAL');
+    renderApp({ path: '/projection', api: fake.api });
+
+    // 125 + 40 + 15 planned; Combined adds the subscription's 3.
+    expect(await (await totalsOf('هزینه')).findAllByText(rial(mt(180)))).toHaveLength(2);
+    expect(screen.getByRole('radio', { name: 'دستی' })).toHaveProperty('checked', true);
+    await userEvent.click(screen.getByRole('radio', { name: 'ترکیبی' }));
+    expect(await (await totalsOf('هزینه')).findByText(rial(mt(183)))).toBeTruthy();
+    expect(fake.projectionSettings().mode).toBe('MANUAL');
+  });
+
+  describe('Planned Items', () => {
+    it('are listed for every Member, without a way to change them below Admin', async () => {
+      const fake = viewerWithPlan();
+      renderApp({ path: '/projection', api: fake.api });
+
+      const section = within(await screen.findByRole('region', { name: 'اقلام برنامه‌ریزی‌شده' }));
+      const rent = within(await section.findByRole('listitem', { name: 'اجاره' }));
+      expect(rent.getByText(/ثابت ماهانه · هزینه · اجاره/)).toBeTruthy();
+      expect(
+        within(section.getByRole('listitem', { name: 'بیمهٔ خودرو' })).getByText(
+          `یک‌باره · هزینه · بدون دسته · ${isolate(rial(mt(15)))} در ${isolate(shownDay(j(1405, 9, 1)))}`,
+        ),
+      ).toBeTruthy();
+      expect(section.queryByRole('link')).toBeNull();
+    });
+
+    it('lets an Admin add a Fixed Monthly item, which needs a Category', async () => {
+      const { fake, installment } = await workedExample();
+      renderApp({ path: '/projection', api: fake.api });
+
+      await userEvent.click(await screen.findByRole('link', { name: 'قلم تازه' }));
+      const form = within(await screen.findByRole('form', { name: 'قلم برنامه‌ریزی‌شدهٔ تازه' }));
+      expect(form.getByRole('radio', { name: 'ثابت ماهانه' })).toHaveProperty('checked', true);
+      await userEvent.type(form.getByRole('textbox', { name: 'نام' }), 'قسط وام');
+      await userEvent.type(form.getByRole('textbox', { name: 'مبلغ' }), '80000000');
+      await userEvent.click(form.getByRole('button', { name: 'ساخت' }));
+      expect(form.getByText('قلم ثابت ماهانه دسته می‌خواهد.')).toBeTruthy();
+      expect(fake.plannedItems()).toEqual([]);
+
+      await userEvent.selectOptions(form.getByRole('combobox', { name: 'دسته' }), 'قسط');
+      const start = form.getByRole('textbox', { name: 'اولین ماه' });
+      await userEvent.clear(start);
+      await userEvent.type(start, shownDay(j(1405, 8, 10)));
+      await userEvent.type(
+        form.getByRole('textbox', { name: 'پایان (اختیاری)' }),
+        shownDay(j(1405, 12, 10)),
+      );
+      await userEvent.click(form.getByRole('button', { name: 'ساخت' }));
+
+      const section = within(await screen.findByRole('region', { name: 'اقلام برنامه‌ریزی‌شده' }));
+      expect(await section.findByRole('listitem', { name: 'قسط وام' })).toBeTruthy();
+      expect(fake.plannedItems()).toMatchObject([
+        {
+          name: 'قسط وام',
+          kind: 'FIXED_MONTHLY',
+          type: 'EXPENSE',
+          categoryId: installment.id,
+          amount: mt(8),
+          currency: 'IRR',
+          startOn: j(1405, 8, 10),
+          endOn: j(1405, 12, 10),
+        },
+      ]);
+    });
+
+    it('lets an Admin add a One-Off with no Category, and no end', async () => {
+      const { fake } = await workedExample();
+      renderApp({ path: '/projection/planned/new', api: fake.api });
+
+      const form = within(await screen.findByRole('form', { name: 'قلم برنامه‌ریزی‌شدهٔ تازه' }));
+      await userEvent.click(form.getByRole('radio', { name: 'یک‌باره' }));
+      expect(form.queryByRole('textbox', { name: 'پایان (اختیاری)' })).toBeNull();
+      await userEvent.type(form.getByRole('textbox', { name: 'نام' }), 'بیمهٔ خودرو');
+      await userEvent.type(form.getByRole('textbox', { name: 'مبلغ' }), '150000000');
+      const day = form.getByRole('textbox', { name: 'روز' });
+      await userEvent.clear(day);
+      await userEvent.type(day, shownDay(j(1405, 9, 1)));
+      await userEvent.click(form.getByRole('button', { name: 'ساخت' }));
+
+      await screen.findByRole('region', { name: 'اقلام برنامه‌ریزی‌شده' });
+      expect(fake.plannedItems()).toMatchObject([
+        { name: 'بیمهٔ خودرو', kind: 'ONE_OFF', categoryId: null, endOn: null, amount: mt(15) },
+      ]);
+    });
+
+    it('lets an Admin change and delete an item', async () => {
+      const { fake } = await withPlannedItems();
+      renderApp({ path: '/projection', api: fake.api });
+
+      await userEvent.click(
+        await screen.findByRole('link', { name: `ویرایش ${isolate('قسط وام')}` }),
+      );
+      const form = within(await screen.findByRole('form', { name: 'ویرایش قلم برنامه‌ریزی‌شده' }));
+      // Its kind and type stay as made.
+      expect(form.queryByRole('radio')).toBeNull();
+      const amount = form.getByRole('textbox', { name: 'مبلغ' });
+      await userEvent.clear(amount);
+      await userEvent.type(amount, '90000000');
+      await userEvent.click(form.getByRole('button', { name: 'ذخیره' }));
+      await screen.findByRole('region', { name: 'اقلام برنامه‌ریزی‌شده' });
+      expect(fake.plannedItems().find((i) => i.name === 'قسط وام')).toMatchObject({
+        amount: mt(9),
+        version: 2,
+      });
+
+      await userEvent.click(
+        await screen.findByRole('link', { name: `ویرایش ${isolate('بیمهٔ خودرو')}` }),
+      );
+      await userEvent.click(await screen.findByRole('button', { name: 'حذف قلم' }));
+      await screen.findByRole('region', { name: 'اقلام برنامه‌ریزی‌شده' });
+      expect(fake.plannedItems().map((i) => i.name)).toEqual(['اجاره', 'قسط وام', 'حقوق']);
+    });
   });
 });
