@@ -1,9 +1,10 @@
 import { ApiError } from '@daric/api-client';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
-import { Link, useSearchParams } from 'react-router';
+import { Link } from 'react-router';
 import { useApi } from '../api/api';
 import { alertClass, cardClass, linkClass } from '../auth/AuthForm';
 import { ME_QUERY_KEY } from '../auth/session';
+import { useLinkToken } from '../auth/linkToken';
 import { useI18n } from '../i18n/locale';
 
 /**
@@ -15,8 +16,7 @@ export function VerifyEmailPage() {
   const { t } = useI18n();
   const api = useApi();
   const queryClient = useQueryClient();
-  const [params] = useSearchParams();
-  const token = params.get('token') ?? '';
+  const token = useLinkToken();
   const verify = useQuery({
     queryKey: ['verify-email', token],
     queryFn: async () => {

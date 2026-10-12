@@ -7,6 +7,7 @@ import { AuthGuard } from './modules/auth/auth.guard';
 import { CsrfGuard } from './modules/auth/csrf.guard';
 import { loggerOptions } from './common/logger';
 import { CONFIG } from './common/di-tokens';
+import { HOUR, MINUTE } from './common/time';
 import type { Config } from './config';
 import { DatabaseModule } from './db/database.module';
 import { AccountsModule } from './modules/accounts/accounts.module';
@@ -32,9 +33,6 @@ export interface AppOptions {
   /** Where logs go instead of stdout (tests). */
   logStream?: Writable | undefined;
 }
-
-const MINUTE = 60_000;
-const HOUR = 60 * MINUTE;
 
 @Global()
 @Module({})

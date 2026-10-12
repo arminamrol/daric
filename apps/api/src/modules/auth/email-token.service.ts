@@ -1,11 +1,18 @@
 import { randomBytes } from 'node:crypto';
 import { Injectable } from '@nestjs/common';
 import { and, count, eq, gt, isNull } from 'drizzle-orm';
+import { HOUR } from '../../common/time';
 import type { Executor, Transaction } from '../../db/client';
 import { emailTokens, users } from '../../db/schema';
 import { hashToken } from './token.service';
 
 export type EmailTokenPurpose = (typeof emailTokens.purpose.enumValues)[number];
+
+/** The User a link is mailed to, at their current address. */
+export interface Recipient {
+  id: string;
+  email: string;
+}
 
 /** How long a mailed link works. */
 export const EMAIL_TOKEN_TTL_HOURS: Readonly<Record<EmailTokenPurpose, number>> = {
@@ -15,8 +22,6 @@ export const EMAIL_TOKEN_TTL_HOURS: Readonly<Record<EmailTokenPurpose, number>> 
 
 /** Mails of one purpose a User can be sent per hour, whoever asks for them. */
 export const EMAIL_TOKENS_PER_HOUR = 3;
-
-const HOUR = 60 * 60 * 1000;
 
 /**
  * Single-use, expiring tokens for links mailed to a User. Only a token's hash
@@ -31,7 +36,7 @@ export class EmailTokenService {
    */
   async issue(
     tx: Transaction,
-    user: { id: string; email: string },
+    user: Recipient,
     purpose: EmailTokenPurpose,
     now = new Date(),
   ): Promise<string | null> {

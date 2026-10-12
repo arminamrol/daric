@@ -179,6 +179,27 @@ describe('password reset', () => {
     expect(again.status).toBe(400);
   });
 
+  it('lets only one of two concurrent resets with one token through', async () => {
+    const { email } = await registerUser(t.url);
+    await forgot(email);
+    const token = t.mail.lastToken(email);
+    const statuses = await Promise.all(
+      ['first passphrase', 'second passphrase'].map((password) =>
+        call(t.url, 'POST', '/v1/auth/password/reset', { body: { token, password } }).then(
+          (r) => r.status,
+        ),
+      ),
+    );
+    expect(statuses.sort()).toEqual([204, 400]);
+  });
+
+  it('holds the hourly cap under concurrent requests', async () => {
+    const { email } = await registerUser(t.url);
+    await Promise.all(Array.from({ length: 6 }, () => forgot(email)));
+    const resets = t.mail.to(email).filter((m) => m.subject === 'بازنشانی رمز عبور دریک');
+    expect(resets).toHaveLength(3);
+  });
+
   it('answers the same for an unknown email and sends nothing', async () => {
     const email = uniqueEmail();
     const res = await forgot(email);

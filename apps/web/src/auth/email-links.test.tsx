@@ -43,7 +43,13 @@ describe('forgotten password', () => {
     const server = fakeApi();
     server.addUser(email);
     await server.api.forgotPassword(email);
-    renderApp({ path: `/reset-password?token=${server.resetToken(email)}`, api: server.api });
+    const { router } = renderApp({
+      path: `/reset-password?token=${server.resetToken(email)}`,
+      api: server.api,
+    });
+    // The token leaves the address bar once read.
+    await screen.findByLabelText(/^رمز عبور تازه/);
+    expect(router.state.location.search).toBe('');
 
     await userEvent.type(await screen.findByLabelText(/^رمز عبور تازه/), newPassword);
     await userEvent.click(screen.getByRole('button', { name: 'ذخیرهٔ رمز تازه' }));

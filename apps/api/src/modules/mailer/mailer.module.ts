@@ -17,6 +17,6 @@ export class MailerModule implements OnApplicationShutdown {
   constructor(@Inject(MAILER) private readonly mailer: Mailer) {}
 
   onApplicationShutdown(): void {
-    if (this.mailer instanceof SmtpMailer) this.mailer.close();
+    this.mailer.close?.();
   }
 }

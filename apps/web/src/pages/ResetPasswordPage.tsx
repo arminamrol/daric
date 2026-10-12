@@ -4,9 +4,10 @@ import type { PlainMessageKey } from '@daric/i18n';
 import { useMutation } from '@tanstack/react-query';
 import { useId, useRef, useState } from 'react';
 import type { FormEvent } from 'react';
-import { Link, useSearchParams } from 'react-router';
+import { Link } from 'react-router';
 import { useApi } from '../api/api';
 import { alertClass, cardClass, inputClass, linkClass, submitClass } from '../auth/AuthForm';
+import { useLinkToken } from '../auth/linkToken';
 import { useI18n } from '../i18n/locale';
 
 function passwordError(password: string): PlainMessageKey | undefined {
@@ -20,8 +21,7 @@ function passwordError(password: string): PlainMessageKey | undefined {
 export function ResetPasswordPage() {
   const { t } = useI18n();
   const api = useApi();
-  const [params] = useSearchParams();
-  const token = params.get('token') ?? '';
+  const token = useLinkToken();
   const id = useId();
   const ids = {
     title: `${id}-title`,

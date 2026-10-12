@@ -21,14 +21,20 @@ import {
   resetPasswordTemplate,
   verifyEmailTemplate,
 } from '../mailer/templates';
-import { EMAIL_TOKEN_TTL_HOURS, EmailTokenService } from './email-token.service';
+import {
+  EMAIL_TOKEN_TTL_HOURS,
+  type EmailTokenPurpose,
+  EmailTokenService,
+  type Recipient,
+} from './email-token.service';
 import { hashPassword } from './passwords';
 import { TokenService } from './token.service';
 
-interface Recipient {
-  id: string;
-  email: string;
-}
+/** Where each kind of mailed link opens in the web app, and the mail that carries it. */
+const LINK_MAILS = {
+  VERIFY_EMAIL: { path: '/verify-email', template: verifyEmailTemplate },
+  RESET_PASSWORD: { path: '/reset-password', template: resetPasswordTemplate },
+} satisfies Record<EmailTokenPurpose, unknown>;
 
 const invalidLink = () => new BadRequestException('The link is invalid, used or expired');
 
@@ -52,11 +58,8 @@ export class EmailLinksService {
    * The verification mail for a new User, issued inside the registration
    * transaction; the caller delivers it once that commits.
    */
-  async verificationMail(tx: Transaction, user: Recipient): Promise<MailMessage | null> {
-    const token = await this.emailTokens.issue(tx, user, 'VERIFY_EMAIL');
-    if (!token) return null;
-    const link = this.link('/verify-email', token);
-    return { to: user.email, ...verifyEmailTemplate(link, EMAIL_TOKEN_TTL_HOURS.VERIFY_EMAIL) };
+  verificationMail(tx: Transaction, user: Recipient): Promise<MailMessage | null> {
+    return this.linkMail(tx, user, 'VERIFY_EMAIL');
   }
 
   deliver(message: MailMessage | null): void {
@@ -94,7 +97,8 @@ export class EmailLinksService {
 
   /**
    * Mails a reset link if the email belongs to a User. The answer is the same
-   * either way, so it does not reveal who is registered.
+   * either way. (Its timing differs a little, but registration already tells
+   * whether an email is taken.)
    */
   async forgotPassword(email: string, client: ClientInfo): Promise<void> {
     const message = await this.db.transaction(async (tx) => {
@@ -104,18 +108,15 @@ export class EmailLinksService {
         .innerJoin(users, eq(users.id, authIdentities.userId))
         .where(and(eq(authIdentities.provider, 'PASSWORD'), eq(authIdentities.identifier, email)));
       if (!user) return null;
-      const token = await this.emailTokens.issue(tx, user, 'RESET_PASSWORD');
-      if (!token) return null;
-      await this.audit.record(tx, {
-        action: 'auth.password_reset_requested',
-        actorUserId: user.id,
-        client,
-      });
-      const link = this.link('/reset-password', token);
-      return {
-        to: user.email,
-        ...resetPasswordTemplate(link, EMAIL_TOKEN_TTL_HOURS.RESET_PASSWORD),
-      };
+      const mail = await this.linkMail(tx, user, 'RESET_PASSWORD');
+      if (mail) {
+        await this.audit.record(tx, {
+          action: 'auth.password_reset_requested',
+          actorUserId: user.id,
+          client,
+        });
+      }
+      return mail;
     });
     this.deliver(message);
   }
@@ -141,6 +142,18 @@ export class EmailLinksService {
       return { to: user.email, ...passwordChangedTemplate(this.link('/forgot-password')) };
     });
     this.deliver(message);
+  }
+
+  /** Issues a token and builds the mail carrying its link; null past the User's hourly cap. */
+  private async linkMail(
+    tx: Transaction,
+    user: Recipient,
+    purpose: EmailTokenPurpose,
+  ): Promise<MailMessage | null> {
+    const token = await this.emailTokens.issue(tx, user, purpose);
+    if (!token) return null;
+    const { path, template } = LINK_MAILS[purpose];
+    return { to: user.email, ...template(this.link(path, token), EMAIL_TOKEN_TTL_HOURS[purpose]) };
   }
 
   private link(path: string, token?: string): string {
