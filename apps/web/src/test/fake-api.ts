@@ -1,5 +1,9 @@
 import { ApiError, type ApiClient } from '@daric/api-client';
 import {
+  accountValue,
+  amountToWire,
+  netWorth,
+  netWorthSchema,
   balanceEffect,
   budgetExpenses,
   budgetPeriodOf,
@@ -23,6 +27,7 @@ import {
 } from '@daric/core';
 import type {
   Account,
+  AccountValuation,
   Budget,
   BudgetPeriod,
   Category,
@@ -87,6 +92,8 @@ export function fakeApi({
   let nextRuleId = 1;
   let rates: StoredRate[] = [];
   let nextRateId = 1;
+  let valuations: AccountValuation[] = [];
+  let nextValuationId = 1;
   /** Occurrences confirmed (with their Transaction) or skipped, by `ruleId|dueOn`. */
   const handled = new Map<string, { transactionId: string | null }>();
   /** Unreachable: every call fails as fetch does when the network is down. */
@@ -321,6 +328,43 @@ export function fakeApi({
         r.effectiveOn === rate.effectiveOn,
     );
     if (taken) throw new ApiError(409, { message: 'The currency already has a rate on this day' });
+  }
+
+  /** Puts a Valuation straight into the Workspace, as if entered earlier. */
+  function addValuation(
+    fields: Pick<AccountValuation, 'accountId' | 'amount' | 'valuedOn'>,
+  ): AccountValuation {
+    const valuation: AccountValuation = {
+      id: `01900000-0000-7000-8e00-${String(nextValuationId++).padStart(12, '0')}`,
+      version: 1,
+      ...fields,
+    };
+    valuations.push(valuation);
+    return valuation;
+  }
+
+  function findAccount(accountId: string): Account {
+    const account = accounts.find((a) => a.id === accountId);
+    if (!account) throw new ApiError(404, { message: 'Not Found' });
+    return account;
+  }
+
+  function findValuation(accountId: string, valuationId: string): AccountValuation {
+    const valuation = valuations.find((v) => v.id === valuationId && v.accountId === accountId);
+    if (!valuation) throw new ApiError(404, { message: 'Not Found' });
+    return valuation;
+  }
+
+  /** One Valuation per Account and day, as the API checks it. */
+  function assertValuationFree(valuation: AccountValuation) {
+    const taken = valuations.some(
+      (v) =>
+        v.id !== valuation.id &&
+        v.accountId === valuation.accountId &&
+        v.valuedOn === valuation.valuedOn,
+    );
+    if (taken)
+      throw new ApiError(409, { message: 'The Account already has a Valuation on this day' });
   }
 
   function findBudget(budgetId: string): StoredBudget {
@@ -748,6 +792,88 @@ export function fakeApi({
       findRate(rateId);
       rates = rates.filter((r) => r.id !== rateId);
     },
+    async listValuations(workspaceId, accountId) {
+      inWorkspace(workspaceId);
+      findAccount(accountId);
+      return valuations
+        .filter((v) => v.accountId === accountId)
+        .sort((a, b) => b.valuedOn.localeCompare(a.valuedOn))
+        .map((v) => ({ ...v }));
+    },
+    async createValuation(workspaceId, accountId, input) {
+      inWorkspace(workspaceId, 'ADMIN');
+      if (findAccount(accountId).archived) {
+        throw new ApiError(400, { message: 'The Account is archived' });
+      }
+      assertValuationFree({ id: '', accountId, version: 1, ...input });
+      return { ...addValuation({ accountId, ...input }) };
+    },
+    async updateValuation(workspaceId, accountId, valuationId, input) {
+      inWorkspace(workspaceId, 'ADMIN');
+      const current = findValuation(accountId, valuationId);
+      const updated = { ...current, ...input, version: current.version + 1 };
+      assertValuationFree(updated);
+      valuations = valuations.map((v) => (v.id === valuationId ? updated : v));
+      return { ...updated };
+    },
+    async deleteValuation(workspaceId, accountId, valuationId) {
+      inWorkspace(workspaceId, 'ADMIN');
+      findValuation(accountId, valuationId);
+      valuations = valuations.filter((v) => v.id !== valuationId);
+    },
+    async getNetWorth(workspaceId) {
+      inWorkspace(workspaceId);
+      const day = today();
+      const base = currencyByCode(workspace.baseCurrency);
+      const valued = accounts.map(withBalance).map((account) => ({
+        account,
+        ...accountValue(
+          money(account.balance, currencyByCode(account.currency)),
+          valuations.filter((v) => v.accountId === account.id),
+          day,
+        ),
+      }));
+      const result = netWorth(
+        valued.map(({ account, value }) => ({ id: account.id, class: account.class, value })),
+        base,
+        currentRates(),
+        day,
+      );
+      const wire = (m: { amount: bigint }) => amountToWire(m.amount);
+      // Through the schema, as the client reads the API's answer.
+      return netWorthSchema.parse({
+        day,
+        baseCurrency: base.code,
+        total: wire(result.total),
+        assets: wire(result.assets),
+        liabilities: wire(result.liabilities),
+        byCurrency: result.byCurrency.map((c) => ({
+          currency: c.currency.code,
+          assets: wire(c.assets),
+          liabilities: wire(c.liabilities),
+          net: wire(c.net),
+        })),
+        accounts: valued.map(({ account, value, valuedOn }, i) => {
+          const inBase = result.accounts[i]?.inBase;
+          return {
+            accountId: account.id,
+            name: account.name,
+            class: account.class,
+            currency: account.currency,
+            archived: account.archived,
+            value: wire(value),
+            valuedOn,
+            inBase: inBase ? wire(inBase) : null,
+          };
+        }),
+        ratesUsed: result.ratesUsed.map(({ currency, rate, effectiveOn }) => ({
+          currency,
+          rate,
+          effectiveOn,
+        })),
+        missing: result.missing.map((c) => c.code),
+      });
+    },
     async listRecurringRules(workspaceId, { includeArchived = false } = {}) {
       inWorkspace(workspaceId);
       return rules.filter((r) => includeArchived || !r.archived).map(ruleWire);
@@ -855,6 +981,8 @@ export function fakeApi({
     addRate,
     /** As stored, into any Base Currency. */
     rates: () => rates,
+    addValuation,
+    valuations: () => valuations,
     /** In the order recorded, deleted ones left out. */
     transactions: () => live(),
     /** Ids of those deleted softly. */

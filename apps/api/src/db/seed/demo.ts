@@ -13,6 +13,7 @@ import { hashPassword } from '../../modules/auth/passwords';
 import { seedDefaultCategories } from '../../modules/categories/defaults';
 import { type Database, type Transaction, one } from '../client';
 import {
+  accountValuations,
   accounts,
   authIdentities,
   budgets,
@@ -73,6 +74,8 @@ const demoAccounts = {
     opening: 2_000_000n,
   },
   dollars: { name: 'دلار', type: 'CASH', class: 'ASSET', currency: 'USD', opening: 50_000n },
+  // Valued each month instead of moved by Transactions.
+  gold: { name: 'سکهٔ طلا', type: 'OTHER_ASSET', class: 'ASSET', currency: 'IRR', opening: 0n },
   loan: {
     name: 'وام قرض‌الحسنه',
     type: 'LOAN',
@@ -640,6 +643,16 @@ export async function seedDemo(
         baseCurrency: 'IRR',
         rate: String(1_050_000 - (months.length - 1 - i) * 12_500),
         effectiveOn: dayOf('jalali', { ...month, day: 1 }),
+      })),
+    );
+
+    // Two gold coins, valued on the first day of each month as their price climbs.
+    await tx.insert(accountValuations).values(
+      months.map((month, i) => ({
+        workspaceId,
+        accountId: accountIds.gold,
+        amount: 1_800_000_000n - BigInt(months.length - 1 - i) * 40_000_000n,
+        valuedOn: dayOf('jalali', { ...month, day: 1 }),
       })),
     );
 

@@ -6,6 +6,8 @@ export * from './label';
 export * from './budget';
 export * from './exchange-rate';
 export * from './recurring';
+export * from './valuation';
+export * from './net-worth';
 export {
   currencyCodes,
   monthParamSchema,

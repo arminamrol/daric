@@ -387,6 +387,73 @@ describe('api-client', () => {
     });
   });
 
+  describe('Valuations and Net Worth', () => {
+    const accountId = '01900000-0000-7000-8000-0000000000a1';
+    const valuation = {
+      id: '01900000-0000-7000-8000-0000000000d1',
+      accountId,
+      amount: '950000000',
+      valuedOn: '2026-10-01',
+      version: 1,
+    } as const;
+    const base = `/v1/workspaces/${workspace.id}/accounts/${accountId}/valuations`;
+    const netWorthPath = `/v1/workspaces/${workspace.id}/net-worth`;
+    const netWorth = {
+      day: '2026-10-11',
+      baseCurrency: 'IRR',
+      total: '950000000',
+      assets: '950000000',
+      liabilities: '0',
+      byCurrency: [{ currency: 'IRR', assets: '950000000', liabilities: '0', net: '950000000' }],
+      accounts: [
+        {
+          accountId,
+          name: 'Gold',
+          class: 'ASSET',
+          currency: 'IRR',
+          archived: false,
+          value: '950000000',
+          valuedOn: '2026-10-01',
+          inBase: '950000000',
+        },
+      ],
+      ratesUsed: [],
+      missing: [],
+    } as const;
+
+    it('lists, creates, updates and deletes Valuations, and reads Net Worth with bigints', async () => {
+      const { client, sent } = fakeServer(
+        {
+          [`GET ${base}`]: () => ({ status: 200, body: [valuation] }),
+          [`POST ${base}`]: () => ({ status: 201, body: valuation }),
+          [`PATCH ${base}/${valuation.id}`]: () => ({ status: 200, body: valuation }),
+          [`DELETE ${base}/${valuation.id}`]: () => ({ status: 204 }),
+          [`GET ${netWorthPath}`]: () => ({ status: 200, body: netWorth }),
+        },
+        { '__Host-daric_csrf': 'csrf-1' },
+      );
+      expect(await client.listValuations(workspace.id, accountId)).toEqual([
+        { ...valuation, amount: 950_000_000n },
+      ]);
+      await client.createValuation(workspace.id, accountId, {
+        amount: 950_000_000n,
+        valuedOn: '2026-10-01',
+      });
+      await client.updateValuation(workspace.id, accountId, valuation.id, { amount: 1n });
+      await client.deleteValuation(workspace.id, accountId, valuation.id);
+      const read = await client.getNetWorth(workspace.id);
+      expect(read.total).toBe(950_000_000n);
+      expect(read.accounts[0]?.inBase).toBe(950_000_000n);
+      expect(sent.map((r) => [r.method, r.url, r.body])).toEqual([
+        ['GET', base, undefined],
+        ['POST', base, { amount: '950000000', valuedOn: '2026-10-01' }],
+        ['PATCH', `${base}/${valuation.id}`, { amount: '1' }],
+        ['DELETE', `${base}/${valuation.id}`, undefined],
+        ['GET', netWorthPath, undefined],
+      ]);
+    });
+  });
+
   describe('Recurring Rules', () => {
     const rule = {
       id: '01900000-0000-7000-8000-0000000000e1',

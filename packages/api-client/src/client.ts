@@ -55,6 +55,13 @@ import {
   userPreferencesSchema,
   type Workspace,
   workspaceSchema,
+  type AccountValuation,
+  type CreateValuationInput,
+  type NetWorthReport,
+  netWorthSchema,
+  type UpdateValuationInput,
+  valuationListSchema,
+  valuationSchema,
 } from '@daric/core';
 
 /** A non-2xx answer from the API. */
@@ -152,6 +159,25 @@ export interface ApiClient {
   ): Promise<ExchangeRateWire>;
   /** Owner or Admin only. */
   deleteExchangeRate(workspaceId: string, rateId: string): Promise<void>;
+  /** The Account's Valuations, newest first. */
+  listValuations(workspaceId: string, accountId: string): Promise<AccountValuation[]>;
+  /** Owner or Admin only. One per Account and day; never on an archived Account. */
+  createValuation(
+    workspaceId: string,
+    accountId: string,
+    input: CreateValuationInput,
+  ): Promise<AccountValuation>;
+  /** Owner or Admin only. */
+  updateValuation(
+    workspaceId: string,
+    accountId: string,
+    valuationId: string,
+    input: UpdateValuationInput,
+  ): Promise<AccountValuation>;
+  /** Owner or Admin only. */
+  deleteValuation(workspaceId: string, accountId: string, valuationId: string): Promise<void>;
+  /** Net Worth today in the Base Currency, by currency and by Account. */
+  getNetWorth(workspaceId: string): Promise<NetWorthReport>;
   /** Oldest first. Archived rules are left out unless `includeArchived`. */
   listRecurringRules(
     workspaceId: string,
@@ -369,6 +395,25 @@ export function createApiClient(options: ApiClientOptions = {}): ApiClient {
       request('PATCH', ratePath(workspaceId, rateId), exchangeRateSchema, input),
     deleteExchangeRate: (workspaceId, rateId) =>
       request('DELETE', ratePath(workspaceId, rateId), noContent),
+    listValuations: (workspaceId, accountId) =>
+      request('GET', valuationsPath(workspaceId, accountId), valuationListSchema),
+    createValuation: (workspaceId, accountId, input) =>
+      request('POST', valuationsPath(workspaceId, accountId), valuationSchema, input),
+    updateValuation: (workspaceId, accountId, valuationId, input) =>
+      request(
+        'PATCH',
+        `${valuationsPath(workspaceId, accountId)}/${encodeURIComponent(valuationId)}`,
+        valuationSchema,
+        input,
+      ),
+    deleteValuation: (workspaceId, accountId, valuationId) =>
+      request(
+        'DELETE',
+        `${valuationsPath(workspaceId, accountId)}/${encodeURIComponent(valuationId)}`,
+        noContent,
+      ),
+    getNetWorth: (workspaceId) =>
+      request('GET', `/v1/workspaces/${encodeURIComponent(workspaceId)}/net-worth`, netWorthSchema),
     listRecurringRules: (workspaceId, { includeArchived = false } = {}) =>
       request(
         'GET',
@@ -396,6 +441,10 @@ export function createApiClient(options: ApiClientOptions = {}): ApiClient {
     skipOccurrence: (workspaceId, ruleId, dueOn) =>
       request('POST', `${occurrencePath(workspaceId, ruleId, dueOn)}/skip`, noContent),
   };
+}
+
+function valuationsPath(workspaceId: string, accountId: string): string {
+  return `/v1/workspaces/${encodeURIComponent(workspaceId)}/accounts/${encodeURIComponent(accountId)}/valuations`;
 }
 
 function recurringPath(workspaceId: string): string {
