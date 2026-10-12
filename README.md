@@ -1,6 +1,6 @@
 # Daric
 
-Personal and household finance: accounts, transactions, budgets, net worth and year-end projection, Persian-first (Jalali calendar, RTL) with English.
+Personal and household finance: accounts, transactions, budgets, net worth, reports and year-end projection, Persian-first (Jalali calendar, RTL) with English.
 
 - Vocabulary: [`CONTEXT.md`](CONTEXT.md)
 - Plan: [`docs/plan.md`](docs/plan.md)

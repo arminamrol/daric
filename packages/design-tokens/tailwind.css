@@ -65,6 +65,8 @@
   --color-focus: var(--daric-focus);
   --color-danger: var(--daric-danger);
   --color-success: var(--daric-success);
+  --color-chart-income: var(--daric-chart-income);
+  --color-chart-expense: var(--daric-chart-expense);
 }
 
 :root {
@@ -81,6 +83,8 @@
   --daric-focus: #a1711c;
   --daric-danger: #b42318;
   --daric-success: #067647;
+  --daric-chart-income: #067647;
+  --daric-chart-expense: #1d4ed8;
 }
 
 :root[data-theme='dark'] {
@@ -97,6 +101,8 @@
   --daric-focus: #e5c163;
   --daric-danger: #f97066;
   --daric-success: #47cd89;
+  --daric-chart-income: #16a34a;
+  --daric-chart-expense: #3b82f6;
 }
 
 @media (prefers-color-scheme: dark) {
@@ -114,5 +120,7 @@
     --daric-focus: #e5c163;
     --daric-danger: #f97066;
     --daric-success: #47cd89;
+    --daric-chart-income: #16a34a;
+    --daric-chart-expense: #3b82f6;
   }
 }

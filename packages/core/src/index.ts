@@ -11,3 +11,4 @@ export * from './recurring';
 export * from './rates';
 export * from './net-worth';
 export * from './projection';
+export * from './reports';

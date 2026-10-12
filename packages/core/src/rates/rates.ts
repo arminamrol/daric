@@ -93,6 +93,31 @@ export function toBaseCurrency<R extends ExchangeRate>(
 }
 
 /**
+ * Converts Amounts into the Base Currency one total at a time, keeping every
+ * rate it used and every currency it lacked across all of them.
+ */
+export class RateConverter<R extends ExchangeRate> {
+  readonly ratesUsed = new Map<string, R>();
+  readonly missing = new Set<string>();
+
+  constructor(
+    private readonly base: Currency,
+    private readonly rates: readonly R[],
+  ) {}
+
+  /** `amounts` added up in the Base Currency at the rates in force on `day`. */
+  convert(amounts: readonly Money[], day: IsoDay): bigint {
+    if (amounts.length === 0) return 0n;
+    const result = toBaseCurrency(amounts, this.base, this.rates, day);
+    for (const rate of result.ratesUsed) {
+      this.ratesUsed.set(`${rate.currency}|${rate.effectiveOn}`, rate);
+    }
+    for (const currency of result.missing) this.missing.add(currency.code);
+    return result.total.amount;
+  }
+}
+
+/**
  * The day a total of `period` is converted on: the Period's last day, or
  * `today` while the Period is still running.
  */

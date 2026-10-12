@@ -63,7 +63,10 @@ export type SemanticColor =
   | 'accent'
   | 'focus'
   | 'danger'
-  | 'success';
+  | 'success'
+  /** Chart marks for Income and Expense, told apart under color-vision deficiencies. */
+  | 'chartIncome'
+  | 'chartExpense';
 
 export type ThemeColors = Readonly<Record<SemanticColor, string>>;
 
@@ -84,6 +87,8 @@ export const themes: Readonly<Record<ThemeName, ThemeColors>> = {
     focus: gold[600],
     danger: '#b42318',
     success: '#067647',
+    chartIncome: '#067647',
+    chartExpense: '#1d4ed8',
   },
   dark: {
     background: navy[950],
@@ -98,6 +103,8 @@ export const themes: Readonly<Record<ThemeName, ThemeColors>> = {
     focus: gold[300],
     danger: '#f97066',
     success: '#47cd89',
+    chartIncome: '#16a34a',
+    chartExpense: '#3b82f6',
   },
 };
 

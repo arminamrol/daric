@@ -25,6 +25,10 @@ import {
   plannedItemProblem,
   projectYear,
   projectionSchema,
+  periodReport,
+  reportSchema,
+  trendMonths,
+  trendReport,
   mayChangeTransaction,
   periodDays,
   todayIn,
@@ -1102,6 +1106,68 @@ export function fakeApi({
           currency,
           rate,
           effectiveOn,
+        })),
+      });
+    },
+    async getReport(workspaceId, { period } = {}) {
+      inWorkspace(workspaceId);
+      const day = today();
+      const reported = period ?? monthPeriodOfDay(day, workspace.calendar);
+      const months = trendMonths(reported, workspace.calendar, day);
+      const currencyOf = (accountId: string) =>
+        currencyByCode(
+          accounts.find((a) => a.id === accountId)?.currency ?? workspace.baseCurrency,
+        );
+      const input = {
+        calendar: workspace.calendar,
+        today: day,
+        base: currencyByCode(workspace.baseCurrency),
+        rates: currentRates(),
+        transactions: live().map((t) => ({
+          type: t.type,
+          categoryId: t.type === 'TRANSFER' ? null : t.categoryId,
+          amount: money(t.amount, currencyOf(t.accountId)),
+          occurredOn: t.occurredOn,
+          labelIds: t.type === 'TRANSFER' ? [] : t.labelIds,
+        })),
+      };
+      const report = periodReport({ ...input, period: reported, categories });
+      const trend = trendReport({ ...input, months });
+      const wire = (amount: bigint) => amountToWire(amount);
+      // Through the schema, as the client reads the API's answer.
+      return reportSchema.parse({
+        ...report,
+        period: periodParam(reported),
+        baseCurrency: workspace.baseCurrency,
+        income: wire(report.income),
+        expense: wire(report.expense),
+        net: wire(report.net),
+        categories: report.categories.map((line) => ({
+          ...line,
+          total: wire(line.total),
+          own: wire(line.own),
+          children: line.children.map((child) => ({ ...child, total: wire(child.total) })),
+        })),
+        labels: report.labels.map((line) => ({
+          ...line,
+          income: wire(line.income),
+          expense: wire(line.expense),
+        })),
+        unlabeled: {
+          income: wire(report.unlabeled.income),
+          expense: wire(report.unlabeled.expense),
+        },
+        ratesUsed: report.ratesUsed.map(({ currency, rate, effectiveOn }) => ({
+          currency,
+          rate,
+          effectiveOn,
+        })),
+        trend: trend.map((point) => ({
+          ...point,
+          month: periodParam(point.month),
+          income: wire(point.income),
+          expense: wire(point.expense),
+          net: wire(point.net),
         })),
       });
     },
