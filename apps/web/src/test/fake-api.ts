@@ -44,6 +44,7 @@ import type {
   ExchangeRateWire,
   MonthPeriod,
   DueOccurrence,
+  ExportFormat,
   Label,
   PlannedItem,
   ProjectionMode,
@@ -114,6 +115,8 @@ export function fakeApi({
   let nextValuationId = 1;
   /** In the order taken; listed oldest first by day. */
   const snapshots: NetWorthSnapshot[] = [];
+  /** Formats of the exports asked for, oldest first. */
+  const exports: ExportFormat[] = [];
   /** Occurrences confirmed (with their Transaction) or skipped, by `ruleId|dueOn`. */
   const handled = new Map<string, { transactionId: string | null }>();
   let projectionSettings: { trailingMonths: number; mode: ProjectionMode; version: number } = {
@@ -1163,6 +1166,15 @@ export function fakeApi({
         })),
       });
     },
+    async exportWorkspace(workspaceId, format) {
+      inWorkspace(workspaceId, 'ADMIN');
+      exports.push(format);
+      const type = format === 'csv' ? 'application/zip' : 'application/json';
+      return {
+        blob: new Blob([format === 'csv' ? 'PK' : '{}'], { type }),
+        fileName: `daric-export-${today()}.${format === 'csv' ? 'zip' : 'json'}`,
+      };
+    },
     async getReport(workspaceId, { period } = {}) {
       inWorkspace(workspaceId);
       const day = today();
@@ -1338,6 +1350,7 @@ export function fakeApi({
     transactions: () => live(),
     /** Ids of those deleted softly. */
     deletedTransactions: () => [...deleted],
+    exports: () => [...exports],
     /** In the API's list order, archived ones included. */
     categories: () => inTreeOrder(categories),
     signedInUser: () => current?.email,

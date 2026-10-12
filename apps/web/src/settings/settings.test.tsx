@@ -111,6 +111,70 @@ describe('Workspace settings', () => {
   });
 });
 
+describe('Data export', () => {
+  const exportSection = () => screen.findByRole('region', { name: 'خروجی داده‌ها' });
+
+  /** Files the page handed the browser to save, by name. */
+  function watchDownloads() {
+    const saved: string[] = [];
+    // jsdom has no object URLs.
+    vi.stubGlobal(
+      'URL',
+      class extends URL {
+        static override createObjectURL = () => 'blob:export';
+        static override revokeObjectURL = () => undefined;
+      },
+    );
+    vi.spyOn(HTMLAnchorElement.prototype, 'click').mockImplementation(function (
+      this: HTMLAnchorElement,
+    ) {
+      if (this.href === 'blob:export') saved.push(this.download);
+    });
+    return saved;
+  }
+  afterEach(() => {
+    vi.restoreAllMocks();
+    vi.unstubAllGlobals();
+  });
+
+  it('lets the Owner download every entity as CSV files or one JSON file', async () => {
+    const saved = watchDownloads();
+    const fake = signedIn();
+    renderApp({ path: '/settings', api: fake.api });
+    const section = within(await exportSection());
+
+    await userEvent.click(section.getByRole('button', { name: 'دریافت CSV (فایل zip)' }));
+    expect(await section.findByRole('status')).toHaveProperty('textContent', 'فایل دریافت شد.');
+    await userEvent.click(section.getByRole('button', { name: 'دریافت JSON' }));
+
+    await vi.waitFor(() => expect(fake.exports()).toEqual(['csv', 'json']));
+    await vi.waitFor(() =>
+      expect(saved).toEqual(['daric-export-2026-10-09.zip', 'daric-export-2026-10-09.json']),
+    );
+  });
+
+  it('says so when the export fails', async () => {
+    watchDownloads();
+    const fake = signedIn();
+    fake.api.exportWorkspace = () => Promise.reject(new Error('offline'));
+    renderApp({ path: '/settings', api: fake.api });
+    const section = within(await exportSection());
+
+    await userEvent.click(section.getByRole('button', { name: 'دریافت JSON' }));
+
+    expect(await section.findByRole('alert')).toHaveProperty(
+      'textContent',
+      'دریافت نشد. دوباره امتحان کنید.',
+    );
+  });
+
+  it('is offered to Owners and Admins only', async () => {
+    renderApp({ path: '/settings', api: signedIn({ role: 'MEMBER' }).api });
+    await workspaceForm();
+    expect(screen.queryByRole('region', { name: 'خروجی داده‌ها' })).toBeNull();
+  });
+});
+
 describe('User preferences', () => {
   it('change only how dates are drawn, not which month it is', async () => {
     const fake = signedIn();

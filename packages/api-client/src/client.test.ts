@@ -977,6 +977,45 @@ describe('api-client', () => {
     });
   });
 
+  describe('exportWorkspace', () => {
+    it('downloads the export as a file named by the server', async () => {
+      const sent: { url: string; init: RequestInit | undefined }[] = [];
+      const client = createApiClient({
+        fetch: async (input, init) => {
+          sent.push({ url: String(input), init });
+          return new Response(new Uint8Array([80, 75, 3, 4]), {
+            status: 200,
+            headers: {
+              'content-type': 'application/zip',
+              'content-disposition': 'attachment; filename="daric-export-2026-10-11.zip"',
+            },
+          });
+        },
+        readCookie: () => undefined,
+      });
+
+      const file = await client.exportWorkspace(workspace.id, 'csv');
+
+      expect(sent[0]?.url).toBe(`/v1/workspaces/${workspace.id}/export?format=csv`);
+      expect(sent[0]?.init?.credentials).toBe('include');
+      expect(file.fileName).toBe('daric-export-2026-10-11.zip');
+      expect(file.blob.type).toBe('application/zip');
+      expect(new Uint8Array(await file.blob.arrayBuffer())).toEqual(new Uint8Array([80, 75, 3, 4]));
+    });
+
+    it('fails with the API error when the export is refused', async () => {
+      const { client } = fakeServer({
+        [`GET /v1/workspaces/${workspace.id}/export`]: () => ({
+          status: 403,
+          body: { message: 'Forbidden' },
+        }),
+      });
+      const error = await client.exportWorkspace(workspace.id, 'json').catch((e: unknown) => e);
+      expect(error).toBeInstanceOf(ApiError);
+      expect(error).toMatchObject({ status: 403, body: { message: 'Forbidden' } });
+    });
+  });
+
   it('prefixes paths with the base URL', async () => {
     const sent: string[] = [];
     const client = createApiClient({

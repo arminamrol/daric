@@ -39,6 +39,7 @@
     "@node-rs/argon2": "^2.2.2",
     "cookie-parser": "^1.4.7",
     "drizzle-orm": "^0.45.4",
+    "fflate": "^0.8.3",
     "helmet": "^8.3.0",
     "jose": "^6.2.12",
     "nestjs-pino": "^5.3.1",

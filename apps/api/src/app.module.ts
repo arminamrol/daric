@@ -15,6 +15,7 @@ import { AuditModule } from './modules/audit/audit.module';
 import { AuthController } from './modules/auth/auth.controller';
 import { AuthModule } from './modules/auth/auth.module';
 import { BudgetsModule } from './modules/budgets/budgets.module';
+import { ExportModule } from './modules/export/export.module';
 import { ExchangeRatesModule } from './modules/exchange-rates/exchange-rates.module';
 import { CategoriesModule } from './modules/categories/categories.module';
 import { LabelsModule } from './modules/labels/labels.module';
@@ -93,6 +94,7 @@ export class AppModule {
         ReportsModule,
         ValuationsModule,
         NetWorthModule,
+        ExportModule,
       ],
       providers: [
         // Order matters: rate limiting, then CSRF, then authentication.
