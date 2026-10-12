@@ -7,8 +7,8 @@ import {
   monthPeriodOfDay,
   periodDays,
   periodParam,
-  previousPeriod,
   projectYear,
+  trailingWindow,
   todayIn,
 } from '@daric/core';
 import type {
@@ -70,7 +70,7 @@ export class ProjectionService {
       .values({ workspaceId, ...input })
       .onConflictDoUpdate({
         target: projectionSettings.workspaceId,
-        set: { ...input, version: sql`${projectionSettings.version} + 1` },
+        set: { ...input, updatedAt: new Date(), version: sql`${projectionSettings.version} + 1` },
       });
     await this.audit.record(tx, {
       action: 'projection_settings.update',
@@ -104,10 +104,10 @@ export class ProjectionService {
 
     // Read from the earlier of the year's start and the window's first month.
     const thisMonth = monthPeriodOfDay(today, calendar);
-    let windowStart = thisMonth;
-    for (let i = 0; i < trailingMonths; i++) windowStart = previousPeriod(windowStart);
+    const [windowStart = thisMonth] = trailingWindow(thisMonth, trailingMonths);
     const yearStart = periodDays({ kind: 'year', year: thisMonth.year }, calendar).from;
-    const from = [periodDays(windowStart, calendar).from, yearStart].sort()[0] as string;
+    const windowFrom = periodDays(windowStart, calendar).from;
+    const from = windowFrom < yearStart ? windowFrom : yearStart;
 
     const rows = await tx
       .select({

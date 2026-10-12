@@ -16,6 +16,13 @@ type Figures = ProjectionReport['income'];
 
 const FIGURES_OF = { INCOME: 'income', EXPENSE: 'expense' } as const;
 
+/** An Amount in the report's Base Currency, as shown. */
+function useShownInBase(baseCurrency: string) {
+  const format = useFormatters();
+  const base = currencyByCode(baseCurrency);
+  return (amount: bigint) => format.money(money(amount, base));
+}
+
 /** `parent › child` names by Category id; archived ones keep theirs. */
 function useCategoryNames() {
   const { t } = useI18n();
@@ -38,9 +45,8 @@ function TypeTotals({
   base: string;
 }) {
   const { t } = useI18n();
-  const format = useFormatters();
   const titleId = useId();
-  const shown = (amount: bigint) => format.money(money(amount, currencyByCode(base)));
+  const shown = useShownInBase(base);
   return (
     <article aria-labelledby={titleId} className="flex flex-col gap-2">
       <h3 id={titleId} className="font-bold">
@@ -70,10 +76,8 @@ function CategoryBreakdown({
   nameOf: (categoryId: string) => string;
 }) {
   const { t } = useI18n();
-  const format = useFormatters();
   const titleId = useId();
-  const base = currencyByCode(projection.baseCurrency);
-  const shown = (amount: bigint) => format.money(money(amount, base));
+  const shown = useShownInBase(projection.baseCurrency);
   const lines = projection.categories
     .filter((c) => c.type === type)
     .sort((a, b) => (a.projected < b.projected ? 1 : a.projected > b.projected ? -1 : 0));
@@ -121,8 +125,7 @@ function Assumptions({
   const titleId = useId();
   const averagesId = useId();
   const recurringId = useId();
-  const base = currencyByCode(projection.baseCurrency);
-  const shown = (amount: bigint) => format.money(money(amount, base));
+  const shown = useShownInBase(projection.baseCurrency);
   const { remaining, window, monthsUsed } = projection;
   const used = window.slice(window.length - monthsUsed);
   const months = used.map((p) => isolate(format.period(p))).join(t('totals.separator'));
@@ -242,7 +245,6 @@ function Assumptions({
 export function ProjectionPage() {
   const { t } = useI18n();
   const format = useFormatters();
-  const { workspace } = useSignedIn();
   const projection = useProjection();
   const nameOf = useCategoryNames();
   const totalsId = useId();
@@ -266,7 +268,7 @@ export function ProjectionPage() {
               year: format.count(data.year),
               yearEnd: isolate(format.day(data.yearEnd)),
               today: isolate(format.day(data.today)),
-              base: format.currency(currencyByCode(workspace.baseCurrency)),
+              base: format.currency(currencyByCode(data.baseCurrency)),
             })}
           </p>
           <section

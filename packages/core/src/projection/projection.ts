@@ -160,6 +160,16 @@ function push<K, V>(map: Map<K, V[]>, key: K, value: V): void {
   else map.set(key, [value]);
 }
 
+/** The `n` closed months before `month`, oldest first; they may reach into last year. */
+export function trailingWindow(month: MonthPeriod, n: number): MonthPeriod[] {
+  const window: MonthPeriod[] = [];
+  for (let m = month, i = 0; i < n; i++) {
+    m = previousPeriod(m);
+    window.unshift(m);
+  }
+  return window;
+}
+
 /**
  * The Automatic Projection of the current Workspace-Calendar year, per type and
  * per Category: P = A + round(V × rem) + R, where A is what happened up to
@@ -184,11 +194,7 @@ export function projectYear<R extends ExchangeRate>(input: ProjectionInput<R>): 
     fullMonths: 12 - date.month,
   };
 
-  const window: MonthPeriod[] = [];
-  for (let month = thisMonth, i = 0; i < input.trailingMonths; i++) {
-    month = previousPeriod(month);
-    window.unshift(month);
-  }
+  const window = trailingWindow(thisMonth, input.trailingMonths);
   const historyFrom = input.historyFrom;
   const used = window.filter(
     (month) => historyFrom !== null && periodDays(month, calendar).until > historyFrom,
