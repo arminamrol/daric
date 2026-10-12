@@ -13,6 +13,7 @@ export type AuditAction =
   | 'auth.password_reset_requested'
   | 'auth.password_reset'
   | 'workspace.update'
+  | 'workspace.export'
   | 'account.create'
   | 'account.update'
   | 'category.create'

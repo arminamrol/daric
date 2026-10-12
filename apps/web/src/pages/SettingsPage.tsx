@@ -1,6 +1,8 @@
+import { hasRole } from '@daric/core';
 import { useSignedIn } from '../auth/session';
 import { useI18n } from '../i18n/locale';
 import { DisplayPreview } from '../settings/DisplayPreview';
+import { ExportData } from '../settings/ExportData';
 import { PreferencesForm } from '../settings/PreferencesForm';
 import { WorkspaceSettingsForm } from '../settings/WorkspaceSettingsForm';
 
@@ -14,6 +16,7 @@ export function SettingsPage() {
       <DisplayPreview />
       <PreferencesForm preferences={me.preferences} />
       <WorkspaceSettingsForm workspace={workspace} />
+      {hasRole(workspace.role, 'ADMIN') && <ExportData workspaceId={workspace.id} />}
     </div>
   );
 }

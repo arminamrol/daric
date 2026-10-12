@@ -25,6 +25,8 @@ import {
   type CreateCategoryInput,
   type CreateLabelInput,
   type CreateTransactionInput,
+  type ExportFormat,
+  exportFiles,
   CSRF_COOKIE,
   CSRF_HEADER,
   type Label,
@@ -106,6 +108,18 @@ export function transactionConflict(error: unknown): Transaction | undefined {
 }
 
 const noContent = { parse: (): void => undefined };
+
+/** A file the API sent to download. */
+export interface DownloadedFile {
+  blob: Blob;
+  /** From the server's Content-Disposition, else `fallback`. */
+  fileName: string;
+}
+
+function fileNameOf(res: Response, fallback: string): string {
+  const match = /filename="([^"]+)"/.exec(res.headers.get('content-disposition') ?? '');
+  return match?.[1] ?? fallback;
+}
 
 export interface ApiClientOptions {
   /** Origin of the API; empty when the API is served from the web app's own origin. */
@@ -268,6 +282,11 @@ export interface ApiClient {
   ): Promise<Transaction>;
   /** Member or above. Skipping it again changes nothing. */
   skipOccurrence(workspaceId: string, ruleId: string, dueOn: string): Promise<void>;
+  /**
+   * Every entity of the Workspace: one JSON file, or a zip of one CSV file per
+   * entity. Owner or Admin only; audited.
+   */
+  exportWorkspace(workspaceId: string, format: ExportFormat): Promise<DownloadedFile>;
   /** Newest first. A Period is of the Workspace Calendar; a parent Category includes its children. */
   listTransactions(workspaceId: string, filters?: ListTransactionsQuery): Promise<Transaction[]>;
   /** One that is not deleted. */
@@ -529,6 +548,17 @@ export function createApiClient(options: ApiClientOptions = {}): ApiClient {
       ),
     skipOccurrence: (workspaceId, ruleId, dueOn) =>
       request('POST', `${occurrencePath(workspaceId, ruleId, dueOn)}/skip`, noContent),
+    exportWorkspace: async (workspaceId, format) => {
+      const res = await doFetch(
+        `${baseUrl}/v1/workspaces/${encodeURIComponent(workspaceId)}/export?format=${format}`,
+        { credentials: 'include' },
+      );
+      if (!res.ok) throw new ApiError(res.status, await readBody(res));
+      return {
+        blob: await res.blob(),
+        fileName: fileNameOf(res, `daric-export.${exportFiles[format].extension}`),
+      };
+    },
   };
 }
 

@@ -56,6 +56,13 @@ export const fa = {
   'settings.preview.title': 'نمونه نمایش',
   'settings.preview.date': 'تاریخ امروز',
   'settings.preview.money': 'مبلغ',
+  'settings.export.title': 'خروجی داده‌ها',
+  'settings.export.hint':
+    'همه داده‌های این فضای کاری را دریافت کنید: یک فایل CSV برای هر نوع داده در یک فایل zip، یا یک فایل JSON. مبلغ‌ها به کوچک‌ترین واحد ارز (مثلاً ریال یا سنت) نوشته می‌شوند.',
+  'settings.export.csv': 'دریافت CSV (فایل zip)',
+  'settings.export.json': 'دریافت JSON',
+  'settings.export.done': 'فایل دریافت شد.',
+  'settings.export.failed': 'دریافت نشد. دوباره امتحان کنید.',
   'transactions.title': 'تراکنش‌ها',
   'transactions.form.title': 'ثبت تراکنش',
   'transactions.form.type': 'نوع تراکنش',

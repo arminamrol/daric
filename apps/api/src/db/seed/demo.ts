@@ -525,12 +525,12 @@ function idsFor<K extends string>(items: Record<K, unknown>): Record<K, string> 
   return Object.fromEntries(Object.keys(items).map((key) => [key, uuidv7()])) as Record<K, string>;
 }
 
-/** Removes the demo User and every Workspace they own, so a rerun starts clean. */
-async function removeDemo(tx: Transaction): Promise<void> {
+/** Removes the demo User (by `email`) and every Workspace they own, so a rerun starts clean. */
+async function removeDemo(tx: Transaction, email: string): Promise<void> {
   const [user] = await tx
     .select({ id: users.id })
     .from(users)
-    .where(sql`lower(${users.email}) = ${DEMO_EMAIL}`);
+    .where(sql`lower(${users.email}) = ${email.toLowerCase()}`);
   if (!user) return;
   const owned = tx
     .select({ id: workspaceMembers.workspaceId })
@@ -541,7 +541,7 @@ async function removeDemo(tx: Transaction): Promise<void> {
 }
 
 /**
- * Creates the demo User (DEMO_EMAIL / DEMO_PASSWORD) with a Jalali Personal
+ * Creates the demo User (DEMO_EMAIL, or `email`, / DEMO_PASSWORD) with a Jalali Personal
  * Workspace: Accounts, the default Categories, Labels, Budgets, Recurring Rules, Planned Items, dollar
  * Exchange Rates, Valuations, and Transactions and
  * Transfers from the start of the Jalali month MONTHS_BACK months before
@@ -552,16 +552,17 @@ async function removeDemo(tx: Transaction): Promise<void> {
  */
 export async function seedDemo(
   db: Database,
-  options: { today: IsoDay },
+  options: { today: IsoDay; email?: string },
 ): Promise<{ userId: string; workspaceId: string }> {
+  const email = options.email ?? DEMO_EMAIL;
   const secretHash = await hashPassword(DEMO_PASSWORD);
   return db.transaction(async (tx) => {
-    await removeDemo(tx);
+    await removeDemo(tx, email);
 
-    const user = one(await tx.insert(users).values({ email: DEMO_EMAIL }).returning());
+    const user = one(await tx.insert(users).values({ email }).returning());
     await tx
       .insert(authIdentities)
-      .values({ userId: user.id, provider: 'PASSWORD', identifier: DEMO_EMAIL, secretHash });
+      .values({ userId: user.id, provider: 'PASSWORD', identifier: email, secretHash });
     const workspace = one(
       await tx
         .insert(workspaces)
