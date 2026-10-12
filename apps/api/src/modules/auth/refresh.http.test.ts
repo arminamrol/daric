@@ -12,7 +12,7 @@ import {
   type TestApp,
 } from '../../test/app';
 import { testDatabase, uniqueEmail } from '../../test/db';
-import { hashRefreshToken } from './token.service';
+import { hashToken } from './token.service';
 
 let t: TestApp;
 const { db, pool } = testDatabase();
@@ -137,7 +137,7 @@ describe('mobile refresh', () => {
     await db
       .update(refreshTokens)
       .set({ expiresAt: new Date(Date.now() - 1000) })
-      .where(eq(refreshTokens.tokenHash, hashRefreshToken(s.refreshToken)));
+      .where(eq(refreshTokens.tokenHash, hashToken(s.refreshToken)));
     expect((await refresh(s.refreshToken)).status).toBe(401);
   });
 
@@ -147,7 +147,7 @@ describe('mobile refresh', () => {
     await db
       .update(refreshTokens)
       .set({ expiresAt: new Date(Date.now() - 1000) })
-      .where(eq(refreshTokens.tokenHash, hashRefreshToken(s.refreshToken)));
+      .where(eq(refreshTokens.tokenHash, hashToken(s.refreshToken)));
     expect((await refresh(s.refreshToken)).status).toBe(401);
     expect((await refresh(rotated.body.refreshToken)).status).toBe(401);
   });
@@ -268,7 +268,7 @@ describe('web logout', () => {
     const [row] = await db
       .select({ revokedAt: refreshTokens.revokedAt })
       .from(refreshTokens)
-      .where(eq(refreshTokens.tokenHash, hashRefreshToken(refreshToken)));
+      .where(eq(refreshTokens.tokenHash, hashToken(refreshToken)));
     expect(row?.revokedAt).not.toBeNull();
   });
 

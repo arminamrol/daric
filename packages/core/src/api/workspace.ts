@@ -81,7 +81,8 @@ export const updateUserPreferencesInputSchema = z
 export type UpdateUserPreferencesInput = z.infer<typeof updateUserPreferencesInputSchema>;
 
 export const meSchema = z.object({
-  user: userSchema,
+  /** `emailVerified` once the User has followed a link mailed to their address. */
+  user: userSchema.extend({ emailVerified: z.boolean() }),
   preferences: userPreferencesSchema,
   workspaces: z.array(workspaceSchema),
 });

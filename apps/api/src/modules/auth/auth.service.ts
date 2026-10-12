@@ -7,6 +7,7 @@ import { DATABASE } from '../../common/di-tokens';
 import { type Database, one } from '../../db/client';
 import { authIdentities, users, workspaceMembers, workspaces } from '../../db/schema';
 import { AuditService } from '../audit/audit.service';
+import { EmailLinksService } from './email-links.service';
 import { seedDefaultCategories } from '../categories/defaults';
 import { hashPassword, verifyAgainstDummy, verifyPassword } from './passwords';
 import { type IssuedTokens, TokenService } from './token.service';
@@ -32,6 +33,7 @@ export class AuthService {
     @Inject(DATABASE) private readonly db: Database,
     @Inject(TokenService) private readonly tokens: TokenService,
     @Inject(AuditService) private readonly audit: AuditService,
+    @Inject(EmailLinksService) private readonly emailLinks: EmailLinksService,
   ) {}
 
   /** Rotates a refresh token (see TokenService.rotate); a replayed token is audited and refused. */
@@ -69,12 +71,12 @@ export class AuthService {
 
   /**
    * Creates the User, their Personal Workspace with its default Categories and
-   * Owner membership in one transaction.
+   * Owner membership in one transaction, then mails them a verification link.
    */
   async register(input: RegisterInput, client: ClientInfo): Promise<SignedIn> {
     const secretHash = await hashPassword(input.password);
     try {
-      return await this.db.transaction(async (tx) => {
+      const { result, mail } = await this.db.transaction(async (tx) => {
         const user = one(await tx.insert(users).values({ email: input.email }).returning());
         await tx.insert(authIdentities).values({
           userId: user.id,
@@ -98,8 +100,13 @@ export class AuthService {
           workspaceId: workspace.id,
           client,
         });
-        return signedIn(user, await this.tokens.issue(tx, user.id));
+        return {
+          result: signedIn(user, await this.tokens.issue(tx, user.id)),
+          mail: await this.emailLinks.verificationMail(tx, user),
+        };
       });
+      this.emailLinks.deliver(mail);
+      return result;
     } catch (error) {
       if (isUniqueViolation(error)) throw new ConflictException('Email is already registered');
       throw error;

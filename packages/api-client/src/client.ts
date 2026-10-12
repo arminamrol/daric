@@ -36,6 +36,7 @@ import {
   meSchema,
   type RegisterInput,
   type ReorderCategoriesInput,
+  type ResetPasswordInput,
   periodParam,
   type Session,
   sessionSchema,
@@ -119,6 +120,14 @@ export interface ApiClient {
   login(input: LoginInput): Promise<Session>;
   /** Ends this Signed-in Device; the API clears the session cookies. */
   logout(): Promise<void>;
+  /** Uses the token from a mailed verification link; 400 when it is invalid, used or expired. */
+  verifyEmail(token: string): Promise<void>;
+  /** Mails the signed-in User a new verification link; 409 once verified, 429 when asked too often. */
+  resendVerification(): Promise<void>;
+  /** Mails a reset link if the email is registered; succeeds the same either way. */
+  forgotPassword(email: string): Promise<void>;
+  /** Sets a new password from a mailed reset link and ends every Signed-in Device of the User. */
+  resetPassword(input: ResetPasswordInput): Promise<void>;
   me(): Promise<Me>;
   /** Owner or Admin only. */
   updateWorkspace(workspaceId: string, input: UpdateWorkspaceInput): Promise<Workspace>;
@@ -347,6 +356,10 @@ export function createApiClient(options: ApiClientOptions = {}): ApiClient {
     register: (input) => request('POST', '/v1/auth/register', sessionSchema, input),
     login: (input) => request('POST', '/v1/auth/login', sessionSchema, input),
     logout: () => request('POST', '/v1/auth/logout', noContent),
+    verifyEmail: (token) => request('POST', '/v1/auth/email/verify', noContent, { token }),
+    resendVerification: () => request('POST', '/v1/auth/email/verification', noContent),
+    forgotPassword: (email) => request('POST', '/v1/auth/password/forgot', noContent, { email }),
+    resetPassword: (input) => request('POST', '/v1/auth/password/reset', noContent, input),
     me: () => request('GET', '/v1/me', meSchema),
     updateWorkspace: (workspaceId, input) =>
       request('PATCH', `/v1/workspaces/${encodeURIComponent(workspaceId)}`, workspaceSchema, input),

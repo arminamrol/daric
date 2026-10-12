@@ -66,9 +66,16 @@ function fakeServer(
 describe('api-client', () => {
   it('sends credentials so the browser attaches the session cookies', async () => {
     const { client, sent } = fakeServer({
-      'GET /v1/me': () => ({ status: 200, body: { user, preferences, workspaces: [] } }),
+      'GET /v1/me': () => ({
+        status: 200,
+        body: { user: { ...user, emailVerified: true }, preferences, workspaces: [] },
+      }),
     });
-    expect(await client.me()).toEqual({ user, preferences, workspaces: [] });
+    expect(await client.me()).toEqual({
+      user: { ...user, emailVerified: true },
+      preferences,
+      workspaces: [],
+    });
     expect(sent[0]?.credentials).toBe('include');
     expect(sent[0]?.url).toBe('/v1/me');
   });
@@ -104,7 +111,12 @@ describe('api-client', () => {
 
   it('does not send a CSRF header on reads', async () => {
     const { client, sent } = fakeServer(
-      { 'GET /v1/me': () => ({ status: 200, body: { user, preferences, workspaces: [] } }) },
+      {
+        'GET /v1/me': () => ({
+          status: 200,
+          body: { user: { ...user, emailVerified: true }, preferences, workspaces: [] },
+        }),
+      },
       { '__Host-daric_csrf': 'csrf-1' },
     );
     await client.me();
@@ -120,6 +132,30 @@ describe('api-client', () => {
     expect(sent[0]?.headers.get('x-csrf-token')).toBe('csrf-1');
     expect(sent[0]?.body).toBeUndefined();
     expect(sent[0]?.credentials).toBe('include');
+  });
+
+  it('sends the mailed-link requests with the CSRF header', async () => {
+    const { client, sent } = fakeServer(
+      {
+        'POST /v1/auth/email/verify': () => ({ status: 204 }),
+        'POST /v1/auth/email/verification': () => ({ status: 204 }),
+        'POST /v1/auth/password/forgot': () => ({ status: 202 }),
+        'POST /v1/auth/password/reset': () => ({ status: 204 }),
+      },
+      { '__Host-daric_csrf': 'csrf-1' },
+    );
+    await client.verifyEmail('verify-token');
+    await client.resendVerification();
+    await client.forgotPassword(user.email);
+    await client.resetPassword({ token: 'reset-token', password: 'a new passphrase' });
+
+    expect(sent.map((r) => [r.url, r.body])).toEqual([
+      ['/v1/auth/email/verify', { token: 'verify-token' }],
+      ['/v1/auth/email/verification', undefined],
+      ['/v1/auth/password/forgot', { email: user.email }],
+      ['/v1/auth/password/reset', { token: 'reset-token', password: 'a new passphrase' }],
+    ]);
+    expect(sent.every((r) => r.headers.get('x-csrf-token') === 'csrf-1')).toBe(true);
   });
 
   it('never asks for tokens: it sends no Authorization header and no mobile client header', async () => {
@@ -947,7 +983,10 @@ describe('api-client', () => {
       baseUrl: 'https://api.daric.test',
       fetch: async (input) => {
         sent.push(String(input));
-        return new Response(JSON.stringify({ user, preferences, workspaces: [] }), { status: 200 });
+        return new Response(
+          JSON.stringify({ user: { ...user, emailVerified: true }, preferences, workspaces: [] }),
+          { status: 200 },
+        );
       },
       readCookie: () => undefined,
     });

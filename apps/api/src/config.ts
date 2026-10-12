@@ -1,6 +1,8 @@
 import { z } from 'zod';
 
 const positiveInt = z.coerce.number().int().positive();
+/** `true`/`false` from the environment; `z.coerce.boolean()` would read "false" as true. */
+const flag = z.enum(['true', 'false']).transform((v) => v === 'true');
 
 const envSchema = z.object({
   NODE_ENV: z.enum(['development', 'test', 'production']).default('development'),
@@ -24,10 +26,25 @@ const envSchema = z.object({
   RATE_LIMIT_PER_MINUTE: positiveInt.default(120),
   /** Requests per minute per client on login and registration. */
   AUTH_RATE_LIMIT_PER_MINUTE: positiveInt.default(10),
+  /** Requests per hour per client on routes that send mail (password reset, verification resend). */
+  MAIL_RATE_LIMIT_PER_HOUR: positiveInt.default(5),
   /** Hops of reverse proxies in front of the API, for client IPs in rate limits and audit logs. */
   TRUST_PROXY: z.coerce.number().int().min(0).default(0),
   /** Minutes between runs of the month-end Net Worth Snapshot job; 0 turns it off. */
   SNAPSHOT_JOB_INTERVAL_MINUTES: z.coerce.number().int().min(0).default(60),
+  /** SMTP server outgoing mail goes through; Mailpit in development. */
+  SMTP_HOST: z.string().min(1).default('localhost'),
+  SMTP_PORT: positiveInt.default(1025),
+  /** TLS from the start (usually port 465); otherwise STARTTLS is used when the server offers it. */
+  SMTP_SECURE: flag.default(false),
+  SMTP_USER: z.string().min(1).optional(),
+  SMTP_PASSWORD: z.string().min(1).optional(),
+  MAIL_FROM: z.string().min(1).default('Daric <no-reply@daric.local>'),
+  /** Origin of the web app; links in emails point here. */
+  APP_URL: z
+    .url()
+    .default('http://localhost:5173')
+    .transform((u) => u.replace(/\/+$/, '')),
   LOG_LEVEL: z.enum(['fatal', 'error', 'warn', 'info', 'debug', 'trace', 'silent']).default('info'),
 });
 
