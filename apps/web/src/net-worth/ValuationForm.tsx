@@ -1,6 +1,7 @@
 import { ApiError } from '@daric/api-client';
 import { IRR, parseAmount, parseDisplayDay } from '@daric/core';
 import type { Account, ParseAmountError } from '@daric/core';
+import { isolate } from '@daric/i18n';
 import type { PlainMessageKey } from '@daric/i18n';
 import { useId, useRef, useState } from 'react';
 import type { FormEvent } from 'react';
@@ -131,7 +132,9 @@ export function ValuationForm({ account }: { account: Account }) {
         {field(
           'amount',
           t('valuations.form.amount'),
-          t('valuations.form.amountHint', { unit: unitName ? t(unitName) : currency.code }),
+          t('valuations.form.amountHint', {
+            unit: unitName ? t(unitName) : isolate(currency.code),
+          }),
           text,
           setText,
         )}

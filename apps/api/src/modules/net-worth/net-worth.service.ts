@@ -1,6 +1,6 @@
 import { Inject, Injectable, NotFoundException } from '@nestjs/common';
 import { accountValue, amountToWire, currencyByCode, money, netWorth, todayIn } from '@daric/core';
-import type { NetWorthWire } from '@daric/core';
+import type { NetWorthWire, Valuation } from '@daric/core';
 import { eq } from 'drizzle-orm';
 import type { Membership } from '../../common/request';
 import { workspaces } from '../../db/schema';
@@ -30,11 +30,12 @@ export class NetWorthService {
     const valuations = await allValuations();
     const rates = await ratesInto(base.code);
 
+    const byAccount = new Map<string, Valuation[]>();
+    for (const v of valuations)
+      byAccount.set(v.accountId, [...(byAccount.get(v.accountId) ?? []), v]);
     const valued = accounts.map((account) => {
-      const currency = currencyByCode(account.currency);
-      const balance = money(BigInt(account.balance), currency);
-      const own = valuations.filter((v) => v.accountId === account.id);
-      return { account, ...accountValue(balance, own, day) };
+      const balance = money(BigInt(account.balance), currencyByCode(account.currency));
+      return { account, ...accountValue(balance, byAccount.get(account.id) ?? [], day) };
     });
     const result = netWorth(
       valued.map(({ account, value }) => ({ id: account.id, class: account.class, value })),

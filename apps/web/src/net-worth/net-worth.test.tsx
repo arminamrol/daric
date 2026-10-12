@@ -103,7 +103,9 @@ describe('Valuations', () => {
     renderApp({ path: '/net-worth', api: fake.api });
     await userEvent.click(await screen.findByRole('link', { name: 'خودرو' }));
 
-    expect(await screen.findByRole('heading', { name: 'ارزش‌گذاری خودرو' })).toBeTruthy();
+    expect(
+      await screen.findByRole('heading', { name: `ارزش‌گذاری ${isolate('خودرو')}` }),
+    ).toBeTruthy();
     expect(screen.getByText('هنوز ارزش‌گذاری نشده است.')).toBeTruthy();
     const form = await newValuationForm();
     expect(form.getByRole('textbox', { name: 'تاریخ' })).toHaveProperty('value', '۱۴۰۵/۰۷/۱۸');

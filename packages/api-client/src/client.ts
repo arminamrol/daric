@@ -400,18 +400,9 @@ export function createApiClient(options: ApiClientOptions = {}): ApiClient {
     createValuation: (workspaceId, accountId, input) =>
       request('POST', valuationsPath(workspaceId, accountId), valuationSchema, input),
     updateValuation: (workspaceId, accountId, valuationId, input) =>
-      request(
-        'PATCH',
-        `${valuationsPath(workspaceId, accountId)}/${encodeURIComponent(valuationId)}`,
-        valuationSchema,
-        input,
-      ),
+      request('PATCH', valuationPath(workspaceId, accountId, valuationId), valuationSchema, input),
     deleteValuation: (workspaceId, accountId, valuationId) =>
-      request(
-        'DELETE',
-        `${valuationsPath(workspaceId, accountId)}/${encodeURIComponent(valuationId)}`,
-        noContent,
-      ),
+      request('DELETE', valuationPath(workspaceId, accountId, valuationId), noContent),
     getNetWorth: (workspaceId) =>
       request('GET', `/v1/workspaces/${encodeURIComponent(workspaceId)}/net-worth`, netWorthSchema),
     listRecurringRules: (workspaceId, { includeArchived = false } = {}) =>
@@ -445,6 +436,10 @@ export function createApiClient(options: ApiClientOptions = {}): ApiClient {
 
 function valuationsPath(workspaceId: string, accountId: string): string {
   return `/v1/workspaces/${encodeURIComponent(workspaceId)}/accounts/${encodeURIComponent(accountId)}/valuations`;
+}
+
+function valuationPath(workspaceId: string, accountId: string, valuationId: string) {
+  return `${valuationsPath(workspaceId, accountId)}/${encodeURIComponent(valuationId)}`;
 }
 
 function recurringPath(workspaceId: string): string {

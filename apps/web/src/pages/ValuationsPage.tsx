@@ -107,7 +107,7 @@ export function ValuationsPage() {
     <div className="mx-auto flex max-w-2xl flex-col gap-6">
       <div className="flex flex-wrap items-center gap-3">
         <h1 className="me-auto text-2xl font-bold">
-          {t('valuations.title', { name: account.name })}
+          {t('valuations.title', { name: isolate(account.name) })}
         </h1>
         {back}
       </div>
