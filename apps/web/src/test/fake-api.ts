@@ -1162,7 +1162,7 @@ export function fakeApi({
           rate,
           effectiveOn,
         })),
-        trend: trend.months.map((point) => ({
+        trend: trend.map((point) => ({
           ...point,
           month: periodParam(point.month),
           income: wire(point.income),

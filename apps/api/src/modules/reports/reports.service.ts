@@ -116,7 +116,7 @@ export class ReportsService {
       },
       ratesUsed: report.ratesUsed,
       missing: report.missing,
-      trend: trend.months.map((point) => ({
+      trend: trend.map((point) => ({
         month: periodParam(point.month),
         income: amountToWire(point.income),
         expense: amountToWire(point.expense),

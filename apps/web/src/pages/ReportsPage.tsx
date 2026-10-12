@@ -20,6 +20,9 @@ import { useFormatters } from '../settings/settings';
 
 const TrendChart = lazy(() => import('../reports/TrendChart'));
 
+/** How each type is named in report strings and chart colors. */
+const TYPE_KEY = { INCOME: 'income', EXPENSE: 'expense' } as const;
+
 /** An Amount in the report's Base Currency, as shown. */
 function useShownInBase(baseCurrency: string) {
   const format = useFormatters();
@@ -41,7 +44,7 @@ function ShareBar({ share, type }: { share: number; type: TransactionType }) {
         className="block h-full rounded-full"
         style={{
           width: `${Math.min(share, 100)}%`,
-          background: `var(--color-chart-${type === 'INCOME' ? 'income' : 'expense'})`,
+          background: `var(--color-chart-${TYPE_KEY[type]})`,
         }}
       />
     </span>
@@ -213,7 +216,7 @@ function CategoryBreakdown({
   const nameOf = (id: string) => categories.find((c) => c.id === id)?.name ?? '';
   const lines = report.categories.filter((line) => line.type === type);
   if (lines.length === 0) return null;
-  const typeName = t(`reports.${type === 'INCOME' ? 'income' : 'expense'}`);
+  const typeName = t(`reports.${TYPE_KEY[type]}`);
 
   return (
     <section aria-labelledby={titleId} className="flex flex-col gap-2">

@@ -215,7 +215,7 @@ describe('trendReport', () => {
         months: [4, 5, 6, 7].map((month) => ({ kind: 'month', year: 1405, month }) as const),
       }),
     );
-    expect(trend.months).toEqual([
+    expect(trend).toEqual([
       {
         month: { kind: 'month', year: 1405, month: 4 },
         income: 800n,
@@ -245,7 +245,6 @@ describe('trendReport', () => {
         missing: [],
       },
     ]);
-    expect(trend.missing).toEqual(['USD']);
   });
 
   it('matches the Period report of each month', () => {
@@ -254,7 +253,7 @@ describe('trendReport', () => {
       earn('salary', j(1405, 7, 1), 5n),
     ];
     const rates = [{ currency: 'USD', rate: '1.5', effectiveOn: j(1405, 1, 1) }];
-    const [point] = trendReport(input({ rates, transactions, months: [mehr] })).months;
+    const [point] = trendReport(input({ rates, transactions, months: [mehr] }));
     const report = periodReport(input({ rates, transactions }));
     expect(point).toMatchObject({
       income: report.income,

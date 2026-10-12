@@ -88,13 +88,27 @@ function push<K, V>(map: Map<K, V[]>, key: K, value: V): void {
   else map.set(key, [value]);
 }
 
-/** An Income or Expense, which always has a Category. */
-type Flow = ReportTransaction & { readonly type: TransactionType; readonly categoryId: string };
+/** An Income or Expense Transaction, which always has a Category. */
+type IncomeOrExpense = ReportTransaction & {
+  readonly type: TransactionType;
+  readonly categoryId: string;
+};
+
+/** One Category's total of one type, in the Base Currency. */
+interface CategoryTotal {
+  readonly type: TransactionType;
+  readonly categoryId: string;
+  readonly total: bigint;
+}
 
 /** Income and Expense Transactions in `[from, until)`; Transfers never count. */
-function flowsIn(transactions: readonly ReportTransaction[], from: IsoDay, until: IsoDay): Flow[] {
+function incomeAndExpenseIn(
+  transactions: readonly ReportTransaction[],
+  from: IsoDay,
+  until: IsoDay,
+): IncomeOrExpense[] {
   return transactions.filter(
-    (t): t is Flow =>
+    (t): t is IncomeOrExpense =>
       t.type !== 'TRANSFER' &&
       t.categoryId !== null &&
       t.occurredOn >= from &&
@@ -117,17 +131,18 @@ function byTotal(
 }
 
 /**
- * Each type's total in the Base Currency, converted per Category (the same
- * buckets the breakdown shows) on `day`, so the totals are the sums of its lines.
+ * Each Category's total in the Base Currency, converted once per Category (the
+ * buckets the breakdown shows) on `day`, so the type totals are the sums of its
+ * lines, as the Projection does.
  */
 function totalsByCategory(
-  flows: readonly Flow[],
+  transactions: readonly IncomeOrExpense[],
   converter: RateConverter<ExchangeRate>,
   day: IsoDay,
-): { type: TransactionType; categoryId: string; total: bigint }[] {
+): CategoryTotal[] {
   const amounts = new Map<string, Money[]>();
   const keys = new Map<string, { type: TransactionType; categoryId: string }>();
-  for (const t of flows) {
+  for (const t of transactions) {
     const k = `${t.type}|${t.categoryId}`;
     keys.set(k, { type: t.type, categoryId: t.categoryId });
     push(amounts, k, t.amount);
@@ -138,14 +153,18 @@ function totalsByCategory(
   }));
 }
 
+/** One type's total: the sum of its Categories'. */
+function typeTotal(totals: readonly CategoryTotal[], type: TransactionType): bigint {
+  return totals.filter((c) => c.type === type).reduce((sum, c) => sum + c.total, 0n);
+}
+
 /**
  * Top-level lines with their children folded in. A Category missing from
  * `categories` stands on its own line.
  */
 function categoryLines(
-  leaves: readonly { type: TransactionType; categoryId: string; total: bigint }[],
+  totals: readonly CategoryTotal[],
   categories: readonly CategoryNode[],
-  totalOf: (type: TransactionType) => bigint,
 ): CategoryLine[] {
   const parentOf = new Map(categories.map((c) => [c.id, c.parentId]));
   const tops = new Map<
@@ -157,18 +176,18 @@ function categoryLines(
       children: { categoryId: string; total: bigint }[];
     }
   >();
-  for (const leaf of leaves) {
-    const parentId = parentOf.get(leaf.categoryId) ?? null;
-    const topId = parentId ?? leaf.categoryId;
-    const k = `${leaf.type}|${topId}`;
+  for (const line of totals) {
+    const parentId = parentOf.get(line.categoryId) ?? null;
+    const topId = parentId ?? line.categoryId;
+    const k = `${line.type}|${topId}`;
     let top = tops.get(k);
-    if (!top) tops.set(k, (top = { type: leaf.type, categoryId: topId, own: 0n, children: [] }));
-    if (parentId === null) top.own += leaf.total;
-    else top.children.push({ categoryId: leaf.categoryId, total: leaf.total });
+    if (!top) tops.set(k, (top = { type: line.type, categoryId: topId, own: 0n, children: [] }));
+    if (parentId === null) top.own += line.total;
+    else top.children.push({ categoryId: line.categoryId, total: line.total });
   }
   return [...tops.values()]
     .map((top) => {
-      const whole = totalOf(top.type);
+      const whole = typeTotal(totals, top.type);
       const total = top.children.reduce((sum, c) => sum + c.total, top.own);
       return {
         categoryId: top.categoryId,
@@ -182,31 +201,45 @@ function categoryLines(
     .sort((a, b) => (a.type !== b.type ? (a.type === 'INCOME' ? -1 : 1) : byTotal(a, b)));
 }
 
-/** Income and Expense per Label, each converted once on `day`; '' holds the unlabeled. */
+interface IncomeAndExpense {
+  readonly income: bigint;
+  readonly expense: bigint;
+}
+
+/** Larger first; 0 when equal. */
+function descending(a: bigint, b: bigint): number {
+  return a === b ? 0 : a > b ? -1 : 1;
+}
+
+/**
+ * Income and Expense per Label, and of what carried none, each converted once
+ * on `day`. A Transaction with several Labels counts under each.
+ */
 function totalsByLabel(
-  flows: readonly Flow[],
+  transactions: readonly IncomeOrExpense[],
   converter: RateConverter<ExchangeRate>,
   day: IsoDay,
-): Map<string, { income: bigint; expense: bigint }> {
-  const amounts = new Map<string, { INCOME: Money[]; EXPENSE: Money[] }>();
-  const add = (labelId: string, t: Flow) => {
-    let bucket = amounts.get(labelId);
-    if (!bucket) amounts.set(labelId, (bucket = { INCOME: [], EXPENSE: [] }));
-    bucket[t.type].push(t.amount);
-  };
-  for (const t of flows) {
-    if (t.labelIds.length === 0) add('', t);
-    for (const labelId of t.labelIds) add(labelId, t);
+): { byLabel: Map<string, IncomeAndExpense>; unlabeled: IncomeAndExpense } {
+  type Bucket = Record<TransactionType, Money[]>;
+  const bucket = (): Bucket => ({ INCOME: [], EXPENSE: [] });
+  const byLabel = new Map<string, Bucket>();
+  const unlabeled = bucket();
+  for (const t of transactions) {
+    if (t.labelIds.length === 0) unlabeled[t.type].push(t.amount);
+    for (const labelId of t.labelIds) {
+      let amounts = byLabel.get(labelId);
+      if (!amounts) byLabel.set(labelId, (amounts = bucket()));
+      amounts[t.type].push(t.amount);
+    }
   }
-  return new Map(
-    [...amounts].map(([labelId, bucket]) => [
-      labelId,
-      {
-        income: converter.convert(bucket.INCOME, day),
-        expense: converter.convert(bucket.EXPENSE, day),
-      },
-    ]),
-  );
+  const convert = (amounts: Bucket): IncomeAndExpense => ({
+    income: converter.convert(amounts.INCOME, day),
+    expense: converter.convert(amounts.EXPENSE, day),
+  });
+  return {
+    byLabel: new Map([...byLabel].map(([labelId, amounts]) => [labelId, convert(amounts)])),
+    unlabeled: convert(unlabeled),
+  };
 }
 
 /**
@@ -219,32 +252,23 @@ export function periodReport<R extends ExchangeRate>(input: ReportInput<R>): Per
   const { from, until } = periodDays(period, calendar);
   const rateDay = rateDayOf(period, calendar, today);
   const converter = new RateConverter(input.base, input.rates);
-  const flows = flowsIn(input.transactions, from, until);
-  const leaves = totalsByCategory(flows, converter, rateDay);
-  const byLabel = totalsByLabel(flows, converter, rateDay);
-  const totalOf = (type: TransactionType) =>
-    leaves.filter((l) => l.type === type).reduce((sum, l) => sum + l.total, 0n);
-  const income = totalOf('INCOME');
-  const expense = totalOf('EXPENSE');
-  const unlabeled = byLabel.get('') ?? { income: 0n, expense: 0n };
+  const inPeriod = incomeAndExpenseIn(input.transactions, from, until);
+  const totals = totalsByCategory(inPeriod, converter, rateDay);
+  const { byLabel, unlabeled } = totalsByLabel(inPeriod, converter, rateDay);
+  const income = typeTotal(totals, 'INCOME');
+  const expense = typeTotal(totals, 'EXPENSE');
   const labels = [...byLabel]
-    .filter(([labelId]) => labelId !== '')
     .map(([labelId, t]) => ({
       labelId,
       ...t,
       incomeShare: shareOf(t.income, income),
       expenseShare: shareOf(t.expense, expense),
     }))
-    .sort((a, b) =>
-      a.expense !== b.expense
-        ? a.expense > b.expense
-          ? -1
-          : 1
-        : a.income !== b.income
-          ? a.income > b.income
-            ? -1
-            : 1
-          : a.labelId.localeCompare(b.labelId),
+    .sort(
+      (a, b) =>
+        descending(a.expense, b.expense) ||
+        descending(a.income, b.income) ||
+        a.labelId.localeCompare(b.labelId),
     );
   return {
     period,
@@ -254,7 +278,7 @@ export function periodReport<R extends ExchangeRate>(input: ReportInput<R>): Per
     income,
     expense,
     net: income - expense,
-    categories: categoryLines(leaves, input.categories, totalOf),
+    categories: categoryLines(totals, input.categories),
     labels,
     unlabeled,
     ratesUsed: [...converter.ratesUsed.values()],
@@ -304,32 +328,23 @@ export interface TrendInput<R extends ExchangeRate = ExchangeRate> extends Omit<
   readonly months: readonly MonthPeriod[];
 }
 
-export interface TrendReport<R extends ExchangeRate = ExchangeRate> {
-  readonly months: TrendPoint[];
-  readonly ratesUsed: R[];
-  /** Currency codes some month left out. */
-  readonly missing: string[];
-}
-
 /**
  * Income and Expense of each month in the Base Currency, each converted at the
  * month's own rates (its last day's, or today's while it runs) and per
  * Category, as `periodReport` does, so a month's point matches its report.
  */
-export function trendReport<R extends ExchangeRate>(input: TrendInput<R>): TrendReport<R> {
+export function trendReport(input: TrendInput): TrendPoint[] {
   const { calendar, today } = input;
-  const all = new RateConverter(input.base, input.rates);
-  const months = input.months.map((month): TrendPoint => {
+  return input.months.map((month) => {
     const { from, until } = periodDays(month, calendar);
-    const day = rateDayOf(month, calendar, today);
     const converter = new RateConverter(input.base, input.rates);
-    const leaves = totalsByCategory(flowsIn(input.transactions, from, until), converter, day);
-    const totalOf = (type: TransactionType) =>
-      leaves.filter((l) => l.type === type).reduce((sum, l) => sum + l.total, 0n);
-    for (const [k, rate] of converter.ratesUsed) all.ratesUsed.set(k, rate);
-    for (const code of converter.missing) all.missing.add(code);
-    const income = totalOf('INCOME');
-    const expense = totalOf('EXPENSE');
+    const totals = totalsByCategory(
+      incomeAndExpenseIn(input.transactions, from, until),
+      converter,
+      rateDayOf(month, calendar, today),
+    );
+    const income = typeTotal(totals, 'INCOME');
+    const expense = typeTotal(totals, 'EXPENSE');
     return {
       month,
       income,
@@ -338,5 +353,4 @@ export function trendReport<R extends ExchangeRate>(input: TrendInput<R>): Trend
       missing: [...converter.missing].sort(),
     };
   });
-  return { months, ratesUsed: [...all.ratesUsed.values()], missing: [...all.missing].sort() };
 }
