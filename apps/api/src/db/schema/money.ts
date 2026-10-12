@@ -5,6 +5,7 @@ import {
   date,
   foreignKey,
   index,
+  jsonb,
   numeric,
   pgEnum,
   pgTable,
@@ -12,9 +13,11 @@ import {
   text,
   timestamp,
   unique,
+  uniqueIndex,
   uuid,
 } from 'drizzle-orm/pg-core';
-import { accountClasses, accountTypes } from '@daric/core';
+import { accountClasses, accountTypes, snapshotKinds } from '@daric/core';
+import type { NetWorthWire } from '@daric/core';
 import { id, timestamps, version } from './columns';
 import { workspaces } from './tenancy';
 
@@ -120,5 +123,44 @@ export const accountValuations = pgTable(
     }),
     check('account_valuations_amount_check', sql`${t.amount} >= 0`),
     index('account_valuations_workspace_id_idx').on(t.workspaceId),
+  ],
+);
+
+export const snapshotKind = pgEnum('snapshot_kind', snapshotKinds);
+
+/** What a Net Worth Snapshot keeps beside its totals, as the API returns it. */
+export type SnapshotBreakdown = Pick<
+  NetWorthWire,
+  'byCurrency' | 'accounts' | 'ratesUsed' | 'missing'
+>;
+
+/**
+ * A Net Worth Snapshot: Net Worth on `day` in the Base Currency of the time,
+ * with its breakdown. Never changed once taken. At most one AUTO snapshot per
+ * day, which is a month's last day, so the month-end job can run again safely.
+ */
+export const netWorthSnapshots = pgTable(
+  'net_worth_snapshots',
+  {
+    id: id(),
+    workspaceId: uuid('workspace_id')
+      .notNull()
+      .references(() => workspaces.id, { onDelete: 'cascade' }),
+    kind: snapshotKind('kind').notNull(),
+    day: date('day', { mode: 'string' }).notNull(),
+    baseCurrency: text('base_currency')
+      .notNull()
+      .references(() => currencies.code),
+    total: bigint('total', { mode: 'bigint' }).notNull(),
+    assets: bigint('assets', { mode: 'bigint' }).notNull(),
+    liabilities: bigint('liabilities', { mode: 'bigint' }).notNull(),
+    breakdown: jsonb('breakdown').$type<SnapshotBreakdown>().notNull(),
+    createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => [
+    uniqueIndex('net_worth_snapshots_auto_day_key')
+      .on(t.workspaceId, t.day)
+      .where(sql`${t.kind} = 'AUTO'`),
+    index('net_worth_snapshots_workspace_id_day_idx').on(t.workspaceId, t.day),
   ],
 );

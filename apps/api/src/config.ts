@@ -26,6 +26,8 @@ const envSchema = z.object({
   AUTH_RATE_LIMIT_PER_MINUTE: positiveInt.default(10),
   /** Hops of reverse proxies in front of the API, for client IPs in rate limits and audit logs. */
   TRUST_PROXY: z.coerce.number().int().min(0).default(0),
+  /** Minutes between runs of the month-end Net Worth Snapshot job; 0 turns it off. */
+  SNAPSHOT_JOB_INTERVAL_MINUTES: z.coerce.number().int().min(0).default(60),
   LOG_LEVEL: z.enum(['fatal', 'error', 'warn', 'info', 'debug', 'trace', 'silent']).default('info'),
 });
 

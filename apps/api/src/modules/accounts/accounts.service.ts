@@ -1,7 +1,7 @@
 import { Inject, Injectable, NotFoundException } from '@nestjs/common';
 import { accountBalance, amountToWire, flowEffect, money } from '@daric/core';
 import type { AccountWire, CreateAccountInput, UpdateAccountInput } from '@daric/core';
-import { and, eq, isNull, sql, type SQL, type SQLWrapper } from 'drizzle-orm';
+import { and, eq, isNull, lte, sql, type SQL, type SQLWrapper } from 'drizzle-orm';
 import { isUuid, type Membership } from '../../common/request';
 import { one } from '../../db/client';
 import { accounts, currencies, transactions, workspaces } from '../../db/schema';
@@ -25,11 +25,19 @@ const sumOf = (column: SQLWrapper, filter?: SQL) =>
     ? sql<string>`coalesce(sum(${column}) FILTER (WHERE ${filter}), 0)`
     : sql<string>`coalesce(sum(${column}), 0)`;
 
+/** Transactions that count in balances: not deleted, and on or before `until` if given. */
+function counted(until: string | undefined) {
+  return and(
+    isNull(transactions.deletedAt),
+    until === undefined ? undefined : lte(transactions.occurredOn, until),
+  );
+}
+
 /**
  * What flowed into and out of each Account as the Account of its Transactions,
  * deleted ones left out: Income in, Expense and Transfers out.
  */
-function flowsByAccount() {
+function flowsByAccount(until: string | undefined) {
   return scopedTx()
     .select({
       accountId: transactions.accountId,
@@ -39,20 +47,20 @@ function flowsByAccount() {
       ),
     })
     .from(transactions)
-    .where(isNull(transactions.deletedAt))
+    .where(counted(until))
     .groupBy(transactions.accountId)
     .as('flows');
 }
 
 /** What Transfers put into each Account, deleted ones left out. */
-function transfersInByAccount() {
+function transfersInByAccount(until: string | undefined) {
   return scopedTx()
     .select({
       accountId: sql<string>`${transactions.toAccountId}`.as('to_account_id'),
       transferredIn: sumOf(transactions.toAmount).as('transferred_in'),
     })
     .from(transactions)
-    .where(and(eq(transactions.type, 'TRANSFER'), isNull(transactions.deletedAt)))
+    .where(and(eq(transactions.type, 'TRANSFER'), counted(until)))
     .groupBy(transactions.toAccountId)
     .as('transfers_in');
 }
@@ -88,9 +96,9 @@ function toWire(row: Row): AccountWire {
 export class AccountsService {
   constructor(@Inject(AuditService) private readonly audit: AuditService) {}
 
-  private select(where: SQL | undefined) {
-    const flows = flowsByAccount();
-    const transfersIn = transfersInByAccount();
+  private select(where: SQL | undefined, balancesOn?: string) {
+    const flows = flowsByAccount(balancesOn);
+    const transfersIn = transfersInByAccount(balancesOn);
     return scopedTx()
       .select({
         ...columns,
@@ -106,9 +114,11 @@ export class AccountsService {
       .orderBy(accounts.createdAt, accounts.id);
   }
 
-  async list(options: { includeArchived: boolean }): Promise<AccountWire[]> {
+  /** With `balancesOn`, balances count only Transactions on or before that day. */
+  async list(options: { includeArchived: boolean; balancesOn?: string }): Promise<AccountWire[]> {
     const rows = await this.select(
       options.includeArchived ? undefined : isNull(accounts.archivedAt),
+      options.balancesOn,
     );
     return rows.map(toWire);
   }

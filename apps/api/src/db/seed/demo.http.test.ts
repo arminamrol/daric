@@ -5,6 +5,7 @@ import { call, registerUser, startTestApp, type TestApp } from '../../test/app';
 import { testDatabase } from '../../test/db';
 import { one } from '../client';
 import { transactionLabels, transactions, users, workspaceMembers } from '../schema';
+import { NetWorthService } from '../../modules/net-worth/net-worth.service';
 import { DEMO_EMAIL, DEMO_PASSWORD, seedDemo } from './demo';
 
 const { db, pool } = testDatabase();
@@ -165,6 +166,34 @@ describe('demo seed', () => {
       expect.objectContaining({ name: 'سکهٔ طلا', value: '1800000000', valuedOn: '2026-09-23' }),
     );
     expect(BigInt(res.body.total)).toBeGreaterThan(0n);
+  });
+
+  it('dates the Workspace from the first demo month, so the month-end job snapshots each ended month', async () => {
+    // Run for the demo Workspace only, as the seed does: the job would reach other tests' too.
+    const netWorth = t.app.get(NetWorthService);
+    await netWorth.takeDueAutoSnapshots(new Date('2026-10-23T00:00:00Z'), {
+      workspaceId: seeded.workspaceId,
+    });
+    const token = await login();
+    const res = await call(
+      t.url,
+      'GET',
+      `/v1/workspaces/${seeded.workspaceId}/net-worth/snapshots`,
+      { token },
+    );
+    expect(res.status).toBe(200);
+    const history = res.body as unknown as { kind: string; day: string; missing: string[] }[];
+    // On 1 Aban 1405, when Mehr has ended: Farvardin through Mehr.
+    expect(history.map((s) => s.day)).toEqual([
+      '2026-04-20',
+      '2026-05-21',
+      '2026-06-21',
+      '2026-07-22',
+      '2026-08-22',
+      '2026-09-22',
+      '2026-10-22',
+    ]);
+    expect(history.every((s) => s.kind === 'AUTO' && s.missing.length === 0)).toBe(true);
   });
 
   it('uses rial amounts in the range of a Tehran household', async () => {

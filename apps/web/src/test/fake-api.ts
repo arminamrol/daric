@@ -26,6 +26,7 @@ import {
   todayIn,
 } from '@daric/core';
 import type {
+  NetWorthSnapshot,
   Account,
   AccountValuation,
   Budget,
@@ -94,6 +95,8 @@ export function fakeApi({
   let nextRateId = 1;
   let valuations: AccountValuation[] = [];
   let nextValuationId = 1;
+  /** In the order taken; listed oldest first by day. */
+  const snapshots: NetWorthSnapshot[] = [];
   /** Occurrences confirmed (with their Transaction) or skipped, by `ruleId|dueOn`. */
   const handled = new Map<string, { transactionId: string | null }>();
   /** Unreachable: every call fails as fetch does when the network is down. */
@@ -341,6 +344,26 @@ export function fakeApi({
     };
     valuations.push(valuation);
     return valuation;
+  }
+  /** Puts a Net Worth Snapshot in, as if taken earlier; no breakdown unless given. */
+  function addSnapshot(
+    fields: Pick<NetWorthSnapshot, 'day' | 'total'> & Partial<NetWorthSnapshot>,
+  ): NetWorthSnapshot {
+    const snapshot: NetWorthSnapshot = {
+      id: `01900000-0000-7000-f000-${String(snapshots.length + 1).padStart(12, '0')}`,
+      kind: 'AUTO',
+      takenAt: new Date().toISOString(),
+      baseCurrency: workspace.baseCurrency,
+      assets: fields.total > 0n ? fields.total : 0n,
+      liabilities: fields.total < 0n ? -fields.total : 0n,
+      byCurrency: [],
+      accounts: [],
+      ratesUsed: [],
+      missing: [],
+      ...fields,
+    };
+    snapshots.push(snapshot);
+    return snapshot;
   }
 
   function findAccount(accountId: string): Account {
@@ -874,6 +897,33 @@ export function fakeApi({
         missing: result.missing.map((c) => c.code),
       });
     },
+    async listNetWorthSnapshots(workspaceId) {
+      inWorkspace(workspaceId);
+      return [...snapshots]
+        .sort((a, b) => (a.day < b.day ? -1 : a.day > b.day ? 1 : 0))
+        .map((s) => ({
+          id: s.id,
+          kind: s.kind,
+          day: s.day,
+          takenAt: s.takenAt,
+          baseCurrency: s.baseCurrency,
+          total: s.total,
+          assets: s.assets,
+          liabilities: s.liabilities,
+          missing: s.missing,
+        }));
+    },
+    async takeNetWorthSnapshot(workspaceId) {
+      inWorkspace(workspaceId, 'MEMBER');
+      const now = await endpoints.getNetWorth(workspaceId);
+      return addSnapshot({ ...now, kind: 'MANUAL' });
+    },
+    async getNetWorthSnapshot(workspaceId, snapshotId) {
+      inWorkspace(workspaceId);
+      const snapshot = snapshots.find((s) => s.id === snapshotId);
+      if (!snapshot) throw new ApiError(404, { message: 'Not Found' });
+      return snapshot;
+    },
     async listRecurringRules(workspaceId, { includeArchived = false } = {}) {
       inWorkspace(workspaceId);
       return rules.filter((r) => includeArchived || !r.archived).map(ruleWire);
@@ -983,6 +1033,7 @@ export function fakeApi({
     rates: () => rates,
     addValuation,
     valuations: () => valuations,
+    addSnapshot,
     /** In the order recorded, deleted ones left out. */
     transactions: () => live(),
     /** Ids of those deleted softly. */

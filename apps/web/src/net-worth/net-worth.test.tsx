@@ -192,3 +192,80 @@ describe('Valuations', () => {
     expect(await screen.findByText('این حساب پیدا نشد.')).toBeTruthy();
   });
 });
+
+describe('Net Worth history', () => {
+  const history = async () => within(await screen.findByRole('region', { name: 'تاریخچه' }));
+
+  it('says the first snapshot comes at the month end when there is none yet', async () => {
+    renderApp({ path: '/net-worth', api: signedIn().api });
+    const region = await history();
+    expect(
+      await region.findByText('هنوز چیزی ثبت نشده است. اولین ثبت خودکار پایان همین ماه است.'),
+    ).toBeTruthy();
+    expect(region.queryByRole('img')).toBeNull();
+  });
+
+  it('charts the snapshots with the same numbers in a table, newest first', async () => {
+    const fake = signedIn();
+    fake.addSnapshot({ day: '2026-08-22', total: 900_000_000n });
+    fake.addSnapshot({ day: '2026-09-22', total: 950_000_000n, missing: ['EUR'] });
+    renderApp({ path: '/net-worth', api: fake.api });
+
+    const region = await history();
+    expect(
+      await region.findByRole('img', {
+        name: `نمودار دارایی خالص از ${isolate('۱۴۰۵/۰۵/۳۱')} تا ${isolate('۱۴۰۵/۰۶/۳۱')}، به ریال`,
+      }),
+    ).toBeTruthy();
+    await userEvent.click(region.getByText('نمایش به صورت جدول'));
+    const table = within(region.getByRole('table', { name: 'تاریخچهٔ دارایی خالص' }));
+    const rows = table.getAllByRole('row').slice(1);
+    expect(rows.map((row) => within(row).getByRole('rowheader').textContent)).toEqual([
+      '۱۴۰۵/۰۶/۳۱',
+      '۱۴۰۵/۰۵/۳۱',
+    ]);
+    const [latest] = rows;
+    expect(latest?.textContent).toContain('پایان ماه');
+    expect(latest?.textContent).toContain('۹۵۰٬۰۰۰٬۰۰۰ ریال');
+    expect(latest?.textContent).toContain('بی یورو؛ نرخ نداشت');
+  });
+
+  it("takes a snapshot of today's Net Worth on demand", async () => {
+    const { fake } = household();
+    renderApp({ path: '/net-worth', api: fake.api });
+
+    const region = await history();
+    await userEvent.click(await region.findByRole('button', { name: 'ثبت دارایی خالص امروز' }));
+    expect(await region.findByRole('status')).toHaveProperty(
+      'textContent',
+      'دارایی خالص امروز ثبت شد.',
+    );
+    await userEvent.click(await region.findByText('نمایش به صورت جدول'));
+    const row = region.getAllByRole('row')[1];
+    expect(row?.textContent).toContain('۱۴۰۵/۰۷/۱۸');
+    expect(row?.textContent).toContain('دستی');
+    expect(row?.textContent).toContain('۱۵۰٬۰۰۰٬۰۰۰ ریال');
+  });
+
+  it('lets Viewers look but not take one', async () => {
+    const fake = signedIn({ role: 'VIEWER' });
+    fake.addSnapshot({ day: '2026-09-22', total: 5n });
+    renderApp({ path: '/net-worth', api: fake.api });
+    const region = await history();
+    expect(await region.findByRole('img')).toBeTruthy();
+    expect(region.queryByRole('button')).toBeNull();
+  });
+
+  it('leaves out snapshots in a former Base Currency, saying how many', async () => {
+    const fake = signedIn();
+    fake.addSnapshot({ day: '2026-08-22', total: 100n, baseCurrency: 'USD' });
+    fake.addSnapshot({ day: '2026-09-22', total: 5n });
+    renderApp({ path: '/net-worth', api: fake.api });
+    const region = await history();
+    expect(
+      await region.findByText('۱ ثبت به ارز پایهٔ دیگری است و این‌جا نیامده است.'),
+    ).toBeTruthy();
+    await userEvent.click(region.getByText('نمایش به صورت جدول'));
+    expect(region.getAllByRole('row')).toHaveLength(2);
+  });
+});

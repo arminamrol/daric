@@ -63,3 +63,26 @@ export function useDeleteValuation(accountId: string) {
     onSuccess: refresh,
   });
 }
+
+export const snapshotsKey = (workspaceId: string) => ['net-worth-snapshots', workspaceId] as const;
+
+/** Every Net Worth Snapshot, oldest first. */
+export function useNetWorthHistory() {
+  const api = useApi();
+  const { workspace } = useSignedIn();
+  return useQuery({
+    queryKey: snapshotsKey(workspace.id),
+    queryFn: () => api.listNetWorthSnapshots(workspace.id),
+  });
+}
+
+/** Member or above: stores today's Net Worth as a MANUAL snapshot. */
+export function useTakeSnapshot() {
+  const api = useApi();
+  const queryClient = useQueryClient();
+  const { workspace } = useSignedIn();
+  return useMutation({
+    mutationFn: () => api.takeNetWorthSnapshot(workspace.id),
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: snapshotsKey(workspace.id) }),
+  });
+}

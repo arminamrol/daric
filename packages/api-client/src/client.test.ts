@@ -454,6 +454,49 @@ describe('api-client', () => {
     });
   });
 
+  describe('Net Worth Snapshots', () => {
+    const path = `/v1/workspaces/${workspace.id}/net-worth/snapshots`;
+    const summary = {
+      id: '01900000-0000-7000-8000-0000000000f1',
+      kind: 'AUTO',
+      day: '2026-09-22',
+      takenAt: '2026-09-22T20:31:00.000Z',
+      baseCurrency: 'IRR',
+      total: '900000000',
+      assets: '950000000',
+      liabilities: '50000000',
+      missing: [],
+    } as const;
+    const snapshot = {
+      ...summary,
+      kind: 'MANUAL',
+      byCurrency: [],
+      accounts: [],
+      ratesUsed: [],
+    } as const;
+
+    it('lists, takes and reads snapshots with bigints', async () => {
+      const { client, sent } = fakeServer(
+        {
+          [`GET ${path}`]: () => ({ status: 200, body: [summary] }),
+          [`POST ${path}`]: () => ({ status: 201, body: snapshot }),
+          [`GET ${path}/${summary.id}`]: () => ({ status: 200, body: snapshot }),
+        },
+        { '__Host-daric_csrf': 'csrf-1' },
+      );
+      expect(await client.listNetWorthSnapshots(workspace.id)).toEqual([
+        { ...summary, total: 900_000_000n, assets: 950_000_000n, liabilities: 50_000_000n },
+      ]);
+      expect((await client.takeNetWorthSnapshot(workspace.id)).kind).toBe('MANUAL');
+      expect((await client.getNetWorthSnapshot(workspace.id, summary.id)).total).toBe(900_000_000n);
+      expect(sent.map((r) => [r.method, r.url])).toEqual([
+        ['GET', path],
+        ['POST', path],
+        ['GET', `${path}/${summary.id}`],
+      ]);
+    });
+  });
+
   describe('Recurring Rules', () => {
     const rule = {
       id: '01900000-0000-7000-8000-0000000000e1',

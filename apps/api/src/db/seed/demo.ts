@@ -5,6 +5,7 @@ import {
   type IsoDay,
   type MonthPeriod,
   monthPeriodOfDay,
+  periodStart,
   previousPeriod,
 } from '@daric/core';
 import { and, eq, inArray, sql } from 'drizzle-orm';
@@ -483,10 +484,12 @@ async function removeDemo(tx: Transaction): Promise<void> {
 /**
  * Creates the demo User (DEMO_EMAIL / DEMO_PASSWORD) with a Jalali Personal
  * Workspace: Accounts, the default Categories, Labels, Budgets, Recurring Rules, dollar
- * Exchange Rates, and Transactions and
+ * Exchange Rates, Valuations, and Transactions and
  * Transfers from the start of the Jalali month MONTHS_BACK months before
  * `today` up to `today`. Replaces the demo User if they exist, so it can run any number
- * of times. Later features add their own entities here.
+ * of times. Later features add their own entities here. Its Workspace dates
+ * from the first of those months; Net Worth Snapshots of the months that have
+ * ended are left to the month-end job (`takeDueAutoSnapshots`).
  */
 export async function seedDemo(
   db: Database,
@@ -600,6 +603,12 @@ export async function seedDemo(
     );
 
     const first = months[0] as MonthPeriod;
+    // Dated as if kept since the first demo month, so the month-end job takes a
+    // Net Worth Snapshot of each month that has ended.
+    await tx
+      .update(workspaces)
+      .set({ createdAt: periodStart(first, { calendar: 'jalali', timeZone: 'Asia/Tehran' }) })
+      .where(eq(workspaces.id, workspaceId));
     const ruleIds = idsFor(demoRules);
     await tx.insert(recurringRules).values(
       (Object.keys(demoRules) as RuleKey[]).map((key) => {
