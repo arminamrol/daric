@@ -1,6 +1,7 @@
 import { z } from 'zod';
 import { amountSchema } from '../money';
 import { plannedItemKinds } from '../projection';
+import type { PlannedItemKind } from '../projection';
 import { transactionTypes } from '../transactions';
 import { idSchema, nameSchema, notEmpty, positiveAmountSchema } from './shared';
 import { isoDaySchema } from './transaction';
@@ -35,7 +36,7 @@ export const ENDS_BEFORE_START = 'A Planned Item cannot end before it starts';
 
 /** Why a Planned Item's fields do not fit together, or null when they do. */
 export function plannedItemProblem(item: {
-  kind: (typeof plannedItemKinds)[number];
+  kind: PlannedItemKind;
   categoryId: string | null;
   startOn: string;
   endOn: string | null;

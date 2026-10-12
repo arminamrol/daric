@@ -358,7 +358,7 @@ function PlannedItems({ nameOf }: { nameOf: NameOf }) {
                     to={`/projection/planned/${item.id}`}
                     className="text-sm font-medium text-accent underline underline-offset-4"
                   >
-                    {t('plannedItems.edit', { name: item.name })}
+                    {t('plannedItems.edit', { name: isolate(item.name) })}
                   </Link>
                 )}
                 <span className="w-full text-sm text-foreground-muted tabular-nums">

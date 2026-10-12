@@ -458,7 +458,9 @@ describe('Projection', () => {
       const { fake } = await withPlannedItems();
       renderApp({ path: '/projection', api: fake.api });
 
-      await userEvent.click(await screen.findByRole('link', { name: 'ویرایش قسط وام' }));
+      await userEvent.click(
+        await screen.findByRole('link', { name: `ویرایش ${isolate('قسط وام')}` }),
+      );
       const form = within(await screen.findByRole('form', { name: 'ویرایش قلم برنامه‌ریزی‌شده' }));
       // Its kind and type stay as made.
       expect(form.queryByRole('radio')).toBeNull();
@@ -472,7 +474,9 @@ describe('Projection', () => {
         version: 2,
       });
 
-      await userEvent.click(await screen.findByRole('link', { name: 'ویرایش بیمهٔ خودرو' }));
+      await userEvent.click(
+        await screen.findByRole('link', { name: `ویرایش ${isolate('بیمهٔ خودرو')}` }),
+      );
       await userEvent.click(await screen.findByRole('button', { name: 'حذف قلم' }));
       await screen.findByRole('region', { name: 'اقلام برنامه‌ریزی‌شده' });
       expect(fake.plannedItems().map((i) => i.name)).toEqual(['اجاره', 'قسط وام', 'حقوق']);

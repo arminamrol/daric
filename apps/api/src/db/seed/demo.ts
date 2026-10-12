@@ -8,6 +8,7 @@ import {
   nextPeriod,
   periodStart,
   type PlannedItemKind,
+  type TransactionType,
   previousPeriod,
 } from '@daric/core';
 import { and, eq, inArray, sql } from 'drizzle-orm';
@@ -121,7 +122,7 @@ const demoBudgets: {
 const demoPlannedItems: {
   name: string;
   kind: PlannedItemKind;
-  type: 'INCOME' | 'EXPENSE';
+  type: TransactionType;
   category: string | null;
   amount: bigint;
   after: number;

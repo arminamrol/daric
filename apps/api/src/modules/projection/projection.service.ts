@@ -32,6 +32,7 @@ import {
 import { scopedTx } from '../../db/scope';
 import { AuditService } from '../audit/audit.service';
 import { ratesInto } from '../exchange-rates/exchange-rates.service';
+import { plannedItemColumns } from './planned-items.service';
 
 function figuresToWire(f: ProjectionFigures) {
   return {
@@ -162,17 +163,7 @@ export class ProjectionService {
       .orderBy(asc(recurringRules.createdAt), asc(recurringRules.id));
 
     const planned = await tx
-      .select({
-        id: plannedItems.id,
-        name: plannedItems.name,
-        kind: plannedItems.kind,
-        type: plannedItems.type,
-        categoryId: plannedItems.categoryId,
-        amount: plannedItems.amount,
-        currency: plannedItems.currency,
-        startOn: plannedItems.startOn,
-        endOn: plannedItems.endOn,
-      })
+      .select(plannedItemColumns)
       .from(plannedItems)
       .orderBy(asc(plannedItems.createdAt), asc(plannedItems.id));
     const projection = projectYear({

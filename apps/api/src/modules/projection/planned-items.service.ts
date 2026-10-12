@@ -13,7 +13,8 @@ import { categories, plannedItems, workspaces } from '../../db/schema';
 import { scopedTx } from '../../db/scope';
 import { AuditService } from '../audit/audit.service';
 
-const columns = {
+/** A Planned Item's columns, as listed and as the Projection reads them. */
+export const plannedItemColumns = {
   id: plannedItems.id,
   name: plannedItems.name,
   kind: plannedItems.kind,
@@ -26,7 +27,7 @@ const columns = {
   version: plannedItems.version,
 };
 
-type Row = { [K in keyof typeof columns]: (typeof plannedItems.$inferSelect)[K] };
+type Row = { [K in keyof typeof plannedItemColumns]: (typeof plannedItems.$inferSelect)[K] };
 
 function toWire(row: Row): PlannedItemWire {
   return { ...row, amount: amountToWire(row.amount) };
@@ -41,7 +42,7 @@ export class PlannedItemsService {
 
   private async select(where: SQL | undefined): Promise<Row[]> {
     return scopedTx()
-      .select(columns)
+      .select(plannedItemColumns)
       .from(plannedItems)
       .where(where)
       .orderBy(asc(plannedItems.createdAt), asc(plannedItems.id));
