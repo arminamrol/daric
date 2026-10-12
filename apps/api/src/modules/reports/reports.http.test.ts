@@ -31,7 +31,7 @@ function client(t: TestApp, user: User, workspaceId = user.workspaceId) {
     report: (period?: string) => as('GET', `/reports${period ? `?period=${period}` : ''}`),
     account: (body: unknown = melli) => created('/accounts', body),
     category: (body: unknown = food) => created('/categories', body),
-    label: (name: string) => created('/labels', { name }),
+    label: (name: string, controllable = false) => created('/labels', { name, controllable }),
     rate: (body: unknown) => created('/exchange-rates', body),
     record: (fields: {
       type?: string;
@@ -202,6 +202,50 @@ describe('Reports', () => {
             ? { income: '0', expense: '700', net: '-700', missing: [] }
             : { income: '0', expense: '0', net: '0', missing: [] }),
       })),
+      controllable: {
+        expense: '0',
+        share: 0,
+        labels: [],
+        trend: twelveMonthsTo(1405, 6).map((month) => ({ month, expense: '0', missing: [] })),
+        monthlyAverage: '0',
+        monthsAveraged: 0,
+        averageRunning: false,
+      },
+    });
+  });
+
+  it('sum up spending under Controllable Labels, its trend and average month', async () => {
+    const { api } = await setUp();
+    const account = await api.account();
+    const category = await api.category();
+    const out = await api.label('Eating out', true);
+    const subs = await api.label('Subscriptions', true);
+    const trip = await api.label('Trip');
+    const record = (amount: string, occurredOn: string, labelIds: string[]) =>
+      api.record({ accountId: account.id, categoryId: category.id, amount, occurredOn, labelIds });
+    await record('300', j(1405, 5, 10), [out.id]);
+    // Two Controllable Labels: counted once in the total, under each in the breakdown.
+    await record('100', j(1405, 6, 10), [out.id, subs.id]);
+    await record('50', j(1405, 6, 11), [subs.id, trip.id]);
+    await record('850', j(1405, 6, 12), [trip.id]);
+
+    const res = await api.report('1405-06');
+    expect(res.status).toBe(200);
+    expect(res.body.controllable).toEqual({
+      expense: '150',
+      share: 15,
+      labels: [
+        { labelId: subs.id, expense: '150', share: 100 },
+        { labelId: out.id, expense: '100', share: 67 },
+      ],
+      trend: twelveMonthsTo(1405, 6).map((month) => ({
+        month,
+        expense: month === '1405-05' ? '300' : month === '1405-06' ? '150' : '0',
+        missing: [],
+      })),
+      monthlyAverage: '225',
+      monthsAveraged: 2,
+      averageRunning: false,
     });
   });
 

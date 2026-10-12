@@ -1,6 +1,7 @@
 import { Injectable, NotFoundException } from '@nestjs/common';
 import {
   amountToWire,
+  controllableSpending,
   currencyByCode,
   money,
   monthPeriodOfDay,
@@ -14,7 +15,14 @@ import {
 import type { Period, ReportWire } from '@daric/core';
 import { and, eq, gte, isNull, lt, ne, sql } from 'drizzle-orm';
 import type { Membership } from '../../common/request';
-import { accounts, categories, transactionLabels, transactions, workspaces } from '../../db/schema';
+import {
+  accounts,
+  categories,
+  labels,
+  transactionLabels,
+  transactions,
+  workspaces,
+} from '../../db/schema';
 import { scopedTx } from '../../db/scope';
 import { ratesInto } from '../exchange-rates/exchange-rates.service';
 
@@ -74,6 +82,10 @@ export class ReportsService {
     const categoryRows = await tx
       .select({ id: categories.id, kind: categories.kind, parentId: categories.parentId })
       .from(categories);
+    const controllableLabels = await tx
+      .select({ id: labels.id })
+      .from(labels)
+      .where(eq(labels.controllable, true));
 
     const input = {
       calendar,
@@ -87,6 +99,13 @@ export class ReportsService {
     };
     const report = periodReport({ ...input, period, categories: categoryRows });
     const trend = trendReport({ ...input, months });
+    const controllable = controllableSpending({
+      ...input,
+      period,
+      categories: categoryRows,
+      months,
+      controllableLabelIds: controllableLabels.map((label) => label.id),
+    });
 
     return {
       period: periodParam(period),
@@ -123,6 +142,22 @@ export class ReportsService {
         net: amountToWire(point.net),
         missing: point.missing,
       })),
+      controllable: {
+        expense: amountToWire(controllable.expense),
+        share: controllable.share,
+        labels: controllable.labels.map((line) => ({
+          ...line,
+          expense: amountToWire(line.expense),
+        })),
+        trend: controllable.trend.map((point) => ({
+          month: periodParam(point.month),
+          expense: amountToWire(point.expense),
+          missing: point.missing,
+        })),
+        monthlyAverage: amountToWire(controllable.monthlyAverage),
+        monthsAveraged: controllable.monthsAveraged,
+        averageRunning: controllable.averageRunning,
+      },
     };
   }
 }

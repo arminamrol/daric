@@ -42,6 +42,33 @@ export const trendPointSchema = z.object({
 });
 
 /**
+ * Spending under Controllable Labels: the Period's total (a Transaction with
+ * several counts once), its breakdown, monthly trend and average month, which
+ * `controllableSavings` turns into what reducing it would save.
+ */
+export const controllableReportSchema = z.object({
+  expense: amountSchema,
+  /** Whole percent of the Period's Expense. */
+  share: shareSchema,
+  /** Most Expense first; their totals overlap. */
+  labels: z.array(z.object({ labelId: z.uuid(), expense: amountSchema, share: shareSchema })),
+  /** The trend's months, oldest first. */
+  trend: z.array(
+    z.object({
+      month: monthParamSchema,
+      expense: amountSchema,
+      /** Currencies this month left out for want of a rate. */
+      missing: z.array(z.string()),
+    }),
+  ),
+  /** Over the trend's closed months from the first with any, or the running month while none has. */
+  monthlyAverage: amountSchema,
+  monthsAveraged: z.number().int().nonnegative(),
+  /** Whether the average is the running month so far, no closed month having any. */
+  averageRunning: z.boolean(),
+});
+
+/**
  * A Period's report in the Base Currency: Income, Expense and net, the
  * Category and Label breakdowns, and the Income and Expense of the twelve
  * months up to the Period's last month (those not yet started left out).
@@ -70,6 +97,7 @@ export const reportSchema = z.object({
   missing: z.array(z.string()),
   /** Oldest month first. */
   trend: z.array(trendPointSchema),
+  controllable: controllableReportSchema,
 });
 export type ReportWire = z.input<typeof reportSchema>;
 export type Report = z.infer<typeof reportSchema>;

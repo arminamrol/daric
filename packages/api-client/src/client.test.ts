@@ -677,6 +677,15 @@ describe('api-client', () => {
       ratesUsed: [],
       missing: [],
       trend: [{ month: '1405-07', income: '5000', expense: '7000', net: '-2000', missing: [] }],
+      controllable: {
+        expense: '1500',
+        share: 21,
+        labels: [{ labelId: '01900000-0000-7000-8000-0000000000d1', expense: '1500', share: 100 }],
+        trend: [{ month: '1405-07', expense: '1500', missing: [] }],
+        monthlyAverage: '1500',
+        monthsAveraged: 1,
+        averageRunning: true,
+      },
     };
 
     it('reads a Period’s report with amounts as bigints and periods parsed', async () => {
@@ -691,6 +700,8 @@ describe('api-client', () => {
       expect(read.period).toEqual({ kind: 'month', year: 1405, month: 7 });
       expect(read.trend[0]?.month).toEqual({ kind: 'month', year: 1405, month: 7 });
       expect(read.categories[0]?.total).toBe(7000n);
+      expect(read.controllable.monthlyAverage).toBe(1500n);
+      expect(read.controllable.trend[0]?.month).toEqual({ kind: 'month', year: 1405, month: 7 });
       const year = await client.getReport(workspace.id, { period: { kind: 'year', year: 1405 } });
       expect(year.period).toEqual({ kind: 'year', year: 1405 });
       expect(sent.map((r) => r.url)).toEqual([path, `${path}?period=1405`]);

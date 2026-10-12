@@ -1,4 +1,4 @@
-import { screen, within } from '@testing-library/react';
+import { fireEvent, screen, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { dayOf } from '@daric/core';
 import { isolate } from '@daric/i18n';
@@ -153,5 +153,81 @@ describe('Reports', () => {
     const summary = await section('خلاصه');
     expect(await summary.findByText(/نرخی برای دلار/)).toBeTruthy();
     expect(summary.getAllByRole('definition')[1]?.textContent).toBe('۲٬۰۰۰٬۰۰۰ ریال');
+  });
+
+  describe('controllable spending', () => {
+    /** Eating out and subscriptions flagged controllable, over three months, plus rent. */
+    function spender() {
+      const fake = signedIn();
+      const account = fake.addAccount({ name: 'ملی' });
+      const food = fake.addCategory({ name: 'خوراک' });
+      const rent = fake.addCategory({ name: 'اجاره' });
+      const out = fake.addLabel({ name: 'بیرون‌غذا', controllable: true });
+      const subs = fake.addLabel({ name: 'اشتراک‌ها', controllable: true });
+      const add = (categoryId: string, occurredOn: string, amount: bigint, labelIds: string[]) =>
+        fake.addTransaction({
+          type: 'EXPENSE',
+          accountId: account.id,
+          categoryId,
+          amount,
+          occurredOn,
+          labelIds,
+        });
+      add(food.id, j(1405, 5, 10), 400_000n, [subs.id]);
+      add(food.id, j(1405, 6, 10), 200_000n, [out.id, subs.id]);
+      add(food.id, j(1405, 7, 2), 100_000n, [out.id]);
+      add(rent.id, j(1405, 7, 1), 1_600_000n, []);
+      return fake;
+    }
+
+    it('sum up the month’s controllable spending, its share, Labels and months', async () => {
+      renderApp({ path: '/reports', api: spender().api });
+
+      const controllable = await section('هزینه‌های قابل کنترل');
+      const figures = controllable.getAllByRole('definition').map((dd) => dd.textContent);
+      expect(figures.slice(0, 2)).toEqual(['۱۰۰٬۰۰۰ ریال', '۶٪']);
+      const labels = within(controllable.getByRole('table', { name: 'به تفکیک برچسب قابل کنترل' }));
+      const labelRows = labels.getAllByRole('row').slice(1);
+      expect(labelRows).toHaveLength(1);
+      expect(labelRows[0]?.textContent).toContain('بیرون‌غذا');
+      expect(labelRows[0]?.textContent).toContain('۱۰۰٬۰۰۰ ریال');
+      const months = within(controllable.getByRole('table', { name: 'هزینهٔ قابل کنترل ماه‌ها' }));
+      const monthRows = months.getAllByRole('row').slice(1);
+      expect(monthRows).toHaveLength(12);
+      expect(monthRows[0]?.textContent).toContain('مهر ۱۴۰۵');
+      expect(monthRows[1]?.textContent).toContain('۲۰۰٬۰۰۰ ریال');
+      expect(monthRows[2]?.textContent).toContain('۴۰۰٬۰۰۰ ریال');
+    });
+
+    it('estimate what reducing it by 20% saves, and follow the slider', async () => {
+      renderApp({ path: '/reports', api: spender().api });
+
+      const controllable = await section('هزینه‌های قابل کنترل');
+      const slider = controllable.getByRole('slider', { name: 'کاهش هزینهٔ قابل کنترل' });
+      expect(slider).toHaveProperty('value', '20');
+      expect(
+        controllable.getByText('بر پایهٔ میانگین ۲ ماه گذشته: ۳۰۰٬۰۰۰ ریال در ماه.'),
+      ).toBeTruthy();
+      const savings = () =>
+        within(controllable.getByRole('status'))
+          .getAllByRole('definition')
+          .map((dd) => dd.textContent);
+      expect(savings()).toEqual(['۶۰٬۰۰۰ ریال', '۷۲۰٬۰۰۰ ریال']);
+
+      fireEvent.change(slider, { target: { value: '50' } });
+      expect(slider.getAttribute('aria-valuetext')).toBe('۵۰٪');
+      expect(savings()).toEqual(['۱۵۰٬۰۰۰ ریال', '۱٬۸۰۰٬۰۰۰ ریال']);
+    });
+
+    it('point to the Labels page while no Label is controllable', async () => {
+      renderApp({ path: '/reports', api: household().api });
+
+      const controllable = await section('هزینه‌های قابل کنترل');
+      expect(controllable.getByText(/هیچ برچسبی قابل کنترل نیست/)).toBeTruthy();
+      expect(controllable.getByRole('link', { name: 'برچسب‌ها' }).getAttribute('href')).toBe(
+        '/labels',
+      );
+      expect(controllable.queryByRole('slider')).toBeNull();
+    });
   });
 });
