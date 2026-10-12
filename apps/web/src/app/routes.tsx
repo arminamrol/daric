@@ -11,6 +11,8 @@ import { LabelFormPage } from '../pages/LabelFormPage';
 import { LabelsPage } from '../pages/LabelsPage';
 import { LoginPage } from '../pages/LoginPage';
 import { NotFoundPage } from '../pages/NotFoundPage';
+import { RateFormPage } from '../pages/RateFormPage';
+import { RatesPage } from '../pages/RatesPage';
 import { RecurringFormPage } from '../pages/RecurringFormPage';
 import { RecurringPage } from '../pages/RecurringPage';
 import { SettingsPage } from '../pages/SettingsPage';
@@ -44,6 +46,9 @@ export const routes: RouteObject[] = [
           { path: 'recurring', element: <RecurringPage /> },
           { path: 'recurring/new', element: <RecurringFormPage /> },
           { path: 'recurring/:ruleId', element: <RecurringFormPage /> },
+          { path: 'rates', element: <RatesPage /> },
+          { path: 'rates/new', element: <RateFormPage /> },
+          { path: 'rates/:rateId', element: <RateFormPage /> },
           { path: 'settings', element: <SettingsPage /> },
         ],
       },

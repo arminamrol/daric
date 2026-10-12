@@ -311,6 +311,7 @@ describe('api-client', () => {
         remaining: '100',
         percent: 90,
         state: 'warning',
+        ratesUsed: [],
         otherCurrencyExpenses: 0,
       },
     } as const;
@@ -345,6 +346,43 @@ describe('api-client', () => {
         ['POST', base, { categoryId: budget.categoryId, period: 'MONTHLY', amount: '1000' }],
         ['PATCH', `${base}/${budget.id}`, { amount: '2000' }],
         ['DELETE', `${base}/${budget.id}`, undefined],
+      ]);
+    });
+  });
+
+  describe('Exchange Rates', () => {
+    const rate = {
+      id: '01900000-0000-7000-8000-0000000000c1',
+      currency: 'USD',
+      rate: '1050000.5',
+      effectiveOn: '2026-10-01',
+      version: 1,
+    } as const;
+    const base = `/v1/workspaces/${workspace.id}/exchange-rates`;
+
+    it('lists, creates, updates and deletes them', async () => {
+      const { client, sent } = fakeServer(
+        {
+          [`GET ${base}`]: () => ({ status: 200, body: [rate] }),
+          [`POST ${base}`]: () => ({ status: 201, body: rate }),
+          [`PATCH ${base}/${rate.id}`]: () => ({ status: 200, body: rate }),
+          [`DELETE ${base}/${rate.id}`]: () => ({ status: 204 }),
+        },
+        { '__Host-daric_csrf': 'csrf-1' },
+      );
+      expect(await client.listExchangeRates(workspace.id)).toEqual([rate]);
+      await client.createExchangeRate(workspace.id, {
+        currency: 'USD',
+        rate: '1050000.5',
+        effectiveOn: '2026-10-01',
+      });
+      await client.updateExchangeRate(workspace.id, rate.id, { rate: '1060000' });
+      await client.deleteExchangeRate(workspace.id, rate.id);
+      expect(sent.map((r) => [r.method, r.url, r.body])).toEqual([
+        ['GET', base, undefined],
+        ['POST', base, { currency: 'USD', rate: '1050000.5', effectiveOn: '2026-10-01' }],
+        ['PATCH', `${base}/${rate.id}`, { rate: '1060000' }],
+        ['DELETE', `${base}/${rate.id}`, undefined],
       ]);
     });
   });

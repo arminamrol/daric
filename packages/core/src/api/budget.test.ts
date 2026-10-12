@@ -87,6 +87,7 @@ describe('budgetSchema', () => {
         remaining: '-200',
         percent: 120,
         state: 'over',
+        ratesUsed: [{ currency: 'USD', rate: '1050000', effectiveOn: '2026-10-01' }],
         otherCurrencyExpenses: 0,
       },
     });

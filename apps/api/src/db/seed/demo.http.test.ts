@@ -138,6 +138,22 @@ describe('demo seed', () => {
     ]);
   });
 
+  it('enters a dollar rate from the first day of each demo month, the latest at 1,050,000 rials', async () => {
+    const token = await login();
+    const res = await call(t.url, 'GET', `/v1/workspaces/${seeded.workspaceId}/exchange-rates`, {
+      token,
+    });
+    expect(res.status).toBe(200);
+    const rates = res.body as unknown as { currency: string; rate: string; effectiveOn: string }[];
+    expect(rates).toHaveLength(7);
+    expect(rates.every((r) => r.currency === 'USD')).toBe(true);
+    // Newest first: 1 Mehr 1405, then 1 Shahrivar 1405.
+    expect(rates.slice(0, 2)).toMatchObject([
+      { rate: '1050000', effectiveOn: '2026-09-23' },
+      { rate: '1037500', effectiveOn: '2026-08-23' },
+    ]);
+  });
+
   it('uses rial amounts in the range of a Tehran household', async () => {
     const rows = await demoTransactions(seeded.workspaceId);
     const salaries = rows.filter((r) => r.type === 'INCOME' && r.note?.startsWith('حقوق'));

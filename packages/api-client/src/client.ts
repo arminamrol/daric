@@ -10,6 +10,10 @@ import {
   categorySchema,
   type CreateAccountInput,
   type CreateBudgetInput,
+  type CreateExchangeRateInput,
+  type ExchangeRateWire,
+  exchangeRateListSchema,
+  exchangeRateSchema,
   type ConfirmOccurrenceInput,
   type CreateRecurringRuleInput,
   type DueOccurrences,
@@ -41,6 +45,7 @@ import {
   type MonthPeriod,
   type UpdateAccountInput,
   type UpdateBudgetInput,
+  type UpdateExchangeRateInput,
   type UpdateCategoryInput,
   type UpdateLabelInput,
   type UpdateTransactionInput,
@@ -132,6 +137,21 @@ export interface ApiClient {
   updateBudget(workspaceId: string, budgetId: string, input: UpdateBudgetInput): Promise<Budget>;
   /** Owner or Admin only. */
   deleteBudget(workspaceId: string, budgetId: string): Promise<void>;
+  /** Rates into the current Base Currency, by currency code, newest first within each. */
+  listExchangeRates(workspaceId: string): Promise<ExchangeRateWire[]>;
+  /** Owner or Admin only. One rate per currency and day; never of the Base Currency itself. */
+  createExchangeRate(
+    workspaceId: string,
+    input: CreateExchangeRateInput,
+  ): Promise<ExchangeRateWire>;
+  /** Owner or Admin only. */
+  updateExchangeRate(
+    workspaceId: string,
+    rateId: string,
+    input: UpdateExchangeRateInput,
+  ): Promise<ExchangeRateWire>;
+  /** Owner or Admin only. */
+  deleteExchangeRate(workspaceId: string, rateId: string): Promise<void>;
   /** Oldest first. Archived rules are left out unless `includeArchived`. */
   listRecurringRules(
     workspaceId: string,
@@ -341,6 +361,14 @@ export function createApiClient(options: ApiClientOptions = {}): ApiClient {
       request('PATCH', budgetPath(workspaceId, budgetId), budgetSchema, input),
     deleteBudget: (workspaceId, budgetId) =>
       request('DELETE', budgetPath(workspaceId, budgetId), noContent),
+    listExchangeRates: (workspaceId) =>
+      request('GET', ratesPath(workspaceId), exchangeRateListSchema),
+    createExchangeRate: (workspaceId, input) =>
+      request('POST', ratesPath(workspaceId), exchangeRateSchema, input),
+    updateExchangeRate: (workspaceId, rateId, input) =>
+      request('PATCH', ratePath(workspaceId, rateId), exchangeRateSchema, input),
+    deleteExchangeRate: (workspaceId, rateId) =>
+      request('DELETE', ratePath(workspaceId, rateId), noContent),
     listRecurringRules: (workspaceId, { includeArchived = false } = {}) =>
       request(
         'GET',
@@ -384,6 +412,14 @@ function budgetsPath(workspaceId: string): string {
 
 function budgetPath(workspaceId: string, budgetId: string) {
   return `${budgetsPath(workspaceId)}/${encodeURIComponent(budgetId)}`;
+}
+
+function ratesPath(workspaceId: string): string {
+  return `/v1/workspaces/${encodeURIComponent(workspaceId)}/exchange-rates`;
+}
+
+function ratePath(workspaceId: string, rateId: string) {
+  return `${ratesPath(workspaceId)}/${encodeURIComponent(rateId)}`;
 }
 
 function transactionPath(workspaceId: string, transactionId: string) {

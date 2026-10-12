@@ -119,6 +119,43 @@ describe('Budgets', () => {
     await screen.findByRole('progressbar', { name: 'خوراک', value: { now: 50 } });
   });
 
+  it('converts Expenses in other currencies with the rate in force, and names the rate', async () => {
+    const { fake, food, spend } = withSpending();
+    const dollars = fake.addAccount({ name: 'دلاری', currency: 'USD' });
+    const euros = fake.addAccount({ name: 'یورویی', currency: 'EUR' });
+    const { from } = periodDays(lastMonth, 'jalali');
+    fake.addRate({ currency: 'USD', rate: '10', effectiveOn: from });
+    fake.addBudget({ categoryId: food.id, period: 'MONTHLY', amount: 1000n });
+    spend(food.id, 100n, from);
+    for (const [accountId, amount] of [
+      [dollars.id, 2500n],
+      [euros.id, 100n],
+    ] as const) {
+      fake.addTransaction({
+        type: 'EXPENSE',
+        accountId,
+        categoryId: food.id,
+        amount,
+        occurredOn: from,
+      });
+    }
+    renderApp({ path: `/budgets?month=${periodParam(lastMonth)}`, api: fake.api });
+
+    // 100 rials plus 25.00 USD at 10 rials each.
+    await screen.findByRole('progressbar', { name: 'خوراک', value: { now: 35 } });
+    // The rate came into force on the month's first day.
+    expect(
+      screen.getByText(
+        new RegExp(
+          `^هزینه‌های دلار با نرخ ${isolate('۱ دلار = ۱۰ ریال')}، از .+، تبدیل شده‌اند\\.$`,
+        ),
+      ),
+    ).toBeTruthy();
+    expect(
+      screen.getByText('هزینه‌هایی با ارز دیگر که نرخی برایشان نیست در این رقم نیامده‌اند.'),
+    ).toBeTruthy();
+  });
+
   it('asks for a Category and a positive limit, and says when the Budget already exists', async () => {
     const { fake, food } = withSpending();
     fake.addBudget({ categoryId: food.id, period: 'MONTHLY', amount: 1000n });

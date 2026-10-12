@@ -2,7 +2,9 @@ import { sql } from 'drizzle-orm';
 import {
   bigint,
   check,
+  date,
   index,
+  numeric,
   pgEnum,
   pgTable,
   smallint,
@@ -52,5 +54,41 @@ export const accounts = pgTable(
     // Lets Transactions reference an Account of their own Workspace only.
     unique('accounts_id_workspace_id_key').on(t.id, t.workspaceId),
     index('accounts_workspace_id_idx').on(t.workspaceId),
+  ],
+);
+
+/**
+ * An Exchange Rate: how many units of `base_currency` one unit of `currency` is
+ * worth, from `effective_on` until the currency's next rate. It keeps the Base
+ * Currency it was entered against, so changing the Workspace's Base Currency
+ * leaves old rates out instead of reading them as rates into the new one.
+ */
+export const exchangeRates = pgTable(
+  'exchange_rates',
+  {
+    id: id(),
+    workspaceId: uuid('workspace_id')
+      .notNull()
+      .references(() => workspaces.id, { onDelete: 'cascade' }),
+    currency: text('currency')
+      .notNull()
+      .references(() => currencies.code),
+    baseCurrency: text('base_currency')
+      .notNull()
+      .references(() => currencies.code),
+    rate: numeric('rate', { precision: 30, scale: 12 }).notNull(),
+    effectiveOn: date('effective_on', { mode: 'string' }).notNull(),
+    ...timestamps(),
+    version: version(),
+  },
+  (t) => [
+    unique('exchange_rates_currency_day_key').on(
+      t.workspaceId,
+      t.baseCurrency,
+      t.currency,
+      t.effectiveOn,
+    ),
+    check('exchange_rates_rate_check', sql`${t.rate} > 0`),
+    check('exchange_rates_currency_check', sql`${t.currency} <> ${t.baseCurrency}`),
   ],
 );

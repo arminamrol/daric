@@ -9,6 +9,7 @@ import { currencyOf } from '../accounts/accounts';
 import { CategoryBadge } from '../categories/CategoryBadge';
 import { useSignedIn } from '../auth/session';
 import { useI18n } from '../i18n/locale';
+import { PeriodTotals } from '../rates/PeriodTotals';
 import { useFormatters } from '../settings/settings';
 import { categoryChoices } from './choices';
 import type { SyncState } from './pending';
@@ -74,20 +75,7 @@ function Month({
         <h2 id={titleId} className="me-auto text-lg font-bold">
           {format.period(group.period)}
         </h2>
-        {group.totals.map(({ currency, income, expense }) => (
-          <div key={currency.code} className="flex gap-3 text-sm tabular-nums">
-            {income.amount > 0n && (
-              <p className="text-success">
-                {t('transactions.list.income', { amount: isolate(format.money(income)) })}
-              </p>
-            )}
-            {expense.amount > 0n && (
-              <p className="text-foreground-muted">
-                {t('transactions.list.expense', { amount: isolate(format.money(expense)) })}
-              </p>
-            )}
-          </div>
-        ))}
+        <PeriodTotals period={group.period} totals={group.totals} />
       </div>
       <ul className="flex flex-col divide-y divide-border rounded-xl border border-border bg-surface">
         {group.transactions.map((transaction) => {

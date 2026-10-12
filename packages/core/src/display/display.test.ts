@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { IRR, USD, displayFormatters, money } from '../index';
+import { EUR, IRR, USD, displayFormatters, money } from '../index';
 import type { DisplaySettings } from '../index';
 
 // 2026-10-09 10:00 in Tehran is 17 Mehr 1405.
@@ -81,5 +81,27 @@ describe('displayFormatters', () => {
       preferences: { ...settings.preferences, digits: 'latin' as const },
     };
     expect(displayFormatters(latin).count(12)).toBe('12');
+  });
+
+  it('names a currency as money shows it, IRR by the Rial/Toman display', () => {
+    const rial = displayFormatters(settings);
+    expect(rial.currency(IRR)).toBe('ریال');
+    expect(rial.currency(USD)).toBe('دلار');
+    const toman = displayFormatters({
+      ...settings,
+      locale: 'en',
+      workspace: { ...settings.workspace, moneyDisplay: 'toman' },
+    });
+    expect(toman.currency(IRR)).toBe('Toman');
+    expect(toman.currency(EUR)).toBe('EUR');
+  });
+
+  it("shows a rate into the Base Currency in tomans in Toman display, in the User's digits", () => {
+    const toman = displayFormatters({
+      ...settings,
+      workspace: { ...settings.workspace, moneyDisplay: 'toman' },
+    });
+    expect(toman.rate('1050000', USD, IRR)).toBe('۱۰۵٬۰۰۰');
+    expect(displayFormatters(settings).rate('1050000', USD, IRR)).toBe('۱٬۰۵۰٬۰۰۰');
   });
 });

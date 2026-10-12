@@ -14,6 +14,7 @@ import { AuditModule } from './modules/audit/audit.module';
 import { AuthController } from './modules/auth/auth.controller';
 import { AuthModule } from './modules/auth/auth.module';
 import { BudgetsModule } from './modules/budgets/budgets.module';
+import { ExchangeRatesModule } from './modules/exchange-rates/exchange-rates.module';
 import { CategoriesModule } from './modules/categories/categories.module';
 import { LabelsModule } from './modules/labels/labels.module';
 import { MeModule } from './modules/me/me.module';
@@ -73,6 +74,7 @@ export class AppModule {
         LabelsModule,
         TransactionsModule,
         BudgetsModule,
+        ExchangeRatesModule,
         RecurringModule,
       ],
       providers: [

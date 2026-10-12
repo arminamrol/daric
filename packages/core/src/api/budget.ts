@@ -1,6 +1,7 @@
 import { z } from 'zod';
 import { budgetPeriods, budgetStates } from '../budgets';
 import { amountSchema } from '../money';
+import { rateUsedSchema } from './exchange-rate';
 import {
   idSchema,
   monthParamSchema,
@@ -22,8 +23,14 @@ export const budgetProgressSchema = z.object({
   /** `warning` from 80% up to the limit, `over` above it. */
   state: z.enum(budgetStates),
   /**
-   * Expenses that would count but are on Accounts of another currency; they are
-   * left out until Exchange Rates can convert them.
+   * The Exchange Rates Expenses in other currencies were converted at: each
+   * currency's rate on the Period's last day, or today while it runs. Only a
+   * Budget in the current Base Currency converts.
+   */
+  ratesUsed: z.array(rateUsedSchema),
+  /**
+   * Expenses that would count but are on Accounts of another currency with no
+   * rate to convert them; they are left out of `spent`.
    */
   otherCurrencyExpenses: z.number().int(),
 });
