@@ -64,7 +64,10 @@ interface FakeUser {
   email: string;
   password: string;
   preferences: UserPreferences;
+  emailVerified: boolean;
 }
+
+type MailedLinkPurpose = 'verify' | 'reset';
 
 /**
  * An in-memory stand-in for the API, as the browser sees it: the session is
@@ -76,6 +79,9 @@ export function fakeApi({
 }: { signedInAs?: string; role?: WorkspaceRole } = {}) {
   const users = new Map<string, FakeUser>();
   let current: FakeUser | undefined;
+  /** Tokens of links "mailed" to Users, until used or replaced; newest last. */
+  const mailedLinks = new Map<string, { email: string; purpose: MailedLinkPurpose }>();
+  let nextMailToken = 1;
   let nextId = 1;
   // Every User shares this one Workspace, with the same Role.
   let workspace: Workspace = {
@@ -125,16 +131,44 @@ export function fakeApi({
     return current;
   }
 
-  function addUser(email: string, password = testPassword): FakeUser {
+  /** A User as if registered earlier; they followed the verification link unless told not. */
+  function addUser(
+    email: string,
+    password = testPassword,
+    { emailVerified = true } = {},
+  ): FakeUser {
     const id = `01900000-0000-7000-8000-${String(nextId++).padStart(12, '0')}`;
     const preferences: UserPreferences = {
       displayCalendar: 'jalali',
       digits: 'persian',
       theme: 'system',
     };
-    const user = { id, email, password, preferences };
+    const user = { id, email, password, preferences, emailVerified };
     users.set(email, user);
     return user;
+  }
+
+  /** "Mails" a link to the User: only the newest token of a purpose works. */
+  function mailLink(email: string, purpose: MailedLinkPurpose): string {
+    for (const [token, link] of mailedLinks) {
+      if (link.email === email && link.purpose === purpose) mailedLinks.delete(token);
+    }
+    const token = `${purpose}-token-${nextMailToken++}`;
+    mailedLinks.set(token, { email, purpose });
+    return token;
+  }
+
+  /** Uses up a token, returning its User; a 400 as the API gives for a bad link. */
+  function followLink(token: string, purpose: MailedLinkPurpose): FakeUser {
+    const link = mailedLinks.get(token);
+    const user = link?.purpose === purpose ? users.get(link.email) : undefined;
+    if (!user) throw new ApiError(400, { message: 'The link is invalid, used or expired' });
+    mailedLinks.delete(token);
+    return user;
+  }
+
+  function lastMailedToken(email: string, purpose: MailedLinkPurpose): string | undefined {
+    return [...mailedLinks].findLast(([, l]) => l.email === email && l.purpose === purpose)?.[0];
   }
 
   function session(user: FakeUser): Session {
@@ -606,7 +640,9 @@ export function fakeApi({
   const endpoints: ApiClient = {
     async register({ email, password }) {
       if (users.has(email)) throw new ApiError(409, { message: 'Email is already registered' });
-      return session(addUser(email, password));
+      const user = addUser(email, password, { emailVerified: false });
+      mailLink(email, 'verify');
+      return session(user);
     },
     async login({ email, password }) {
       const user = users.get(email);
@@ -618,10 +654,27 @@ export function fakeApi({
     async logout() {
       current = undefined;
     },
+    async verifyEmail(token) {
+      followLink(token, 'verify').emailVerified = true;
+    },
+    async resendVerification() {
+      const user = signedIn();
+      if (user.emailVerified) throw new ApiError(409, { message: 'Email is already verified' });
+      mailLink(user.email, 'verify');
+    },
+    async forgotPassword(email) {
+      if (users.has(email)) mailLink(email, 'reset');
+    },
+    async resetPassword({ token, password }) {
+      const user = followLink(token, 'reset');
+      user.password = password;
+      user.emailVerified = true;
+      // Every Signed-in Device ends; this browser's access cookie lives a little longer.
+    },
     async me(): Promise<Me> {
       const user = signedIn();
       return {
-        user: { id: user.id, email: user.email },
+        user: { id: user.id, email: user.email, emailVerified: user.emailVerified },
         preferences: { ...user.preferences },
         workspaces: [{ ...workspace }],
       };
@@ -1288,6 +1341,11 @@ export function fakeApi({
     /** In the API's list order, archived ones included. */
     categories: () => inTreeOrder(categories),
     signedInUser: () => current?.email,
+    /** The token in the newest unused link mailed to `email`, if any. */
+    verificationToken: (email: string) => lastMailedToken(email, 'verify'),
+    resetToken: (email: string) => lastMailedToken(email, 'reset'),
+    /** Whether the User has followed a verification (or reset) link. */
+    emailVerified: (email: string) => users.get(email)?.emailVerified,
     workspace: () => workspace,
     preferences: () => signedIn().preferences,
   };

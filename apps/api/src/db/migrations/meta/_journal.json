@@ -106,6 +106,13 @@
       "when": 1791799815945,
       "tag": "0014_planned_items",
       "breakpoints": true
+    },
+    {
+      "idx": 15,
+      "version": "7",
+      "when": 1791805924933,
+      "tag": "0015_email_tokens",
+      "breakpoints": true
     }
   ]
 }

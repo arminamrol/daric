@@ -51,3 +51,18 @@ export const refreshInputSchema = z.object({
   refreshToken: z.string().min(1).max(256),
 });
 export type RefreshInput = z.infer<typeof refreshInputSchema>;
+
+/** The single-use token from a verification or password-reset email link. */
+export const emailTokenSchema = z.string().min(1).max(256);
+
+export const verifyEmailInputSchema = z.object({ token: emailTokenSchema });
+export type VerifyEmailInput = z.infer<typeof verifyEmailInputSchema>;
+
+export const forgotPasswordInputSchema = z.object({ email: emailSchema });
+export type ForgotPasswordInput = z.infer<typeof forgotPasswordInputSchema>;
+
+export const resetPasswordInputSchema = z.object({
+  token: emailTokenSchema,
+  password: passwordSchema,
+});
+export type ResetPasswordInput = z.infer<typeof resetPasswordInputSchema>;

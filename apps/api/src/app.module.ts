@@ -7,6 +7,7 @@ import { AuthGuard } from './modules/auth/auth.guard';
 import { CsrfGuard } from './modules/auth/csrf.guard';
 import { loggerOptions } from './common/logger';
 import { CONFIG } from './common/di-tokens';
+import { HOUR, MINUTE } from './common/time';
 import type { Config } from './config';
 import { DatabaseModule } from './db/database.module';
 import { AccountsModule } from './modules/accounts/accounts.module';
@@ -17,6 +18,8 @@ import { BudgetsModule } from './modules/budgets/budgets.module';
 import { ExchangeRatesModule } from './modules/exchange-rates/exchange-rates.module';
 import { CategoriesModule } from './modules/categories/categories.module';
 import { LabelsModule } from './modules/labels/labels.module';
+import { MailerModule } from './modules/mailer/mailer.module';
+import { sendsMail } from './modules/mailer/sends-mail';
 import { MeModule } from './modules/me/me.module';
 import { NetWorthModule } from './modules/net-worth/net-worth.module';
 import { ProjectionModule } from './modules/projection/projection.module';
@@ -30,8 +33,6 @@ export interface AppOptions {
   /** Where logs go instead of stdout (tests). */
   logStream?: Writable | undefined;
 }
-
-const MINUTE = 60_000;
 
 @Global()
 @Module({})
@@ -61,15 +62,23 @@ export class AppModule {
           throttlers: [
             { name: 'default', ttl: MINUTE, limit: config.RATE_LIMIT_PER_MINUTE },
             {
-              // Login and registration get a tighter budget against password guessing.
+              // Login, registration and the mailed-link routes get a tighter budget against guessing.
               name: 'auth',
               ttl: MINUTE,
               limit: config.AUTH_RATE_LIMIT_PER_MINUTE,
               skipIf: (context) => context.getClass() !== AuthController,
             },
+            {
+              // Against using us to flood someone's inbox; each User also has a cap of their own.
+              name: 'mail',
+              ttl: HOUR,
+              limit: config.MAIL_RATE_LIMIT_PER_HOUR,
+              skipIf: (context) => !sendsMail(context),
+            },
           ],
         }),
         AuditModule,
+        MailerModule,
         AuthModule,
         WorkspacesModule,
         MeModule,

@@ -103,14 +103,18 @@ All variables live in `.env` (copied from [`.env.example`](.env.example), git-ig
 | `MAILPIT_UI_PORT`               | `8025`                                        | Docker Compose | Host port of Mailpit's web inbox          |
 | `SMTP_HOST`                     | `localhost`                                   | API            | SMTP server for outgoing mail             |
 | `SMTP_PORT`                     | `1025`                                        | API            | Its port                                  |
+| `SMTP_SECURE`                   | `false`                                       | API            | `true` for TLS from the start (port 465)  |
+| `SMTP_USER`, `SMTP_PASSWORD`    | unset                                         | API            | SMTP login, when the server needs one     |
 | `MAIL_FROM`                     | `Daric <no-reply@daric.local>`                | API            | Sender address on outgoing mail           |
+| `APP_URL`                       | `http://localhost:5173`                       | API            | Web app origin that mailed links open     |
 | `PORT`                          | `3000`                                        | API            | Port the API listens on                   |
 | `JWT_SECRET`                    | (dev placeholder)                             | API            | Signs access tokens; 32+ characters       |
 | `ACCESS_TOKEN_TTL_SECONDS`      | `900`                                         | API            | Access token lifetime                     |
 | `REFRESH_TOKEN_TTL_SECONDS`     | `2592000`                                     | API            | Refresh token lifetime                    |
 | `CORS_ORIGINS`                  | `http://localhost:5173`                       | API            | Comma-separated allowed browser origins   |
 | `RATE_LIMIT_PER_MINUTE`         | `120`                                         | API            | Requests per minute per client            |
-| `AUTH_RATE_LIMIT_PER_MINUTE`    | `10`                                          | API            | Same, for login and registration          |
+| `AUTH_RATE_LIMIT_PER_MINUTE`    | `10`                                          | API            | Same, for login, registration and links   |
+| `MAIL_RATE_LIMIT_PER_HOUR`      | `5`                                           | API            | Mail-sending requests per hour per client |
 | `TRUST_PROXY`                   | `0`                                           | API            | Reverse proxies in front of the API       |
 | `SNAPSHOT_JOB_INTERVAL_MINUTES` | `60`                                          | API            | Month-end Net Worth Snapshot job; 0 = off |
 | `LOG_LEVEL`                     | `info`                                        | API            | Pino log level                            |

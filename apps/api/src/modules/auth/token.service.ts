@@ -24,7 +24,8 @@ export type Rotation =
   | { outcome: 'reused'; userId: string }
   | { outcome: 'invalid' };
 
-export function hashRefreshToken(token: string): string {
+/** SHA-256 of an opaque token (refresh or email); only this is stored. */
+export function hashToken(token: string): string {
   return createHash('sha256').update(token).digest('hex');
 }
 
@@ -75,11 +76,19 @@ export class TokenService {
     return row.userId;
   }
 
+  /** Ends every Signed-in Device of the User, e.g. after their password changed. */
+  async revokeAllForUser(db: Executor, userId: string, now = new Date()): Promise<void> {
+    await db
+      .update(refreshTokens)
+      .set({ revokedAt: now })
+      .where(and(eq(refreshTokens.userId, userId), isNull(refreshTokens.revokedAt)));
+  }
+
   private async lockByToken(tx: Transaction, refreshToken: string) {
     const [row] = await tx
       .select()
       .from(refreshTokens)
-      .where(eq(refreshTokens.tokenHash, hashRefreshToken(refreshToken)))
+      .where(eq(refreshTokens.tokenHash, hashToken(refreshToken)))
       .for('update');
     return row;
   }
@@ -115,7 +124,7 @@ export class TokenService {
     await db.insert(refreshTokens).values({
       userId,
       familyId,
-      tokenHash: hashRefreshToken(refreshToken),
+      tokenHash: hashToken(refreshToken),
       expiresAt: refreshTokenExpiresAt,
     });
     return { accessToken, accessTokenExpiresAt, refreshToken, refreshTokenExpiresAt };

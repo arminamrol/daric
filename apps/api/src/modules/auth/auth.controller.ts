@@ -10,6 +10,9 @@ import {
   UnauthorizedException,
 } from '@nestjs/common';
 import {
+  ApiAcceptedResponse,
+  ApiBadRequestResponse,
+  ApiBearerAuth,
   ApiBody,
   ApiConflictResponse,
   ApiCreatedResponse,
@@ -18,6 +21,7 @@ import {
   ApiNoContentResponse,
   ApiOkResponse,
   ApiTags,
+  ApiTooManyRequestsResponse,
   ApiUnauthorizedResponse,
   getSchemaPath,
 } from '@nestjs/swagger';
@@ -26,18 +30,23 @@ import {
   authResultSchema,
   CLIENT_HEADER,
   CSRF_COOKIE,
+  forgotPasswordInputSchema,
   loginInputSchema,
   refreshInputSchema,
   registerInputSchema,
+  resetPasswordInputSchema,
   type Session,
   sessionSchema,
+  verifyEmailInputSchema,
 } from '@daric/core';
 import type { Request, Response } from 'express';
 import { createZodDto } from 'nestjs-zod';
 import { Public } from './auth.guard';
-import { Client, type ClientInfo } from '../../common/request';
+import { Client, type ClientInfo, CurrentUserId } from '../../common/request';
 import { ZodBody } from '../../common/zod';
+import { SendsMail } from '../mailer/sends-mail';
 import { AuthService, type SignedIn } from './auth.service';
+import { EmailLinksService } from './email-links.service';
 import {
   clearSessionCookies,
   isMobileClient,
@@ -52,6 +61,11 @@ class LoginDto extends createZodDto(loginInputSchema) {}
 class RefreshDto extends createZodDto(refreshInputSchema) {}
 class SessionDto extends createZodDto(sessionSchema) {}
 class AuthResultDto extends createZodDto(authResultSchema) {}
+class VerifyEmailDto extends createZodDto(verifyEmailInputSchema) {}
+class ForgotPasswordDto extends createZodDto(forgotPasswordInputSchema) {}
+class ResetPasswordDto extends createZodDto(resetPasswordInputSchema) {}
+
+const invalidLinkResponse = { description: 'The token is unknown, used or expired' };
 
 const signedInResponse = {
   description:
@@ -66,7 +80,10 @@ const signedInResponse = {
 @Public()
 @Controller('v1/auth')
 export class AuthController {
-  constructor(@Inject(AuthService) private readonly auth: AuthService) {}
+  constructor(
+    @Inject(AuthService) private readonly auth: AuthService,
+    @Inject(EmailLinksService) private readonly emailLinks: EmailLinksService,
+  ) {}
 
   @Post('register')
   @ApiCreatedResponse(signedInResponse)
@@ -91,6 +108,62 @@ export class AuthController {
     @Res({ passthrough: true }) res: Response,
   ) {
     return deliverSignIn(req, res, await this.auth.login(body, client));
+  }
+
+  @Post('email/verify')
+  @HttpCode(204)
+  @ApiNoContentResponse({ description: "The User's email is verified" })
+  @ApiBadRequestResponse(invalidLinkResponse)
+  async verifyEmail(
+    @ZodBody(VerifyEmailDto) body: VerifyEmailDto,
+    @Client() client: ClientInfo,
+  ): Promise<void> {
+    await this.emailLinks.verify(body.token, client);
+  }
+
+  @Post('password/forgot')
+  @HttpCode(202)
+  @SendsMail()
+  @ApiAcceptedResponse({
+    description: 'A reset link is mailed if the email is registered; the answer is the same if not',
+  })
+  @ApiTooManyRequestsResponse({ description: 'Too many mail requests from this client' })
+  async forgotPassword(
+    @ZodBody(ForgotPasswordDto) body: ForgotPasswordDto,
+    @Client() client: ClientInfo,
+  ): Promise<void> {
+    await this.emailLinks.forgotPassword(body.email, client);
+  }
+
+  @Post('password/reset')
+  @HttpCode(204)
+  @ApiNoContentResponse({
+    description: 'The password is changed and every Signed-in Device of the User is ended',
+  })
+  @ApiBadRequestResponse(invalidLinkResponse)
+  async resetPassword(
+    @ZodBody(ResetPasswordDto) body: ResetPasswordDto,
+    @Client() client: ClientInfo,
+  ): Promise<void> {
+    await this.emailLinks.resetPassword(body, client);
+  }
+}
+
+/** Mails a signed-in User a new verification link. */
+@ApiTags('auth')
+@ApiBearerAuth()
+@Controller('v1/auth/email/verification')
+export class EmailVerificationController {
+  constructor(@Inject(EmailLinksService) private readonly emailLinks: EmailLinksService) {}
+
+  @Post()
+  @HttpCode(204)
+  @SendsMail()
+  @ApiNoContentResponse({ description: 'A new link is mailed and earlier ones stop working' })
+  @ApiConflictResponse({ description: 'The email is already verified' })
+  @ApiTooManyRequestsResponse({ description: 'Too many mails to this User or from this client' })
+  async resend(@CurrentUserId() userId: string): Promise<void> {
+    await this.emailLinks.resendVerification(userId);
   }
 }
 

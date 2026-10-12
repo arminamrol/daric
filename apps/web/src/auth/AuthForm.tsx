@@ -60,8 +60,14 @@ function failureMessage(mode: Mode, error: unknown): PlainMessageKey {
   return 'auth.error.unexpected';
 }
 
-const inputClass =
+export const inputClass =
   'w-full rounded-md border border-border bg-background px-3 py-2 text-foreground aria-invalid:border-danger';
+export const cardClass =
+  'mx-auto flex max-w-sm flex-col gap-6 rounded-xl border border-border bg-surface px-6 py-8';
+export const submitClass =
+  'rounded-md bg-primary px-4 py-2 font-medium text-on-primary disabled:opacity-60';
+export const linkClass = 'font-medium text-accent underline underline-offset-4';
+export const alertClass = 'rounded-md bg-surface-muted px-3 py-2 text-sm text-danger';
 
 /**
  * The login and sign-up form; the server sets the session cookies, so success
@@ -124,7 +130,7 @@ export function AuthForm({ mode }: { mode: Mode }) {
       .join(' ') || undefined;
 
   return (
-    <section className="mx-auto flex max-w-sm flex-col gap-6 rounded-xl border border-border bg-surface px-6 py-8">
+    <section className={cardClass}>
       <h1 id={ids.title} className="text-2xl font-bold">
         {t(copy.title)}
       </h1>
@@ -199,21 +205,22 @@ export function AuthForm({ mode }: { mode: Mode }) {
           </p>
         </div>
         {submit.isError && (
-          <p role="alert" className="rounded-md bg-surface-muted px-3 py-2 text-sm text-danger">
+          <p role="alert" className={alertClass}>
             {t(failureMessage(mode, submit.error))}
           </p>
         )}
-        <button
-          type="submit"
-          disabled={submit.isPending}
-          className="rounded-md bg-primary px-4 py-2 font-medium text-on-primary disabled:opacity-60"
-        >
+        <button type="submit" disabled={submit.isPending} className={submitClass}>
           {t(copy.submit)}
         </button>
       </form>
+      {mode === 'login' && (
+        <Link to="/forgot-password" className={`text-sm ${linkClass}`}>
+          {t('auth.login.forgot')}
+        </Link>
+      )}
       <p className="text-sm text-foreground-muted">
         {t(copy.switchPrompt)}{' '}
-        <Link to={copy.switchTo} className="font-medium text-accent underline underline-offset-4">
+        <Link to={copy.switchTo} className={linkClass}>
           {t(copy.switchLink)}
         </Link>
       </p>

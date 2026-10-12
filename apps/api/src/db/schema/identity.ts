@@ -16,6 +16,8 @@ export const users = pgTable(
     displayCalendar: displayCalendar('display_calendar').notNull().default('jalali'),
     digits: digitSystem('digits').notNull().default('persian'),
     theme: themePreference('theme').notNull().default('system'),
+    /** When the User followed a link mailed to `email`; null until then. */
+    emailVerifiedAt: timestamp('email_verified_at', { withTimezone: true }),
     ...timestamps(),
   },
   (t) => [uniqueIndex('users_email_key').on(sql`lower(${t.email})`)],
@@ -63,5 +65,31 @@ export const refreshTokens = pgTable(
     uniqueIndex('refresh_tokens_token_hash_key').on(t.tokenHash),
     index('refresh_tokens_user_id_idx').on(t.userId),
     index('refresh_tokens_family_id_idx').on(t.familyId),
+  ],
+);
+
+export const emailTokenPurpose = pgEnum('email_token_purpose', ['VERIFY_EMAIL', 'RESET_PASSWORD']);
+
+/** A single-use token mailed to a User in a verification or password-reset link. */
+export const emailTokens = pgTable(
+  'email_tokens',
+  {
+    id: id(),
+    userId: uuid('user_id')
+      .notNull()
+      .references(() => users.id, { onDelete: 'cascade' }),
+    purpose: emailTokenPurpose('purpose').notNull(),
+    /** The address the link went to; the token is void once the User's email differs. */
+    email: text('email').notNull(),
+    /** SHA-256 of the token; the token itself is never stored. */
+    tokenHash: text('token_hash').notNull(),
+    expiresAt: timestamp('expires_at', { withTimezone: true }).notNull(),
+    /** Set when the token is used or a newer one for the same purpose replaces it. */
+    usedAt: timestamp('used_at', { withTimezone: true }),
+    createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => [
+    uniqueIndex('email_tokens_token_hash_key').on(t.tokenHash),
+    index('email_tokens_user_id_purpose_idx').on(t.userId, t.purpose),
   ],
 );

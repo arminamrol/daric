@@ -6,11 +6,15 @@ import { inject } from 'vitest';
 import { configureApp } from '../app';
 import { AppModule } from '../app.module';
 import { loadConfig, type Config } from '../config';
+import { MAILER } from '../modules/mailer/mailer';
 import { uniqueEmail } from './db';
+import { FakeMailer } from './fake-mailer';
 
 export interface TestApp {
   app: INestApplication;
   url: string;
+  /** Every mail the app sent; the API never talks to an SMTP server in tests. */
+  mail: FakeMailer;
   close(): Promise<void>;
 }
 
@@ -23,6 +27,7 @@ export function testConfig(overrides: Record<string, string> = {}): Config {
     JWT_SECRET: 'test-secret-test-secret-test-secret!',
     AUTH_RATE_LIMIT_PER_MINUTE: '1000',
     RATE_LIMIT_PER_MINUTE: '10000',
+    MAIL_RATE_LIMIT_PER_HOUR: '1000',
     LOG_LEVEL: 'silent',
     // Tests run the month-end job themselves, with the time they need.
     SNAPSHOT_JOB_INTERVAL_MINUTES: '0',
@@ -42,9 +47,12 @@ export async function startTestApp(
   } = {},
 ): Promise<TestApp> {
   const config = testConfig(options.env);
+  const mail = new FakeMailer();
   const builder = Test.createTestingModule({
     imports: [AppModule.forRoot(config, { logStream: options.logStream })],
-  });
+  })
+    .overrideProvider(MAILER)
+    .useValue(mail);
   const moduleRef = await (options.override?.(builder) ?? builder).compile();
   const app = configureApp(
     moduleRef.createNestApplication<NestExpressApplication>({ bufferLogs: true }),
@@ -52,7 +60,7 @@ export async function startTestApp(
   );
   await app.listen(0, '127.0.0.1');
   const url = await app.getUrl();
-  return { app, url: url.replace('[::1]', '127.0.0.1'), close: () => app.close() };
+  return { app, url: url.replace('[::1]', '127.0.0.1'), mail, close: () => app.close() };
 }
 
 export async function call(

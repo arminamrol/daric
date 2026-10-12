@@ -39,12 +39,21 @@ export class MeController {
   @ApiOkResponse({ type: MeDto })
   async get(@CurrentUserId() userId: string): Promise<Me> {
     const [row] = await this.db
-      .select({ id: users.id, email: users.email, preferences: preferenceColumns })
+      .select({
+        id: users.id,
+        email: users.email,
+        verifiedAt: users.emailVerifiedAt,
+        preferences: preferenceColumns,
+      })
       .from(users)
       .where(eq(users.id, userId));
     if (!row) throw new NotFoundException();
-    const { preferences, ...user } = row;
-    return { user, preferences, workspaces: await this.workspaces.listForUser(userId) };
+    const { preferences, verifiedAt, ...user } = row;
+    return {
+      user: { ...user, emailVerified: verifiedAt !== null },
+      preferences,
+      workspaces: await this.workspaces.listForUser(userId),
+    };
   }
 
   /** Preferences only change how things are drawn, so any User may set their own. */

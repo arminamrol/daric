@@ -6,6 +6,7 @@ import { BudgetFormPage } from '../pages/BudgetFormPage';
 import { BudgetsPage } from '../pages/BudgetsPage';
 import { CategoriesPage } from '../pages/CategoriesPage';
 import { CategoryFormPage } from '../pages/CategoryFormPage';
+import { ForgotPasswordPage } from '../pages/ForgotPasswordPage';
 import { HomePage } from '../pages/HomePage';
 import { LabelFormPage } from '../pages/LabelFormPage';
 import { LabelsPage } from '../pages/LabelsPage';
@@ -19,11 +20,13 @@ import { RatesPage } from '../pages/RatesPage';
 import { RecurringFormPage } from '../pages/RecurringFormPage';
 import { RecurringPage } from '../pages/RecurringPage';
 import { ReportsPage } from '../pages/ReportsPage';
+import { ResetPasswordPage } from '../pages/ResetPasswordPage';
 import { SettingsPage } from '../pages/SettingsPage';
 import { SignupPage } from '../pages/SignupPage';
 import { TransactionEditPage } from '../pages/TransactionEditPage';
 import { TransactionsPage } from '../pages/TransactionsPage';
 import { ValuationsPage } from '../pages/ValuationsPage';
+import { VerifyEmailPage } from '../pages/VerifyEmailPage';
 import { Shell } from '../shell/Shell';
 
 export const routes: RouteObject[] = [
@@ -68,8 +71,12 @@ export const routes: RouteObject[] = [
         children: [
           { path: 'login', element: <LoginPage /> },
           { path: 'signup', element: <SignupPage /> },
+          { path: 'forgot-password', element: <ForgotPasswordPage /> },
+          { path: 'reset-password', element: <ResetPasswordPage /> },
         ],
       },
+      // Mailed links open here whether or not the browser is signed in.
+      { path: 'verify-email', element: <VerifyEmailPage /> },
       { path: '*', element: <NotFoundPage /> },
     ],
   },
