@@ -92,6 +92,13 @@
       "when": 1791794291188,
       "tag": "0012_net_worth_snapshots",
       "breakpoints": true
+    },
+    {
+      "idx": 13,
+      "version": "7",
+      "when": 1791796317793,
+      "tag": "0013_projection_settings",
+      "breakpoints": true
     }
   ]
 }

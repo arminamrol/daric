@@ -8,6 +8,7 @@ export * from './exchange-rate';
 export * from './recurring';
 export * from './valuation';
 export * from './net-worth';
+export * from './projection';
 export {
   currencyCodes,
   monthParamSchema,

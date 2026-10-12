@@ -497,6 +497,80 @@ describe('api-client', () => {
     });
   });
 
+  describe('Projection', () => {
+    const path = `/v1/workspaces/${workspace.id}/projection`;
+    const figures = {
+      actual: '4200000000',
+      average: '400000000',
+      variable: '2173333333',
+      recurring: '1280000000',
+      projected: '7653333333',
+    };
+    const zero = { actual: '0', average: '0', variable: '0', recurring: '0', projected: '0' };
+    const projection = {
+      year: 1405,
+      today: '2026-10-09',
+      yearEnd: '2027-03-20',
+      baseCurrency: 'IRR',
+      remaining: { daysLeftInMonth: 13, daysInMonth: 30, fullMonths: 5 },
+      window: ['1405-04', '1405-05', '1405-06'],
+      monthsUsed: 3,
+      income: zero,
+      expense: figures,
+      categories: [
+        { categoryId: '01900000-0000-7000-b000-000000000001', type: 'EXPENSE', ...figures },
+      ],
+      recurring: [
+        {
+          ruleId: '01900000-0000-7000-8000-0000000000e1',
+          name: 'اجاره',
+          type: 'EXPENSE',
+          categoryId: '01900000-0000-7000-b000-000000000001',
+          occurrences: ['2026-10-23'],
+          total: '250000000',
+        },
+      ],
+      ratesUsed: [],
+      missing: [],
+      warnings: [{ kind: 'short_history', monthsUsed: 1, monthsWanted: 3 }],
+    } as const;
+
+    it('reads the Projection with bigints, and reads and changes its settings', async () => {
+      const { client, sent } = fakeServer(
+        {
+          [`GET ${path}`]: () => ({ status: 200, body: projection }),
+          [`GET ${path}/settings`]: () => ({
+            status: 200,
+            body: { trailingMonths: 3, version: 0 },
+          }),
+          [`PATCH ${path}/settings`]: () => ({
+            status: 200,
+            body: { trailingMonths: 6, version: 1 },
+          }),
+        },
+        { '__Host-daric_csrf': 'csrf-1' },
+      );
+      const read = await client.getProjection(workspace.id);
+      expect(read.expense.projected).toBe(7_653_333_333n);
+      expect(read.categories[0]?.variable).toBe(2_173_333_333n);
+      expect(read.recurring[0]?.total).toBe(250_000_000n);
+      expect(read.window[0]).toEqual({ kind: 'month', year: 1405, month: 4 });
+      expect(await client.getProjectionSettings(workspace.id)).toEqual({
+        trailingMonths: 3,
+        version: 0,
+      });
+      expect(await client.updateProjectionSettings(workspace.id, { trailingMonths: 6 })).toEqual({
+        trailingMonths: 6,
+        version: 1,
+      });
+      expect(sent.map((r) => [r.method, r.url, r.body])).toEqual([
+        ['GET', path, undefined],
+        ['GET', `${path}/settings`, undefined],
+        ['PATCH', `${path}/settings`, { trailingMonths: 6 }],
+      ]);
+    });
+  });
+
   describe('Recurring Rules', () => {
     const rule = {
       id: '01900000-0000-7000-8000-0000000000e1',

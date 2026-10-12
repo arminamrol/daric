@@ -55,6 +55,9 @@ export function Shell() {
               <NavLink to="/net-worth" className={navLinkClass}>
                 {t('nav.netWorth')}
               </NavLink>
+              <NavLink to="/projection" className={navLinkClass}>
+                {t('nav.projection')}
+              </NavLink>
               <NavLink to="/rates" className={navLinkClass}>
                 {t('nav.rates')}
               </NavLink>

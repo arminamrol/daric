@@ -4,13 +4,14 @@ import {
   check,
   foreignKey,
   index,
+  integer,
   pgEnum,
   pgTable,
   text,
   unique,
   uuid,
 } from 'drizzle-orm/pg-core';
-import { budgetPeriods } from '@daric/core';
+import { budgetPeriods, DEFAULT_TRAILING_MONTHS, MAX_TRAILING_MONTHS } from '@daric/core';
 import { categories, categoryKind, labels } from './activity';
 import { id, timestamps, version } from './columns';
 import { currencies } from './money';
@@ -62,5 +63,28 @@ export const budgets = pgTable(
     check('budgets_amount_check', sql`${t.amount} > 0`),
     index('budgets_category_id_idx').on(t.categoryId),
     index('budgets_label_id_idx').on(t.labelId),
+  ],
+);
+
+/**
+ * How a Workspace's Projection is worked out; at most one row per Workspace,
+ * and a Workspace without one uses the defaults.
+ */
+export const projectionSettings = pgTable(
+  'projection_settings',
+  {
+    workspaceId: uuid('workspace_id')
+      .primaryKey()
+      .references(() => workspaces.id, { onDelete: 'cascade' }),
+    /** N: how many closed months the Trailing Average looks back over. */
+    trailingMonths: integer('trailing_months').notNull().default(DEFAULT_TRAILING_MONTHS),
+    ...timestamps(),
+    version: version(),
+  },
+  (t) => [
+    check(
+      'projection_settings_trailing_months_check',
+      sql`${t.trailingMonths} BETWEEN 1 AND ${sql.raw(String(MAX_TRAILING_MONTHS))}`,
+    ),
   ],
 );
