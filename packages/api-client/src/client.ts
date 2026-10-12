@@ -26,6 +26,7 @@ import {
   type CreateLabelInput,
   type CreateTransactionInput,
   type ExportFormat,
+  exportFiles,
   CSRF_COOKIE,
   CSRF_HEADER,
   type Label,
@@ -555,7 +556,7 @@ export function createApiClient(options: ApiClientOptions = {}): ApiClient {
       if (!res.ok) throw new ApiError(res.status, await readBody(res));
       return {
         blob: await res.blob(),
-        fileName: fileNameOf(res, `daric-export.${format === 'csv' ? 'zip' : 'json'}`),
+        fileName: fileNameOf(res, `daric-export.${exportFiles[format].extension}`),
       };
     },
   };

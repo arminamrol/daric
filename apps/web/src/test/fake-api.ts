@@ -13,6 +13,7 @@ import {
   categoryKinds,
   dayOf,
   dueOccurrences,
+  exportFiles,
   isOccurrence,
   nextOccurrence,
   monthPeriodOfDay,
@@ -1169,10 +1170,10 @@ export function fakeApi({
     async exportWorkspace(workspaceId, format) {
       inWorkspace(workspaceId, 'ADMIN');
       exports.push(format);
-      const type = format === 'csv' ? 'application/zip' : 'application/json';
+      const { extension, contentType } = exportFiles[format];
       return {
-        blob: new Blob([format === 'csv' ? 'PK' : '{}'], { type }),
-        fileName: `daric-export-${today()}.${format === 'csv' ? 'zip' : 'json'}`,
+        blob: new Blob([format === 'csv' ? 'PK' : '{}'], { type: contentType }),
+        fileName: `daric-export-${today()}.${extension}`,
       };
     },
     async getReport(workspaceId, { period } = {}) {

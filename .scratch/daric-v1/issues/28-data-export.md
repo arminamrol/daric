@@ -25,3 +25,4 @@ Notes for later tickets:
 - Built in memory; fine for a personal Workspace, would want streaming for very large Business ones.
 - Web: Settings shows "خروجی داده‌ها" to Owners and Admins with CSV and JSON buttons (`settings/ExportData.tsx`), via `api.exportWorkspace(workspaceId, format)` → `{ blob, fileName }`.
 - `seedDemo(db, { today, email })` takes an optional email so a test can seed its own demo Workspace without racing `demo.http.test.ts`.
+- Open points from review: each entity is a separate SELECT in the request's READ COMMITTED transaction, so a write landing mid-export can make the files slightly inconsistent with each other. CSV can't tell null from an empty string. The formula guard makes CSV text differ from the JSON for text starting with `= + - @`. `exportFiles` in core maps a format to its extension and content type.

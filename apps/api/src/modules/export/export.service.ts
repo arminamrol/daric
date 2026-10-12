@@ -1,5 +1,5 @@
 import { Inject, Injectable, NotFoundException } from '@nestjs/common';
-import { todayIn, type ExportFormat } from '@daric/core';
+import { exportFiles, todayIn, type ExportFormat } from '@daric/core';
 import { asc, eq, getTableColumns, type AnyColumn } from 'drizzle-orm';
 import type { PgTable } from 'drizzle-orm/pg-core';
 import type { ClientInfo } from '../../common/request';
@@ -84,7 +84,7 @@ const entities: { name: string; table: WorkspaceTable; order: AnyColumn[] }[] = 
   },
 ];
 
-const plain = (row: Record<string, unknown>): ExportRow =>
+const toExportRow = (row: Record<string, unknown>): ExportRow =>
   Object.fromEntries(Object.entries(row).map(([key, value]) => [key, exportValue(value)]));
 
 export interface ExportFile {
@@ -103,9 +103,9 @@ export class ExportService {
     userId: string,
     format: ExportFormat,
     client: ClientInfo,
-    now = new Date(),
   ): Promise<ExportFile> {
-    const data = await this.read(workspaceId);
+    const now = new Date();
+    const { timezone, data } = await this.read(workspaceId);
     await this.audit.record(scopedTx(), {
       action: 'workspace.export',
       actorUserId: userId,
@@ -113,39 +113,38 @@ export class ExportService {
       client,
       metadata: { format },
     });
-    const day = todayIn(now, String(data.workspace['timezone']));
-    return format === 'csv'
-      ? {
-          body: exportCsvZip(data),
-          contentType: 'application/zip',
-          fileName: `daric-export-${day}.zip`,
-        }
-      : {
-          body: new TextEncoder().encode(exportJson(data, now)),
-          contentType: 'application/json; charset=utf-8',
-          fileName: `daric-export-${day}.json`,
-        };
+    const { extension, contentType } = exportFiles[format];
+    return {
+      body: format === 'csv' ? exportCsvZip(data) : new TextEncoder().encode(exportJson(data, now)),
+      contentType,
+      fileName: `daric-export-${todayIn(now, timezone)}.${extension}`,
+    };
   }
 
-  // Row-level security already limits every read to the Workspace; the filter
-  // says so again because an export leaking another Workspace's rows is the worst case.
-  private async read(workspaceId: string): Promise<WorkspaceData> {
+  /**
+   * Row-level security already limits every read to the Workspace; the filter
+   * says so again because an export leaking another Workspace's rows is the worst case.
+   */
+  private async read(workspaceId: string): Promise<{ timezone: string; data: WorkspaceData }> {
     const tx = scopedTx();
     const [workspace] = await tx.select().from(workspaces).where(eq(workspaces.id, workspaceId));
     if (!workspace) throw new NotFoundException();
-    const read = [];
+    const rowsByEntity = [];
     for (const { name, table, order } of entities) {
       const rows = await tx
         .select()
         .from(table)
         .where(eq(table.workspaceId, workspaceId))
         .orderBy(...order.map((column) => asc(column)));
-      read.push({
+      rowsByEntity.push({
         name,
         columns: Object.keys(getTableColumns(table)),
-        rows: (rows as Record<string, unknown>[]).map(plain),
+        rows: (rows as Record<string, unknown>[]).map(toExportRow),
       });
     }
-    return { workspace: plain(workspace), entities: read };
+    return {
+      timezone: workspace.timezone,
+      data: { workspace: toExportRow(workspace), entities: rowsByEntity },
+    };
   }
 }

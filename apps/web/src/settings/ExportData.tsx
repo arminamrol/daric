@@ -11,8 +11,11 @@ function save({ blob, fileName }: DownloadedFile) {
   const link = document.createElement('a');
   link.href = url;
   link.download = fileName;
+  document.body.append(link);
   link.click();
-  URL.revokeObjectURL(url);
+  link.remove();
+  // Some browsers start the download only after the click returns.
+  setTimeout(() => URL.revokeObjectURL(url), 0);
 }
 
 const buttonClass =

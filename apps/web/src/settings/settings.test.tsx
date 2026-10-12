@@ -132,7 +132,9 @@ describe('Data export', () => {
     });
     return saved;
   }
-  afterEach(() => {
+  afterEach(async () => {
+    // Let the page revoke its object URL while the stub is still there.
+    await new Promise((resolve) => setTimeout(resolve, 0));
     vi.restoreAllMocks();
     vi.unstubAllGlobals();
   });
