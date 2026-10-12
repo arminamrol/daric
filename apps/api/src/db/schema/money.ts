@@ -3,6 +3,7 @@ import {
   bigint,
   check,
   date,
+  foreignKey,
   index,
   numeric,
   pgEnum,
@@ -90,5 +91,34 @@ export const exchangeRates = pgTable(
     ),
     check('exchange_rates_rate_check', sql`${t.rate} > 0`),
     check('exchange_rates_currency_check', sql`${t.currency} <> ${t.baseCurrency}`),
+  ],
+);
+
+/**
+ * A Valuation: what an Account was worth on `valued_on`, in its currency's minor
+ * unit. An Account's value is its latest Valuation, else its balance.
+ */
+export const accountValuations = pgTable(
+  'account_valuations',
+  {
+    id: id(),
+    workspaceId: uuid('workspace_id')
+      .notNull()
+      .references(() => workspaces.id, { onDelete: 'cascade' }),
+    accountId: uuid('account_id').notNull(),
+    amount: bigint('amount', { mode: 'bigint' }).notNull(),
+    valuedOn: date('valued_on', { mode: 'string' }).notNull(),
+    ...timestamps(),
+    version: version(),
+  },
+  (t) => [
+    unique('account_valuations_account_day_key').on(t.accountId, t.valuedOn),
+    foreignKey({
+      name: 'account_valuations_account_fk',
+      columns: [t.accountId, t.workspaceId],
+      foreignColumns: [accounts.id, accounts.workspaceId],
+    }),
+    check('account_valuations_amount_check', sql`${t.amount} >= 0`),
+    index('account_valuations_workspace_id_idx').on(t.workspaceId),
   ],
 );

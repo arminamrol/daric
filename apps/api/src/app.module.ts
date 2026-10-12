@@ -18,7 +18,9 @@ import { ExchangeRatesModule } from './modules/exchange-rates/exchange-rates.mod
 import { CategoriesModule } from './modules/categories/categories.module';
 import { LabelsModule } from './modules/labels/labels.module';
 import { MeModule } from './modules/me/me.module';
+import { NetWorthModule } from './modules/net-worth/net-worth.module';
 import { RecurringModule } from './modules/recurring/recurring.module';
+import { ValuationsModule } from './modules/valuations/valuations.module';
 import { TransactionsModule } from './modules/transactions/transactions.module';
 import { WorkspacesModule } from './modules/workspaces/workspaces.module';
 
@@ -76,6 +78,8 @@ export class AppModule {
         BudgetsModule,
         ExchangeRatesModule,
         RecurringModule,
+        ValuationsModule,
+        NetWorthModule,
       ],
       providers: [
         // Order matters: rate limiting, then CSRF, then authentication.

@@ -52,6 +52,9 @@ export function Shell() {
                 {t('nav.budgets')}
               </NavLink>
               <RecurringNavLink className={navLinkClass} />
+              <NavLink to="/net-worth" className={navLinkClass}>
+                {t('nav.netWorth')}
+              </NavLink>
               <NavLink to="/rates" className={navLinkClass}>
                 {t('nav.rates')}
               </NavLink>

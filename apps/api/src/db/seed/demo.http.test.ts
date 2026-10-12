@@ -154,6 +154,19 @@ describe('demo seed', () => {
     ]);
   });
 
+  it('values the gold coins on the first day of each demo month, so Net Worth counts them', async () => {
+    const token = await login();
+    const res = await call(t.url, 'GET', `/v1/workspaces/${seeded.workspaceId}/net-worth`, {
+      token,
+    });
+    expect(res.status).toBe(200);
+    expect(res.body.missing).toEqual([]);
+    expect(res.body.accounts).toContainEqual(
+      expect.objectContaining({ name: 'سکهٔ طلا', value: '1800000000', valuedOn: '2026-09-23' }),
+    );
+    expect(BigInt(res.body.total)).toBeGreaterThan(0n);
+  });
+
   it('uses rial amounts in the range of a Tehran household', async () => {
     const rows = await demoTransactions(seeded.workspaceId);
     const salaries = rows.filter((r) => r.type === 'INCOME' && r.note?.startsWith('حقوق'));

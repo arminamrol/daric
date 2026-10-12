@@ -10,6 +10,7 @@ import { HomePage } from '../pages/HomePage';
 import { LabelFormPage } from '../pages/LabelFormPage';
 import { LabelsPage } from '../pages/LabelsPage';
 import { LoginPage } from '../pages/LoginPage';
+import { NetWorthPage } from '../pages/NetWorthPage';
 import { NotFoundPage } from '../pages/NotFoundPage';
 import { RateFormPage } from '../pages/RateFormPage';
 import { RatesPage } from '../pages/RatesPage';
@@ -19,6 +20,7 @@ import { SettingsPage } from '../pages/SettingsPage';
 import { SignupPage } from '../pages/SignupPage';
 import { TransactionEditPage } from '../pages/TransactionEditPage';
 import { TransactionsPage } from '../pages/TransactionsPage';
+import { ValuationsPage } from '../pages/ValuationsPage';
 import { Shell } from '../shell/Shell';
 
 export const routes: RouteObject[] = [
@@ -34,6 +36,8 @@ export const routes: RouteObject[] = [
           { path: 'accounts', element: <AccountsPage /> },
           { path: 'accounts/new', element: <AccountFormPage /> },
           { path: 'accounts/:accountId', element: <AccountFormPage /> },
+          { path: 'accounts/:accountId/valuations', element: <ValuationsPage /> },
+          { path: 'net-worth', element: <NetWorthPage /> },
           { path: 'categories', element: <CategoriesPage /> },
           { path: 'categories/new', element: <CategoryFormPage /> },
           { path: 'categories/:categoryId', element: <CategoryFormPage /> },

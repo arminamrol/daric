@@ -43,7 +43,7 @@ A place money is held or owed (cash, bank, card, wallet, loan, other asset). Has
 _Avoid_: Wallet (as a generic term), user account
 
 **Valuation**:
-A manually entered value of an Account at a point in time, used for things whose value changes without transactions (gold, car, property).
+A manually entered value of an Account on a day, used for things whose value changes without transactions (gold, car, property). From that day an Account counts in Net Worth at its latest Valuation instead of its balance.
 
 **Amount**:
 An integer count of a currency's minor unit; the currency defines how many decimals it has (IRR 0, USD 2). Never fractional.
