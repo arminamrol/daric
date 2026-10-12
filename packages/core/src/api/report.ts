@@ -53,7 +53,14 @@ export const controllableReportSchema = z.object({
   /** Most Expense first; their totals overlap. */
   labels: z.array(z.object({ labelId: z.uuid(), expense: amountSchema, share: shareSchema })),
   /** The trend's months, oldest first. */
-  trend: z.array(z.object({ month: monthParamSchema, expense: amountSchema })),
+  trend: z.array(
+    z.object({
+      month: monthParamSchema,
+      expense: amountSchema,
+      /** Currencies this month left out for want of a rate. */
+      missing: z.array(z.string()),
+    }),
+  ),
   /** Over the trend's closed months from the first with any, or the running month while none has. */
   monthlyAverage: amountSchema,
   monthsAveraged: z.number().int().nonnegative(),

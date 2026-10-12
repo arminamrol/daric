@@ -206,7 +206,7 @@ describe('Reports', () => {
         expense: '0',
         share: 0,
         labels: [],
-        trend: twelveMonthsTo(1405, 6).map((month) => ({ month, expense: '0' })),
+        trend: twelveMonthsTo(1405, 6).map((month) => ({ month, expense: '0', missing: [] })),
         monthlyAverage: '0',
         monthsAveraged: 0,
         averageRunning: false,
@@ -241,6 +241,7 @@ describe('Reports', () => {
       trend: twelveMonthsTo(1405, 6).map((month) => ({
         month,
         expense: month === '1405-05' ? '300' : month === '1405-06' ? '150' : '0',
+        missing: [],
       })),
       monthlyAverage: '225',
       monthsAveraged: 2,

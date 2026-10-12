@@ -2,7 +2,6 @@ import {
   controllableSavings,
   currencyByCode,
   DEFAULT_SAVINGS_PERCENT,
-  money,
   periodParam,
 } from '@daric/core';
 import type { Label, Report } from '@daric/core';
@@ -10,6 +9,7 @@ import { useId, useState } from 'react';
 import { Link } from 'react-router';
 import { useI18n } from '../i18n/locale';
 import { useFormatters } from '../settings/settings';
+import { useShare, useShownInBase } from './reports';
 
 /** The slider moves in steps of this many percent. */
 const SAVINGS_STEP = 5;
@@ -39,9 +39,8 @@ function Savings({
   const sliderId = useId();
   const basisId = useId();
   const [percent, setPercent] = useState(DEFAULT_SAVINGS_PERCENT);
-  const base = currencyByCode(baseCurrency);
-  const shown = (amount: bigint) => format.money(money(amount, base));
-  const percentText = t('reports.share', { percent: format.count(percent) });
+  const shown = useShownInBase(baseCurrency);
+  const percentText = useShare()(percent);
   const average = shown(controllable.monthlyAverage);
   const savings = controllableSavings(controllable.monthlyAverage, percent);
 
@@ -116,9 +115,8 @@ export function ControllableSpending({
   const format = useFormatters();
   const titleId = useId();
   const { controllable } = report;
-  const base = currencyByCode(report.baseCurrency);
-  const shown = (amount: bigint) => format.money(money(amount, base));
-  const share = (percent: number) => t('reports.share', { percent: format.count(percent) });
+  const shown = useShownInBase(report.baseCurrency);
+  const share = useShare();
   const nameOf = (id: string) => labels.find((l) => l.id === id)?.name ?? '';
   const largest = controllable.trend.reduce((max, p) => (p.expense > max ? p.expense : max), 0n);
 
@@ -201,6 +199,15 @@ export function ControllableSpending({
                     <tr key={periodParam(point.month)}>
                       <th scope="row" className="py-2 text-start font-normal">
                         {format.period(point.month)}
+                        {point.missing.length > 0 && (
+                          <span className="block text-xs text-foreground-muted">
+                            {t('reports.trendMissing', {
+                              currencies: point.missing
+                                .map((code) => format.currency(currencyByCode(code)))
+                                .join(t('totals.separator')),
+                            })}
+                          </span>
+                        )}
                       </th>
                       <td className="py-2 ps-4">
                         <span className="flex flex-col items-end gap-1">

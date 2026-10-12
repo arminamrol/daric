@@ -1,6 +1,5 @@
 import {
   currencyByCode,
-  money,
   nextPeriod,
   periodParam,
   periodParamSchema,
@@ -16,26 +15,13 @@ import { useI18n } from '../i18n/locale';
 import { useLabels } from '../labels/labels';
 import { RateNotes } from '../rates/RateNotes';
 import { ControllableSpending } from '../reports/ControllableSpending';
-import { useReport } from '../reports/reports';
+import { useReport, useShare, useShownInBase } from '../reports/reports';
 import { useFormatters } from '../settings/settings';
 
 const TrendChart = lazy(() => import('../reports/TrendChart'));
 
 /** How each type is named in report strings and chart colors. */
 const TYPE_KEY = { INCOME: 'income', EXPENSE: 'expense' } as const;
-
-/** An Amount in the report's Base Currency, as shown. */
-function useShownInBase(baseCurrency: string) {
-  const format = useFormatters();
-  const base = currencyByCode(baseCurrency);
-  return (amount: bigint) => format.money(money(amount, base));
-}
-
-function useShare() {
-  const { t } = useI18n();
-  const format = useFormatters();
-  return (percent: number) => t('reports.share', { percent: format.count(percent) });
-}
 
 /** A share of its type's total as a thin bar; the number beside it carries the value. */
 function ShareBar({ share, type }: { share: number; type: TransactionType }) {

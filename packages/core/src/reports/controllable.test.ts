@@ -108,6 +108,10 @@ describe('controllableSpending: the Period', () => {
       }),
     );
     expect(result.expense).toBe(1_500_500n);
+    const unrated = controllableSpending(
+      input({ transactions: [spend(j(1405, 6, 2), 150n, ['out'], { currency: USD })] }),
+    );
+    expect(unrated.trend[1]).toEqual({ month: month(6), expense: 0n, missing: ['USD'] });
     expect(
       controllableSpending(
         input({ transactions: [spend(j(1405, 7, 2), 150n, ['out'], { currency: USD })] }),
@@ -129,9 +133,9 @@ describe('controllableSpending: trend and monthly average', () => {
       }),
     );
     expect(result.trend).toEqual([
-      { month: month(5), expense: 300n },
-      { month: month(6), expense: 100n },
-      { month: month(7), expense: 40n },
+      { month: month(5), expense: 300n, missing: [] },
+      { month: month(6), expense: 100n, missing: [] },
+      { month: month(7), expense: 40n, missing: [] },
     ]);
   });
 

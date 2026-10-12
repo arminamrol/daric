@@ -1184,6 +1184,7 @@ export function fakeApi({
           trend: controllable.trend.map((point) => ({
             month: periodParam(point.month),
             expense: wire(point.expense),
+            missing: point.missing,
           })),
           monthlyAverage: wire(controllable.monthlyAverage),
         },

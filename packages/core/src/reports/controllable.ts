@@ -2,7 +2,7 @@ import { periodDays } from '../calendar';
 import type { MonthPeriod } from '../calendar';
 import { divRound } from '../money';
 import type { ExchangeRate } from '../rates';
-import { periodReport, trendReport } from './reports';
+import { periodReport, shareOf, trendReport } from './reports';
 import type { ReportInput, ReportTransaction } from './reports';
 
 /** The savings slider's starting point: what reducing controllable spending by 20% saves. */
@@ -26,6 +26,8 @@ export interface ControllableLabelLine {
 export interface ControllablePoint {
   readonly month: MonthPeriod;
   readonly expense: bigint;
+  /** Currency codes this month left out for want of a rate. */
+  readonly missing: string[];
 }
 
 /** Spending under Controllable Labels, in the Base Currency. */
@@ -47,11 +49,6 @@ export interface ControllableSpending {
   readonly monthsAveraged: number;
   /** Whether `monthlyAverage` is the running month so far, no closed month having any. */
   readonly averageRunning: boolean;
-}
-
-/** Whole percent `part` is of `whole`, rounded half up; 0 of nothing. */
-function shareOf(part: bigint, whole: bigint): number {
-  return whole === 0n ? 0 : Number(divRound(part * 100n, whole));
 }
 
 /** The trend months to average: closed ones from the first with spending, else the running one. */
@@ -78,27 +75,28 @@ export function controllableSpending<R extends ExchangeRate>(
   input: ControllableInput<R>,
 ): ControllableSpending {
   const ids = new Set(input.controllableLabelIds);
-  const controllable = input.transactions.filter(
+  const controllableTransactions = input.transactions.filter(
     (t): t is ReportTransaction =>
       t.type === 'EXPENSE' && t.labelIds.some((labelId) => ids.has(labelId)),
   );
-  const all = periodReport(input);
-  const period = periodReport({ ...input, transactions: controllable });
-  const trend = trendReport({ ...input, transactions: controllable }).map((point) => ({
+  const whole = periodReport(input);
+  const report = periodReport({ ...input, transactions: controllableTransactions });
+  const trend = trendReport({ ...input, transactions: controllableTransactions }).map((point) => ({
     month: point.month,
     expense: point.expense,
+    missing: point.missing,
   }));
   const { months: averaged, running } = monthsToAverage(trend, input);
   const sum = averaged.reduce((total, point) => total + point.expense, 0n);
   return {
-    expense: period.expense,
-    share: shareOf(period.expense, all.expense),
-    labels: period.labels
+    expense: report.expense,
+    share: shareOf(report.expense, whole.expense),
+    labels: report.labels
       .filter((line) => ids.has(line.labelId))
       .map((line) => ({
         labelId: line.labelId,
         expense: line.expense,
-        share: shareOf(line.expense, period.expense),
+        share: shareOf(line.expense, report.expense),
       })),
     trend,
     monthlyAverage: averaged.length === 0 ? 0n : divRound(sum, BigInt(averaged.length)),

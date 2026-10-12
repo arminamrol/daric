@@ -152,6 +152,7 @@ export class ReportsService {
         trend: controllable.trend.map((point) => ({
           month: periodParam(point.month),
           expense: amountToWire(point.expense),
+          missing: point.missing,
         })),
         monthlyAverage: amountToWire(controllable.monthlyAverage),
         monthsAveraged: controllable.monthsAveraged,

@@ -681,7 +681,7 @@ describe('api-client', () => {
         expense: '1500',
         share: 21,
         labels: [{ labelId: '01900000-0000-7000-8000-0000000000d1', expense: '1500', share: 100 }],
-        trend: [{ month: '1405-07', expense: '1500' }],
+        trend: [{ month: '1405-07', expense: '1500', missing: [] }],
         monthlyAverage: '1500',
         monthsAveraged: 1,
         averageRunning: true,

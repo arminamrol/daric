@@ -117,7 +117,7 @@ function incomeAndExpenseIn(
 }
 
 /** Whole percent `part` is of `whole`, rounded half up; 0 of nothing. */
-function shareOf(part: bigint, whole: bigint): number {
+export function shareOf(part: bigint, whole: bigint): number {
   return whole === 0n ? 0 : Number(divRound(part * 100n, whole));
 }
 
