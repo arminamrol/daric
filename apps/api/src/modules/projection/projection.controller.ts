@@ -1,18 +1,21 @@
-import { Get, Inject, Patch } from '@nestjs/common';
+import { Get, Inject, Patch, Query } from '@nestjs/common';
 import {
   ApiBadRequestResponse,
   ApiForbiddenResponse,
   ApiNotFoundResponse,
   ApiOkResponse,
+  ApiQuery,
   ApiTags,
 } from '@nestjs/swagger';
 import {
+  projectionModes,
+  projectionQuerySchema,
   projectionSchema,
   projectionSettingsSchema,
   type UpdateProjectionSettingsInput,
   updateProjectionSettingsInputSchema,
 } from '@daric/core';
-import { createZodDto } from 'nestjs-zod';
+import { createZodDto, ZodValidationPipe } from 'nestjs-zod';
 import { CurrentMembership, CurrentUserId, type Membership } from '../../common/request';
 import { MinRole } from '../../common/workspace.guard';
 import { WorkspaceController } from '../../common/workspace-route';
@@ -21,6 +24,7 @@ import { ProjectionService } from './projection.service';
 
 class ProjectionDto extends createZodDto(projectionSchema) {}
 class ProjectionSettingsDto extends createZodDto(projectionSettingsSchema) {}
+class ProjectionQueryDto extends createZodDto(projectionQuerySchema) {}
 class UpdateProjectionSettingsDto extends createZodDto(updateProjectionSettingsInputSchema) {}
 
 @ApiTags('projection')
@@ -30,13 +34,23 @@ export class ProjectionController {
   constructor(@Inject(ProjectionService) private readonly projection: ProjectionService) {}
 
   @Get()
+  @ApiQuery({
+    name: 'mode',
+    required: false,
+    enum: projectionModes,
+    description: 'The mode to work it out in; the Workspace’s setting by default',
+  })
   @ApiOkResponse({
     type: ProjectionDto,
     description:
-      'The Automatic Projection of the current Workspace-Calendar year, in the Base Currency, with its assumptions',
+      'The Projection of the current Workspace-Calendar year, in the Base Currency, with its assumptions',
   })
-  get(@CurrentMembership() membership: Membership) {
-    return this.projection.get(membership);
+  @ApiBadRequestResponse({ description: 'An unknown mode' })
+  get(
+    @CurrentMembership() membership: Membership,
+    @Query(new ZodValidationPipe(ProjectionQueryDto)) query: ProjectionQueryDto,
+  ) {
+    return this.projection.get(membership, query.mode);
   }
 
   @Get('settings')
@@ -51,7 +65,9 @@ export class ProjectionController {
   @Patch('settings')
   @MinRole('ADMIN')
   @ApiOkResponse({ type: ProjectionSettingsDto })
-  @ApiBadRequestResponse({ description: 'Trailing months outside 1–12' })
+  @ApiBadRequestResponse({
+    description: 'Nothing to change, trailing months outside 1–12, or an unknown mode',
+  })
   @ApiForbiddenResponse({ description: 'Changing the settings needs Admin or above' })
   updateSettings(
     @CurrentMembership() membership: Membership,

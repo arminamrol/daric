@@ -59,10 +59,16 @@ import {
   type CreateValuationInput,
   type NetWorthReport,
   type ProjectionReport,
+  type ProjectionMode,
   projectionSchema,
   type ProjectionSettings,
   projectionSettingsSchema,
   type UpdateProjectionSettingsInput,
+  type CreatePlannedItemInput,
+  type PlannedItem,
+  plannedItemListSchema,
+  plannedItemSchema,
+  type UpdatePlannedItemInput,
   netWorthHistorySchema,
   netWorthSchema,
   type NetWorthSnapshot,
@@ -192,14 +198,29 @@ export interface ApiClient {
   /** Stores today's Net Worth as a MANUAL snapshot. */
   takeNetWorthSnapshot(workspaceId: string): Promise<NetWorthSnapshot>;
   getNetWorthSnapshot(workspaceId: string, snapshotId: string): Promise<NetWorthSnapshot>;
-  /** The Automatic Projection of the current year, with its assumptions. */
-  getProjection(workspaceId: string): Promise<ProjectionReport>;
+  /** The Projection of the current year in `mode` (the Workspace's by default), with its assumptions. */
+  getProjection(
+    workspaceId: string,
+    options?: { mode?: ProjectionMode },
+  ): Promise<ProjectionReport>;
   getProjectionSettings(workspaceId: string): Promise<ProjectionSettings>;
   /** Owner or Admin only. */
   updateProjectionSettings(
     workspaceId: string,
     input: UpdateProjectionSettingsInput,
   ): Promise<ProjectionSettings>;
+  /** Oldest first. */
+  listPlannedItems(workspaceId: string): Promise<PlannedItem[]>;
+  /** Owner or Admin only. The Amount is in the Workspace's Base Currency. */
+  createPlannedItem(workspaceId: string, input: CreatePlannedItemInput): Promise<PlannedItem>;
+  /** Owner or Admin only. */
+  updatePlannedItem(
+    workspaceId: string,
+    itemId: string,
+    input: UpdatePlannedItemInput,
+  ): Promise<PlannedItem>;
+  /** Owner or Admin only. */
+  deletePlannedItem(workspaceId: string, itemId: string): Promise<void>;
   /** Oldest first. Archived rules are left out unless `includeArchived`. */
   listRecurringRules(
     workspaceId: string,
@@ -437,11 +458,24 @@ export function createApiClient(options: ApiClientOptions = {}): ApiClient {
         `${snapshotsPath(workspaceId)}/${encodeURIComponent(snapshotId)}`,
         netWorthSnapshotSchema,
       ),
-    getProjection: (workspaceId) => request('GET', projectionPath(workspaceId), projectionSchema),
+    getProjection: (workspaceId, { mode } = {}) =>
+      request(
+        'GET',
+        `${projectionPath(workspaceId)}${mode ? `?mode=${mode}` : ''}`,
+        projectionSchema,
+      ),
     getProjectionSettings: (workspaceId) =>
       request('GET', `${projectionPath(workspaceId)}/settings`, projectionSettingsSchema),
     updateProjectionSettings: (workspaceId, input) =>
       request('PATCH', `${projectionPath(workspaceId)}/settings`, projectionSettingsSchema, input),
+    listPlannedItems: (workspaceId) =>
+      request('GET', plannedItemsPath(workspaceId), plannedItemListSchema),
+    createPlannedItem: (workspaceId, input) =>
+      request('POST', plannedItemsPath(workspaceId), plannedItemSchema, input),
+    updatePlannedItem: (workspaceId, itemId, input) =>
+      request('PATCH', plannedItemPath(workspaceId, itemId), plannedItemSchema, input),
+    deletePlannedItem: (workspaceId, itemId) =>
+      request('DELETE', plannedItemPath(workspaceId, itemId), noContent),
     listRecurringRules: (workspaceId, { includeArchived = false } = {}) =>
       request(
         'GET',
@@ -477,6 +511,14 @@ function snapshotsPath(workspaceId: string): string {
 
 function projectionPath(workspaceId: string): string {
   return `/v1/workspaces/${encodeURIComponent(workspaceId)}/projection`;
+}
+
+function plannedItemsPath(workspaceId: string): string {
+  return `${projectionPath(workspaceId)}/planned-items`;
+}
+
+function plannedItemPath(workspaceId: string, itemId: string): string {
+  return `${plannedItemsPath(workspaceId)}/${encodeURIComponent(itemId)}`;
 }
 
 function valuationsPath(workspaceId: string, accountId: string): string {

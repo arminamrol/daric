@@ -5,7 +5,9 @@ import {
   type IsoDay,
   type MonthPeriod,
   monthPeriodOfDay,
+  nextPeriod,
   periodStart,
+  type PlannedItemKind,
   previousPeriod,
 } from '@daric/core';
 import { and, eq, inArray, sql } from 'drizzle-orm';
@@ -21,6 +23,7 @@ import {
   categories,
   exchangeRates,
   labels,
+  plannedItems,
   recurringOccurrences,
   recurringRules,
   transactionLabels,
@@ -108,6 +111,61 @@ const demoBudgets: {
   { category: 'EXPENSE:رفت‌وآمد', period: 'MONTHLY', amount: 15_000_000n },
   { category: 'EXPENSE:قبض‌ها', period: 'MONTHLY', amount: 15_000_000n },
   { category: 'EXPENSE:تفریح و سفر', period: 'YEARLY', amount: 200_000_000n },
+];
+
+/**
+ * Demo Planned Items in rials, from the months after today's (`after` months
+ * on, on `day`): a rent rise from next month, a three-month course, a car
+ * insurance with no Category, and a year-end bonus.
+ */
+const demoPlannedItems: {
+  name: string;
+  kind: PlannedItemKind;
+  type: 'INCOME' | 'EXPENSE';
+  category: string | null;
+  amount: bigint;
+  after: number;
+  day: number;
+  /** How many months a Fixed Monthly item runs for; it runs on without. */
+  months?: number;
+}[] = [
+  {
+    name: 'اجارهٔ خانه پس از تمدید',
+    kind: 'FIXED_MONTHLY',
+    type: 'EXPENSE',
+    category: 'EXPENSE:اجاره',
+    amount: 280_000_000n,
+    after: 1,
+    day: 1,
+  },
+  {
+    name: 'کلاس زبان',
+    kind: 'FIXED_MONTHLY',
+    type: 'EXPENSE',
+    category: 'EXPENSE:آموزش',
+    amount: 8_000_000n,
+    after: 1,
+    day: 5,
+    months: 3,
+  },
+  {
+    name: 'بیمهٔ بدنهٔ خودرو',
+    kind: 'ONE_OFF',
+    type: 'EXPENSE',
+    category: null,
+    amount: 45_000_000n,
+    after: 2,
+    day: 15,
+  },
+  {
+    name: 'پاداش',
+    kind: 'ONE_OFF',
+    type: 'INCOME',
+    category: 'INCOME:حقوق',
+    amount: 300_000_000n,
+    after: 3,
+    day: 20,
+  },
 ];
 
 /** A demo Transaction before ids exist; Categories are named `KIND:name`. */
@@ -483,7 +541,7 @@ async function removeDemo(tx: Transaction): Promise<void> {
 
 /**
  * Creates the demo User (DEMO_EMAIL / DEMO_PASSWORD) with a Jalali Personal
- * Workspace: Accounts, the default Categories, Labels, Budgets, Recurring Rules, dollar
+ * Workspace: Accounts, the default Categories, Labels, Budgets, Recurring Rules, Planned Items, dollar
  * Exchange Rates, Valuations, and Transactions and
  * Transfers from the start of the Jalali month MONTHS_BACK months before
  * `today` up to `today`. Replaces the demo User if they exist, so it can run any number
@@ -600,6 +658,29 @@ export async function seedDemo(
         amount: b.amount,
         currency: 'IRR',
       })),
+    );
+
+    const monthsAfter = (n: number) => {
+      let month = thisMonth;
+      for (let i = 0; i < n; i++) month = nextPeriod(month);
+      return month;
+    };
+    await tx.insert(plannedItems).values(
+      demoPlannedItems.map((p) => {
+        const start = monthsAfter(p.after);
+        const end = p.months ? monthsAfter(p.after + p.months - 1) : null;
+        return {
+          workspaceId,
+          name: p.name,
+          kind: p.kind,
+          type: p.type,
+          categoryId: p.category ? categoryId(p.category) : null,
+          amount: p.amount,
+          currency: 'IRR',
+          startOn: dayOf('jalali', { ...start, day: p.day }),
+          endOn: end ? dayOf('jalali', { ...end, day: p.day }) : null,
+        };
+      }),
     );
 
     const first = months[0] as MonthPeriod;

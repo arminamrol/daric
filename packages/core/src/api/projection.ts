@@ -1,23 +1,28 @@
 import { z } from 'zod';
 import { amountSchema } from '../money';
-import { MAX_TRAILING_MONTHS } from '../projection';
+import { MAX_TRAILING_MONTHS, plannedItemKinds, projectionModes } from '../projection';
 import { transactionTypes } from '../transactions';
 import { rateUsedSchema } from './exchange-rate';
-import { monthParamSchema } from './shared';
+import { monthParamSchema, notEmpty } from './shared';
 import { isoDaySchema } from './transaction';
 
 /** How the Workspace's Projection is worked out. */
 export const projectionSettingsSchema = z.object({
   /** N: how many closed months the Trailing Average looks back over. */
   trailingMonths: z.number().int(),
+  /** The mode the Projection is shown in unless another is asked for. */
+  mode: z.enum(projectionModes),
   version: z.number().int(),
 });
 export type ProjectionSettings = z.infer<typeof projectionSettingsSchema>;
 
-/** What an Owner or Admin may change on the Projection settings. */
-export const updateProjectionSettingsInputSchema = z.strictObject({
-  trailingMonths: z.number().int().min(1).max(MAX_TRAILING_MONTHS),
-});
+/** What an Owner or Admin may change on the Projection settings; at least one per request. */
+export const updateProjectionSettingsInputSchema = z
+  .strictObject({
+    trailingMonths: z.number().int().min(1).max(MAX_TRAILING_MONTHS).exactOptional(),
+    mode: z.enum(projectionModes).exactOptional(),
+  })
+  .refine(...notEmpty);
 export type UpdateProjectionSettingsInput = z.infer<typeof updateProjectionSettingsInputSchema>;
 
 /** One type's or one Category's figures, in the Base Currency. */
@@ -30,13 +35,16 @@ export const projectionFiguresSchema = z.object({
   variable: amountSchema,
   /** What Recurring Rules bring after today up to the year end. */
   recurring: amountSchema,
-  /** actual + variable + recurring. */
+  /** What Planned Items bring after today up to the year end. */
+  planned: amountSchema,
+  /** actual + variable + recurring + planned; a mode leaves out what it does not use. */
   projected: amountSchema,
 });
 export type ProjectionFiguresWire = z.input<typeof projectionFiguresSchema>;
 
 export const categoryProjectionSchema = projectionFiguresSchema.extend({
-  categoryId: z.uuid(),
+  /** Null only for One-Off Planned Items with no Category. */
+  categoryId: z.uuid().nullable(),
   type: z.enum(transactionTypes),
 });
 
@@ -46,6 +54,19 @@ export const recurringAssumptionSchema = z.object({
   name: z.string(),
   type: z.enum(transactionTypes),
   categoryId: z.uuid(),
+  /** Its occurrences after today up to the year end. */
+  occurrences: z.array(isoDaySchema),
+  /** Their Amounts added up, in the Base Currency. */
+  total: amountSchema,
+});
+
+/** A Planned Item's part in the Projection. */
+export const plannedAssumptionSchema = z.object({
+  itemId: z.uuid(),
+  name: z.string(),
+  kind: z.enum(plannedItemKinds),
+  type: z.enum(transactionTypes),
+  categoryId: z.uuid().nullable(),
   /** Its occurrences after today up to the year end. */
   occurrences: z.array(isoDaySchema),
   /** Their Amounts added up, in the Base Currency. */
@@ -64,11 +85,14 @@ export const projectionWarningSchema = z.discriminatedUnion('kind', [
 export type ProjectionWarningWire = z.infer<typeof projectionWarningSchema>;
 
 /**
- * The Automatic Projection of the current Workspace-Calendar year, with every
- * assumption behind it: P = actual + round(average × months left) + recurring,
- * per type and per Category, in the Base Currency.
+ * The Projection of the current Workspace-Calendar year in one mode, with
+ * every assumption behind it, per type and per Category, in the Base Currency.
+ * Automatic: actual + round(average × months left) + recurring. Manual:
+ * actual + planned. Combined: per Category a Fixed Monthly Planned Item over
+ * Recurring Rules over the average, One-Off Planned Items added.
  */
 export const projectionSchema = z.object({
+  mode: z.enum(projectionModes),
   year: z.number().int(),
   today: isoDaySchema,
   /** The year's last day. */
@@ -88,8 +112,10 @@ export const projectionSchema = z.object({
   expense: projectionFiguresSchema,
   /** The type totals are the sums of these. */
   categories: z.array(categoryProjectionSchema),
-  /** Active Recurring Rules with occurrences left this year, oldest rule first. */
+  /** Active Recurring Rules counted, with occurrences left this year, oldest rule first. */
   recurring: z.array(recurringAssumptionSchema),
+  /** Planned Items counted, with occurrences left this year, oldest first. */
+  planned: z.array(plannedAssumptionSchema),
   ratesUsed: z.array(rateUsedSchema),
   /** Currencies with Amounts but no rate; those Amounts are left out. */
   missing: z.array(z.string()),
@@ -97,3 +123,9 @@ export const projectionSchema = z.object({
 });
 export type ProjectionWire = z.input<typeof projectionSchema>;
 export type ProjectionReport = z.infer<typeof projectionSchema>;
+
+/** Which mode to work the Projection out in; the Workspace's setting by default. */
+export const projectionQuerySchema = z.object({
+  mode: z.enum(projectionModes).exactOptional(),
+});
+export type ProjectionQuery = z.infer<typeof projectionQuerySchema>;

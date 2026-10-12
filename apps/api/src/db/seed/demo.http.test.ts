@@ -139,6 +139,23 @@ describe('demo seed', () => {
     ]);
   });
 
+  it('plans a rent rise, a course, a car insurance and a bonus for the Projection', async () => {
+    const token = await login();
+    const base = `/v1/workspaces/${seeded.workspaceId}/projection`;
+    const items = await call(t.url, 'GET', `${base}/planned-items`, { token });
+    expect(items.status).toBe(200);
+    // Seeded for 1405/07/19: from Aban, the course for three months.
+    expect(items.body).toMatchObject([
+      { kind: 'FIXED_MONTHLY', type: 'EXPENSE', startOn: '2026-10-23', endOn: null },
+      { kind: 'FIXED_MONTHLY', type: 'EXPENSE', startOn: '2026-10-27', endOn: '2026-12-26' },
+      { kind: 'ONE_OFF', type: 'EXPENSE', categoryId: null, startOn: '2026-12-06' },
+      { kind: 'ONE_OFF', type: 'INCOME', startOn: '2027-01-10' },
+    ]);
+    const manual = await call(t.url, 'GET', `${base}?mode=MANUAL`, { token });
+    expect(manual.status).toBe(200);
+    expect(BigInt(manual.body.expense.planned)).toBeGreaterThan(0n);
+  });
+
   it('enters a dollar rate from the first day of each demo month, the latest at 1,050,000 rials', async () => {
     const token = await login();
     const res = await call(t.url, 'GET', `/v1/workspaces/${seeded.workspaceId}/exchange-rates`, {

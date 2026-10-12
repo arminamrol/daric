@@ -22,6 +22,7 @@ import {
   rateDayOf,
   toBaseCurrency,
   periodParam,
+  plannedItemProblem,
   projectYear,
   projectionSchema,
   mayChangeTransaction,
@@ -39,6 +40,8 @@ import type {
   MonthPeriod,
   DueOccurrence,
   Label,
+  PlannedItem,
+  ProjectionMode,
   RecurringRule,
   Me,
   Session,
@@ -102,7 +105,13 @@ export function fakeApi({
   const snapshots: NetWorthSnapshot[] = [];
   /** Occurrences confirmed (with their Transaction) or skipped, by `ruleId|dueOn`. */
   const handled = new Map<string, { transactionId: string | null }>();
-  let projectionSettings = { trailingMonths: 3, version: 0 };
+  let projectionSettings: { trailingMonths: number; mode: ProjectionMode; version: number } = {
+    trailingMonths: 3,
+    mode: 'AUTOMATIC',
+    version: 0,
+  };
+  let plannedItems: PlannedItem[] = [];
+  let nextPlannedItemId = 1;
   /** Unreachable: every call fails as fetch does when the network is down. */
   let offline = false;
 
@@ -424,6 +433,40 @@ export function fakeApi({
   }
 
   /** Puts a Recurring Rule straight into the Workspace, as if made earlier. */
+  /** Puts a Planned Item straight into the Workspace, as if created earlier. */
+  function addPlannedItem(
+    fields: Partial<PlannedItem> &
+      Pick<PlannedItem, 'name' | 'kind' | 'type' | 'amount' | 'startOn'>,
+  ): PlannedItem {
+    const item: PlannedItem = {
+      id: `01900000-0000-7000-8f00-${String(nextPlannedItemId++).padStart(12, '0')}`,
+      categoryId: null,
+      currency: workspace.baseCurrency,
+      endOn: null,
+      version: 1,
+      ...fields,
+    };
+    plannedItems.push(item);
+    return item;
+  }
+
+  function findPlannedItem(itemId: string): PlannedItem {
+    const item = plannedItems.find((p) => p.id === itemId);
+    if (!item) throw new ApiError(404, { message: 'Not Found' });
+    return item;
+  }
+
+  /** As the API checks a Planned Item's fields and its Category. */
+  function assertPlannedItemFits(item: PlannedItem, current?: PlannedItem) {
+    const problem = plannedItemProblem(item);
+    if (problem) throw new ApiError(400, { message: problem });
+    if (item.categoryId === null || item.categoryId === current?.categoryId) return;
+    const category = categories.find((c) => c.id === item.categoryId);
+    if (!category || category.kind !== item.type || category.archived) {
+      throw new ApiError(400, { message: 'Invalid Category' });
+    }
+  }
+
   function addRule(
     fields: Partial<StoredRule> &
       Pick<StoredRule, 'name' | 'type' | 'accountId' | 'categoryId' | 'amount' | 'startOn'>,
@@ -996,7 +1039,7 @@ export function fakeApi({
       if (done?.transactionId) throw new ApiError(409, { message: 'Confirmed' });
       handled.set(`${ruleId}|${dueOn}`, { transactionId: null });
     },
-    async getProjection(workspaceId) {
+    async getProjection(workspaceId, { mode = projectionSettings.mode } = {}) {
       inWorkspace(workspaceId);
       const day = today();
       const currencyOf = (accountId: string) =>
@@ -1008,6 +1051,7 @@ export function fakeApi({
       const result = projectYear({
         calendar: workspace.calendar,
         today: day,
+        mode,
         trailingMonths: projectionSettings.trailingMonths,
         base: currencyByCode(workspace.baseCurrency),
         rates: currentRates(),
@@ -1021,15 +1065,23 @@ export function fakeApi({
         rules: rules
           .filter((r) => !r.archived)
           .map((r) => ({ ...r, amount: money(r.amount, currencyOf(r.accountId)) })),
+        plannedItems: plannedItems.map((p) => ({
+          ...p,
+          amount: money(p.amount, currencyByCode(p.currency)),
+        })),
         historyFrom: recorded.map((t) => t.occurredOn).sort()[0] ?? null,
       });
       const figures = (
-        f: Record<'actual' | 'average' | 'variable' | 'recurring' | 'projected', bigint>,
+        f: Record<
+          'actual' | 'average' | 'variable' | 'recurring' | 'planned' | 'projected',
+          bigint
+        >,
       ) => ({
         actual: amountToWire(f.actual),
         average: amountToWire(f.average),
         variable: amountToWire(f.variable),
         recurring: amountToWire(f.recurring),
+        planned: amountToWire(f.planned),
         projected: amountToWire(f.projected),
       });
       // Through the schema, as the client reads the API's answer.
@@ -1045,6 +1097,7 @@ export function fakeApi({
           ...figures(c),
         })),
         recurring: result.recurring.map((r) => ({ ...r, total: amountToWire(r.total) })),
+        planned: result.planned.map((p) => ({ ...p, total: amountToWire(p.total) })),
         ratesUsed: result.ratesUsed.map(({ currency, rate, effectiveOn }) => ({
           currency,
           rate,
@@ -1058,8 +1111,42 @@ export function fakeApi({
     },
     async updateProjectionSettings(workspaceId, input) {
       inWorkspace(workspaceId, 'ADMIN');
-      projectionSettings = { ...input, version: projectionSettings.version + 1 };
+      projectionSettings = {
+        ...projectionSettings,
+        ...input,
+        version: projectionSettings.version + 1,
+      };
       return { ...projectionSettings };
+    },
+    async listPlannedItems(workspaceId) {
+      inWorkspace(workspaceId);
+      return plannedItems.map((p) => ({ ...p }));
+    },
+    async createPlannedItem(workspaceId, { categoryId = null, endOn = null, ...input }) {
+      inWorkspace(workspaceId, 'ADMIN');
+      const draft = {
+        id: '',
+        currency: workspace.baseCurrency,
+        version: 1,
+        categoryId,
+        endOn,
+        ...input,
+      };
+      assertPlannedItemFits(draft);
+      return { ...addPlannedItem({ ...input, categoryId, endOn }) };
+    },
+    async updatePlannedItem(workspaceId, itemId, input) {
+      inWorkspace(workspaceId, 'ADMIN');
+      const current = findPlannedItem(itemId);
+      const updated = { ...current, ...input, version: current.version + 1 };
+      assertPlannedItemFits(updated, current);
+      plannedItems = plannedItems.map((p) => (p.id === itemId ? updated : p));
+      return { ...updated };
+    },
+    async deletePlannedItem(workspaceId, itemId) {
+      inWorkspace(workspaceId, 'ADMIN');
+      findPlannedItem(itemId);
+      plannedItems = plannedItems.filter((p) => p.id !== itemId);
     },
     async updatePreferences(input) {
       const user = signedIn();
@@ -1104,6 +1191,11 @@ export function fakeApi({
     valuations: () => valuations,
     addSnapshot,
     projectionSettings: () => projectionSettings,
+    /** Sets the Workspace's Projection mode, as if an Admin chose it earlier. */
+    setProjectionMode: (mode: ProjectionMode) =>
+      void (projectionSettings = { ...projectionSettings, mode }),
+    addPlannedItem,
+    plannedItems: () => plannedItems,
     /** In the order recorded, deleted ones left out. */
     transactions: () => live(),
     /** Ids of those deleted softly. */

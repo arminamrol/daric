@@ -504,10 +504,19 @@ describe('api-client', () => {
       average: '400000000',
       variable: '2173333333',
       recurring: '1280000000',
+      planned: '0',
       projected: '7653333333',
     };
-    const zero = { actual: '0', average: '0', variable: '0', recurring: '0', projected: '0' };
+    const zero = {
+      actual: '0',
+      average: '0',
+      variable: '0',
+      recurring: '0',
+      planned: '0',
+      projected: '0',
+    };
     const projection = {
+      mode: 'AUTOMATIC',
       year: 1405,
       today: '2026-10-09',
       yearEnd: '2027-03-20',
@@ -530,6 +539,7 @@ describe('api-client', () => {
           total: '250000000',
         },
       ],
+      planned: [],
       ratesUsed: [],
       missing: [],
       warnings: [{ kind: 'short_history', monthsUsed: 1, monthsWanted: 3 }],
@@ -541,11 +551,11 @@ describe('api-client', () => {
           [`GET ${path}`]: () => ({ status: 200, body: projection }),
           [`GET ${path}/settings`]: () => ({
             status: 200,
-            body: { trailingMonths: 3, version: 0 },
+            body: { trailingMonths: 3, mode: 'AUTOMATIC', version: 0 },
           }),
           [`PATCH ${path}/settings`]: () => ({
             status: 200,
-            body: { trailingMonths: 6, version: 1 },
+            body: { trailingMonths: 6, mode: 'AUTOMATIC', version: 1 },
           }),
         },
         { '__Host-daric_csrf': 'csrf-1' },
@@ -557,16 +567,86 @@ describe('api-client', () => {
       expect(read.window[0]).toEqual({ kind: 'month', year: 1405, month: 4 });
       expect(await client.getProjectionSettings(workspace.id)).toEqual({
         trailingMonths: 3,
+        mode: 'AUTOMATIC',
         version: 0,
       });
       expect(await client.updateProjectionSettings(workspace.id, { trailingMonths: 6 })).toEqual({
         trailingMonths: 6,
+        mode: 'AUTOMATIC',
         version: 1,
       });
       expect(sent.map((r) => [r.method, r.url, r.body])).toEqual([
         ['GET', path, undefined],
         ['GET', `${path}/settings`, undefined],
         ['PATCH', `${path}/settings`, { trailingMonths: 6 }],
+      ]);
+    });
+
+    it('asks for a mode', async () => {
+      const { client, sent } = fakeServer({
+        [`GET ${path}`]: () => ({
+          status: 200,
+          body: { ...projection, mode: 'MANUAL' },
+        }),
+      });
+      expect((await client.getProjection(workspace.id, { mode: 'MANUAL' })).mode).toBe('MANUAL');
+      expect(sent.map((r) => r.url)).toEqual([`${path}?mode=MANUAL`]);
+    });
+
+    it('lists, makes, changes and deletes Planned Items', async () => {
+      const item = {
+        id: '01900000-0000-7000-8000-0000000000f1',
+        name: 'بیمه',
+        kind: 'ONE_OFF',
+        type: 'EXPENSE',
+        categoryId: null,
+        amount: '150000000',
+        currency: 'IRR',
+        startOn: '2026-12-01',
+        endOn: null,
+        version: 1,
+      } as const;
+      const itemPath = `${path}/planned-items/${item.id}`;
+      const { client, sent } = fakeServer(
+        {
+          [`GET ${path}/planned-items`]: () => ({ status: 200, body: [item] }),
+          [`POST ${path}/planned-items`]: () => ({ status: 201, body: item }),
+          [`PATCH ${itemPath}`]: () => ({
+            status: 200,
+            body: { ...item, amount: '5', version: 2 },
+          }),
+          [`DELETE ${itemPath}`]: () => ({ status: 204 }),
+        },
+        { '__Host-daric_csrf': 'csrf-1' },
+      );
+      const [listed] = await client.listPlannedItems(workspace.id);
+      expect(listed?.amount).toBe(150_000_000n);
+      await client.createPlannedItem(workspace.id, {
+        name: 'بیمه',
+        kind: 'ONE_OFF',
+        type: 'EXPENSE',
+        amount: 150_000_000n,
+        startOn: '2026-12-01',
+      });
+      expect((await client.updatePlannedItem(workspace.id, item.id, { amount: 5n })).amount).toBe(
+        5n,
+      );
+      await client.deletePlannedItem(workspace.id, item.id);
+      expect(sent.map((r) => [r.method, r.url, r.body])).toEqual([
+        ['GET', `${path}/planned-items`, undefined],
+        [
+          'POST',
+          `${path}/planned-items`,
+          {
+            name: 'بیمه',
+            kind: 'ONE_OFF',
+            type: 'EXPENSE',
+            amount: '150000000',
+            startOn: '2026-12-01',
+          },
+        ],
+        ['PATCH', itemPath, { amount: '5' }],
+        ['DELETE', itemPath, undefined],
       ]);
     });
   });

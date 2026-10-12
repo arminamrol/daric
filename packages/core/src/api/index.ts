@@ -9,6 +9,7 @@ export * from './recurring';
 export * from './valuation';
 export * from './net-worth';
 export * from './projection';
+export * from './planned-item';
 export {
   currencyCodes,
   monthParamSchema,
