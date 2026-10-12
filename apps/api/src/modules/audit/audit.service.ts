@@ -27,6 +27,7 @@ export type AuditAction =
   | 'valuation.update'
   | 'valuation.delete'
   | 'net_worth_snapshot.create'
+  | 'projection_settings.update'
   | 'recurring.create'
   | 'recurring.update'
   | 'recurring.confirm'

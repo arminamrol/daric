@@ -19,6 +19,7 @@ import { CategoriesModule } from './modules/categories/categories.module';
 import { LabelsModule } from './modules/labels/labels.module';
 import { MeModule } from './modules/me/me.module';
 import { NetWorthModule } from './modules/net-worth/net-worth.module';
+import { ProjectionModule } from './modules/projection/projection.module';
 import { RecurringModule } from './modules/recurring/recurring.module';
 import { ValuationsModule } from './modules/valuations/valuations.module';
 import { TransactionsModule } from './modules/transactions/transactions.module';
@@ -78,6 +79,7 @@ export class AppModule {
         BudgetsModule,
         ExchangeRatesModule,
         RecurringModule,
+        ProjectionModule,
         ValuationsModule,
         NetWorthModule,
       ],

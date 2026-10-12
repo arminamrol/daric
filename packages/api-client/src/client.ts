@@ -58,6 +58,11 @@ import {
   type AccountValuation,
   type CreateValuationInput,
   type NetWorthReport,
+  type ProjectionReport,
+  projectionSchema,
+  type ProjectionSettings,
+  projectionSettingsSchema,
+  type UpdateProjectionSettingsInput,
   netWorthHistorySchema,
   netWorthSchema,
   type NetWorthSnapshot,
@@ -187,6 +192,14 @@ export interface ApiClient {
   /** Stores today's Net Worth as a MANUAL snapshot. */
   takeNetWorthSnapshot(workspaceId: string): Promise<NetWorthSnapshot>;
   getNetWorthSnapshot(workspaceId: string, snapshotId: string): Promise<NetWorthSnapshot>;
+  /** The Automatic Projection of the current year, with its assumptions. */
+  getProjection(workspaceId: string): Promise<ProjectionReport>;
+  getProjectionSettings(workspaceId: string): Promise<ProjectionSettings>;
+  /** Owner or Admin only. */
+  updateProjectionSettings(
+    workspaceId: string,
+    input: UpdateProjectionSettingsInput,
+  ): Promise<ProjectionSettings>;
   /** Oldest first. Archived rules are left out unless `includeArchived`. */
   listRecurringRules(
     workspaceId: string,
@@ -424,6 +437,11 @@ export function createApiClient(options: ApiClientOptions = {}): ApiClient {
         `${snapshotsPath(workspaceId)}/${encodeURIComponent(snapshotId)}`,
         netWorthSnapshotSchema,
       ),
+    getProjection: (workspaceId) => request('GET', projectionPath(workspaceId), projectionSchema),
+    getProjectionSettings: (workspaceId) =>
+      request('GET', `${projectionPath(workspaceId)}/settings`, projectionSettingsSchema),
+    updateProjectionSettings: (workspaceId, input) =>
+      request('PATCH', `${projectionPath(workspaceId)}/settings`, projectionSettingsSchema, input),
     listRecurringRules: (workspaceId, { includeArchived = false } = {}) =>
       request(
         'GET',
@@ -455,6 +473,10 @@ export function createApiClient(options: ApiClientOptions = {}): ApiClient {
 
 function snapshotsPath(workspaceId: string): string {
   return `/v1/workspaces/${encodeURIComponent(workspaceId)}/net-worth/snapshots`;
+}
+
+function projectionPath(workspaceId: string): string {
+  return `/v1/workspaces/${encodeURIComponent(workspaceId)}/projection`;
 }
 
 function valuationsPath(workspaceId: string, accountId: string): string {

@@ -10,3 +10,4 @@ export * from './budgets';
 export * from './recurring';
 export * from './rates';
 export * from './net-worth';
+export * from './projection';

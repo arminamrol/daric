@@ -12,6 +12,7 @@ import { LabelsPage } from '../pages/LabelsPage';
 import { LoginPage } from '../pages/LoginPage';
 import { NetWorthPage } from '../pages/NetWorthPage';
 import { NotFoundPage } from '../pages/NotFoundPage';
+import { ProjectionPage } from '../pages/ProjectionPage';
 import { RateFormPage } from '../pages/RateFormPage';
 import { RatesPage } from '../pages/RatesPage';
 import { RecurringFormPage } from '../pages/RecurringFormPage';
@@ -38,6 +39,7 @@ export const routes: RouteObject[] = [
           { path: 'accounts/:accountId', element: <AccountFormPage /> },
           { path: 'accounts/:accountId/valuations', element: <ValuationsPage /> },
           { path: 'net-worth', element: <NetWorthPage /> },
+          { path: 'projection', element: <ProjectionPage /> },
           { path: 'categories', element: <CategoriesPage /> },
           { path: 'categories/new', element: <CategoryFormPage /> },
           { path: 'categories/:categoryId', element: <CategoryFormPage /> },

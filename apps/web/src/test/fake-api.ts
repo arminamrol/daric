@@ -21,6 +21,9 @@ import {
   money,
   rateDayOf,
   toBaseCurrency,
+  periodParam,
+  projectYear,
+  projectionSchema,
   mayChangeTransaction,
   periodDays,
   todayIn,
@@ -99,6 +102,7 @@ export function fakeApi({
   const snapshots: NetWorthSnapshot[] = [];
   /** Occurrences confirmed (with their Transaction) or skipped, by `ruleId|dueOn`. */
   const handled = new Map<string, { transactionId: string | null }>();
+  let projectionSettings = { trailingMonths: 3, version: 0 };
   /** Unreachable: every call fails as fetch does when the network is down. */
   let offline = false;
 
@@ -992,6 +996,71 @@ export function fakeApi({
       if (done?.transactionId) throw new ApiError(409, { message: 'Confirmed' });
       handled.set(`${ruleId}|${dueOn}`, { transactionId: null });
     },
+    async getProjection(workspaceId) {
+      inWorkspace(workspaceId);
+      const day = today();
+      const currencyOf = (accountId: string) =>
+        currencyByCode(
+          accounts.find((a) => a.id === accountId)?.currency ?? workspace.baseCurrency,
+        );
+      const recurringIds = new Set([...handled.values()].map((h) => h.transactionId));
+      const recorded = live();
+      const result = projectYear({
+        calendar: workspace.calendar,
+        today: day,
+        trailingMonths: projectionSettings.trailingMonths,
+        base: currencyByCode(workspace.baseCurrency),
+        rates: currentRates(),
+        transactions: recorded.map((t) => ({
+          type: t.type,
+          categoryId: t.type === 'TRANSFER' ? null : t.categoryId,
+          amount: money(t.amount, currencyOf(t.accountId)),
+          occurredOn: t.occurredOn,
+          recurring: recurringIds.has(t.id),
+        })),
+        rules: rules
+          .filter((r) => !r.archived)
+          .map((r) => ({ ...r, amount: money(r.amount, currencyOf(r.accountId)) })),
+        historyFrom: recorded.map((t) => t.occurredOn).sort()[0] ?? null,
+      });
+      const figures = (
+        f: Record<'actual' | 'average' | 'variable' | 'recurring' | 'projected', bigint>,
+      ) => ({
+        actual: amountToWire(f.actual),
+        average: amountToWire(f.average),
+        variable: amountToWire(f.variable),
+        recurring: amountToWire(f.recurring),
+        projected: amountToWire(f.projected),
+      });
+      // Through the schema, as the client reads the API's answer.
+      return projectionSchema.parse({
+        ...result,
+        baseCurrency: workspace.baseCurrency,
+        window: result.window.map(periodParam),
+        income: figures(result.income),
+        expense: figures(result.expense),
+        categories: result.categories.map((c) => ({
+          categoryId: c.categoryId,
+          type: c.type,
+          ...figures(c),
+        })),
+        recurring: result.recurring.map((r) => ({ ...r, total: amountToWire(r.total) })),
+        ratesUsed: result.ratesUsed.map(({ currency, rate, effectiveOn }) => ({
+          currency,
+          rate,
+          effectiveOn,
+        })),
+      });
+    },
+    async getProjectionSettings(workspaceId) {
+      inWorkspace(workspaceId);
+      return { ...projectionSettings };
+    },
+    async updateProjectionSettings(workspaceId, input) {
+      inWorkspace(workspaceId, 'ADMIN');
+      projectionSettings = { ...input, version: projectionSettings.version + 1 };
+      return { ...projectionSettings };
+    },
     async updatePreferences(input) {
       const user = signedIn();
       user.preferences = { ...user.preferences, ...input };
@@ -1034,6 +1103,7 @@ export function fakeApi({
     addValuation,
     valuations: () => valuations,
     addSnapshot,
+    projectionSettings: () => projectionSettings,
     /** In the order recorded, deleted ones left out. */
     transactions: () => live(),
     /** Ids of those deleted softly. */
