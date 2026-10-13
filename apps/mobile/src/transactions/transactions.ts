@@ -1,27 +1,37 @@
 import { withWaitingChanges } from '@daric/api-client';
 import type { SyncState } from '@daric/api-client';
-import type { CreateTransactionInput, ListTransactionsQuery, Transaction } from '@daric/core';
+import { findCurrency, IRR } from '@daric/core';
+import type {
+  Account,
+  CreateTransactionInput,
+  Currency,
+  ListTransactionsQuery,
+  Transaction,
+} from '@daric/core';
 import { useMutation, useQuery } from '@tanstack/react-query';
 import { getRandomBytes } from 'expo-crypto';
 import { useMemo } from 'react';
 import { v7 as uuidv7 } from 'uuid';
 import { useApi } from '../api/api';
 import { useSignedIn } from '../auth/session';
-import { LAST_PICKS_PREFIX } from '../offline/device';
 import { useOfflineDevice, useWaitingChanges } from '../offline/offline';
-import { deviceSettings } from '../storage/device-settings';
 import { accountsKey, categoriesKey, transactionsKey } from './keys';
+
+/** The currency of `account`; rials while it is not known (not loaded yet). */
+export function currencyOf(account: Pick<Account, 'currency'> | undefined): Currency {
+  return (account && findCurrency(account.currency)) ?? IRR;
+}
 
 /** A new UUIDv7, so a create replayed from the queue is recognised by the API. */
 export const newId = () => uuidv7({ random: getRandomBytes(16) });
 
-/** The Workspace's active Accounts. */
-export function useAccounts() {
+/** The Workspace's Accounts; archived ones only when asked, as old Transactions name them. */
+export function useAccounts({ includeArchived = false }: { includeArchived?: boolean } = {}) {
   const api = useApi();
   const { workspace } = useSignedIn();
   return useQuery({
-    queryKey: [...accountsKey(workspace.id), { includeArchived: false }],
-    queryFn: () => api.listAccounts(workspace.id),
+    queryKey: [...accountsKey(workspace.id), { includeArchived }],
+    queryFn: () => api.listAccounts(workspace.id, { includeArchived }),
   });
 }
 
@@ -97,34 +107,11 @@ export function useRecordTransaction() {
         case 'synced':
         case 'queued':
           return outcome.status;
-        case 'rejected':
-          await queue.discard(workspace.id, input.id);
-          throw new ChangeRefused(outcome.reason);
         default:
-          // A create has no base version to conflict with, nor can it be deleted before it exists.
-          throw new ChangeRefused(outcome.status);
+          // Refused, or (not expected of a create) a conflict or gone: it waits no longer.
+          await queue.discard(workspace.id, input.id);
+          throw new ChangeRefused(outcome.status === 'rejected' ? outcome.reason : outcome.status);
       }
     },
   });
-}
-
-/** The Account and per-type Category last used on this phone, so the next entry starts from them. */
-export interface LastPicks {
-  accountId?: string;
-  categoryIds?: Partial<Record<CreateTransactionInput['type'], string>>;
-}
-
-const lastPicksKey = (workspaceId: string) => `${LAST_PICKS_PREFIX}${workspaceId}`;
-
-export function readLastPicks(workspaceId: string): LastPicks {
-  try {
-    const parsed: unknown = JSON.parse(deviceSettings.get(lastPicksKey(workspaceId)) ?? 'null');
-    return parsed && typeof parsed === 'object' ? (parsed as LastPicks) : {};
-  } catch {
-    return {};
-  }
-}
-
-export function writeLastPicks(workspaceId: string, picks: LastPicks): void {
-  deviceSettings.set(lastPicksKey(workspaceId), JSON.stringify(picks));
 }

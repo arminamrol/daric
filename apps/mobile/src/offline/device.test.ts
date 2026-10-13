@@ -7,7 +7,7 @@ import { describe, expect, it, vi } from 'vitest';
 import { memorySettings } from '../storage/settings';
 import type { Settings } from '../storage/settings';
 import { createOfflineDevice } from './device';
-import type { Network } from './device';
+import type { Network } from './network';
 
 const workspaceId = '01900000-0000-7000-9000-000000000001';
 const expense: CreateTransactionInput = {
@@ -159,5 +159,30 @@ describe('the offline device', () => {
     await vi.waitFor(() => expect(created).toHaveLength(1));
     expect(phone.queue.entries()).toHaveLength(0);
     stop();
+  });
+
+  it("wipes what another User's lapsed session left before a new User keeps data", async () => {
+    const store = memoryKeyValueStore();
+    const settings = memorySettings();
+    const queryClient = new QueryClient();
+    const phone = device({ store, settings, queryClient });
+    await phone.signedIn('user-a', true);
+    await phone.queue.submit(create('t1'));
+    queryClient.setQueryData(['transactions', workspaceId], [{ id: 't1' }]);
+
+    // User A's session lapsed (no logout); User B signs in on the same phone.
+    await phone.signedIn('user-b', true);
+    expect(phone.queue.entries()).toHaveLength(0);
+    expect(queryClient.getQueryData(['transactions', workspaceId])).toBeUndefined();
+    expect(await store.get('entries')).toEqual([]);
+  });
+
+  it('keeps what waits when the same User signs in again after their session lapsed', async () => {
+    const settings = memorySettings();
+    const phone = device({ settings });
+    await phone.signedIn('user-a', true);
+    await phone.queue.submit(create('t1'));
+    await phone.signedIn('user-a', true);
+    expect(phone.queue.entries()).toHaveLength(1);
   });
 });

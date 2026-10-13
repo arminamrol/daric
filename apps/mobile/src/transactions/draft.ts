@@ -5,7 +5,6 @@ import type {
   Currency,
   MoneyDisplay,
   ParseAmountError,
-  TransactionType,
 } from '@daric/core';
 import type { PlainMessageKey } from '@daric/i18n';
 
@@ -13,7 +12,8 @@ import type { PlainMessageKey } from '@daric/i18n';
 export interface Draft {
   /** One id per draft: sending the same draft again (a retry) cannot record it twice. */
   id: string;
-  type: TransactionType;
+  /** Transfers are recorded elsewhere (ticket 31). */
+  type: 'EXPENSE' | 'INCOME';
   amount: string;
   accountId: string | undefined;
   categoryId: string | undefined;
@@ -45,7 +45,9 @@ export function readDraft(
     moneyDisplay: MoneyDisplay;
     displayCalendar: CalendarSystem;
   },
-): { ok: true; input: CreateTransactionInput } | { ok: false; errors: DraftErrors } {
+):
+  | { ok: true; input: Extract<CreateTransactionInput, { type: 'EXPENSE' | 'INCOME' }> }
+  | { ok: false; errors: DraftErrors } {
   const parsed = parseAmount(draft.amount, context.currency, { display: context.moneyDisplay });
   const occurredOn = parseDisplayDay(draft.day, context.displayCalendar);
   const errors: DraftErrors = {};

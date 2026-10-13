@@ -1,5 +1,5 @@
 import type { SyncState } from '@daric/api-client';
-import { findCurrency, IRR, money } from '@daric/core';
+import { money } from '@daric/core';
 import type { Account, DisplayFormatters, Transaction } from '@daric/core';
 import { nativeTheme } from '@daric/design-tokens';
 import { isolate } from '@daric/i18n';
@@ -7,6 +7,7 @@ import type { PlainMessageKey } from '@daric/i18n';
 import { StyleSheet, View } from 'react-native';
 import { useI18n } from '../i18n/locale';
 import { Text } from '../ui/Text';
+import { currencyOf } from './transactions';
 
 const SYNC_LABELS = {
   pending: 'transactions.list.pending',
@@ -30,8 +31,7 @@ export function TransactionRow({
 }) {
   const { t } = useI18n();
   const amountIn = (amount: bigint, accountId: string) => {
-    const currency = findCurrency(accounts.get(accountId)?.currency ?? '') ?? IRR;
-    return format.money(money(amount, currency));
+    return format.money(money(amount, currencyOf(accounts.get(accountId))));
   };
   const account = accounts.get(transaction.accountId);
   let title: string;

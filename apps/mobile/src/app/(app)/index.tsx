@@ -1,4 +1,4 @@
-import { categoryTree, findCurrency, groupByMonth, IRR } from '@daric/core';
+import { categoryTree, groupByMonth } from '@daric/core';
 import type { Account, Transaction } from '@daric/core';
 import { nativeTheme } from '@daric/design-tokens';
 import { isolate } from '@daric/i18n';
@@ -11,7 +11,12 @@ import { useFormatters } from '../../display/formatters';
 import { useI18n } from '../../i18n/locale';
 import { useWaitingChanges } from '../../offline/offline';
 import { TransactionRow } from '../../transactions/TransactionRow';
-import { useAccounts, useCategories, useTransactions } from '../../transactions/transactions';
+import {
+  currencyOf,
+  useAccounts,
+  useCategories,
+  useTransactions,
+} from '../../transactions/transactions';
 import { Status } from '../../ui/Screen';
 import { Text } from '../../ui/Text';
 import { useTheme } from '../../ui/theme';
@@ -26,7 +31,7 @@ export default function TransactionsScreen() {
   const year = format.currentPeriod(new Date()).year;
   const filters = useMemo(() => ({ period: { kind: 'year', year } as const }), [year]);
   const list = useTransactions(filters);
-  const accounts = useAccounts();
+  const accounts = useAccounts({ includeArchived: true });
   const categories = useCategories();
   const waiting = useWaitingChanges(workspace.id);
   const canRecord = workspace.role !== 'VIEWER';
@@ -50,10 +55,8 @@ export default function TransactionsScreen() {
   }, [categories.data, t]);
   const sections = useMemo(
     () =>
-      groupByMonth(
-        list.transactions ?? [],
-        workspace.calendar,
-        (tr: Transaction) => findCurrency(accountMap.get(tr.accountId)?.currency ?? '') ?? IRR,
+      groupByMonth(list.transactions ?? [], workspace.calendar, (tr: Transaction) =>
+        currencyOf(accountMap.get(tr.accountId)),
       ).map((group) => ({ title: format.period(group.period), data: group.transactions })),
     [list.transactions, workspace.calendar, accountMap, format],
   );

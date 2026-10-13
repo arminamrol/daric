@@ -1,7 +1,7 @@
 import { ApiError } from '@daric/api-client';
 import type { LoginInput, Me, Workspace } from '@daric/core';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { useApi } from '../api/api';
+import { finishPendingLogout, logOut, useApi } from '../api/api';
 import { useOfflineDevice } from '../offline/offline';
 
 export const ME_QUERY_KEY = ['me'] as const;
@@ -12,6 +12,8 @@ export function useMe() {
   return useQuery({
     queryKey: ME_QUERY_KEY,
     queryFn: async (): Promise<Me | null> => {
+      // Off the critical path: a logout made offline is finished when the API can be reached.
+      void finishPendingLogout();
       try {
         return await api.me();
       } catch (error) {
@@ -42,8 +44,8 @@ export function useLogin() {
   const device = useOfflineDevice();
   return useMutation({
     mutationFn: async ({ keep, ...input }: LoginInput & { keep: boolean }) => {
-      await api.login(input);
-      await device.setKeep(keep);
+      const { user } = await api.login(input);
+      await device.signedIn(user.id, keep);
       await queryClient.resetQueries({ queryKey: ME_QUERY_KEY });
     },
   });
@@ -52,7 +54,7 @@ export function useLogin() {
 /**
  * Ends this Signed-in Device and wipes what it kept: the waiting changes (after
  * one last try to send them), the cached data and the "keep data" answer. The
- * tokens are forgotten even when the API cannot be told.
+ * tokens are forgotten even when the API cannot be told; it is told later.
  */
 export function useLogout() {
   const api = useApi();
@@ -63,9 +65,7 @@ export function useLogout() {
     mutationFn: async () => {
       await device.queue.replay();
       try {
-        await api.logout();
-      } catch {
-        // Offline: the tokens are gone from this phone, so its session can no longer be used.
+        await logOut(api);
       } finally {
         await device.wipe();
         queryClient.setQueryData(ME_QUERY_KEY, null);

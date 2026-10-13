@@ -7,20 +7,15 @@ import { dehydrate, hydrate } from '@tanstack/react-query';
 import type { DehydratedState, QueryClient } from '@tanstack/react-query';
 import type { Settings } from '../storage/settings';
 import { refreshAfterChange } from '../transactions/keys';
+import { forgetLastPicks } from '../transactions/last-picks';
+import type { Network } from './network';
 
 export type TransactionQueue = OfflineQueue<CreateTransactionInput, Transaction>;
 
-/** Whether the phone is online, and a way to hear when it comes back. */
-export interface Network {
-  isOnline(): boolean;
-  /** Calls `onOnline` whenever the phone comes back online; returns the unsubscribe. */
-  subscribe(onOnline: () => void): () => void;
-}
-
 /** Whether this phone is an Offline Device; asked at login, yes unless the user says no. */
 const KEEP = 'daric.keepData';
-/** Device-local picks that name Workspace data, wiped with it. */
-export const LAST_PICKS_PREFIX = 'daric.lastPicks.';
+/** The User whose data the phone holds, so another User's login starts clean. */
+const OWNER = 'daric.dataOwner';
 const CACHE_KEY = 'queryCache';
 /** Bumped when the cached shapes change, so an old cache is not restored. */
 const CACHE_VERSION = 1;
@@ -42,7 +37,12 @@ export interface OfflineDevice {
   queue: TransactionQueue;
   /** Whether Workspace data is kept on this phone. */
   keeps(): boolean;
-  /** Records the login answer to "Keep data on this device?". */
+  /**
+   * After a login: wipes what another User left (their session lapsed without
+   * a logout), then records the answer to "Keep data on this device?".
+   */
+  signedIn(userId: string, keep: boolean): Promise<void>;
+  /** Records the answer to "Keep data on this device?". */
   setKeep(keep: boolean): Promise<void>;
   /** Restores the cache an earlier start kept, if any. */
   restore(): Promise<void>;
@@ -123,9 +123,25 @@ export function createOfflineDevice({
     settings.set(KEEP, next ? 'yes' : null);
   }
 
-  return {
+  async function wipe() {
+    setKeepFlag(false);
+    settings.set(OWNER, null);
+    forgetLastPicks(settings);
+    await queue.clear();
+    await forgetKept();
+  }
+
+  const device: OfflineDevice = {
     queue,
     keeps: () => keep,
+    async signedIn(userId, next) {
+      if (settings.get(OWNER) !== userId) {
+        await wipe();
+        queryClient.removeQueries();
+      }
+      settings.set(OWNER, userId);
+      await device.setKeep(next);
+    },
     async setKeep(next) {
       setKeepFlag(next);
       if (next) {
@@ -158,13 +174,7 @@ export function createOfflineDevice({
         clearInterval(retry);
       };
     },
-    async wipe() {
-      setKeepFlag(false);
-      for (const key of settings.keys()) {
-        if (key.startsWith(LAST_PICKS_PREFIX)) settings.set(key, null);
-      }
-      await queue.clear();
-      await forgetKept();
-    },
+    wipe,
   };
+  return device;
 }

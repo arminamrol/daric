@@ -1,5 +1,4 @@
-import { findCurrency, IRR } from '@daric/core';
-import type { TransactionType } from '@daric/core';
+import { IRR } from '@daric/core';
 import { nativeTheme } from '@daric/design-tokens';
 import { isolate } from '@daric/i18n';
 import type { PlainMessageKey } from '@daric/i18n';
@@ -11,14 +10,15 @@ import { useFormatters } from '../../display/formatters';
 import { useI18n } from '../../i18n/locale';
 import { readDraft } from '../../transactions/draft';
 import type { Draft, DraftErrors } from '../../transactions/draft';
+import { readLastPicks, writeLastPicks } from '../../transactions/last-picks';
 import {
+  currencyOf,
   newId,
-  readLastPicks,
   useAccounts,
   useCategories,
   useRecordTransaction,
-  writeLastPicks,
 } from '../../transactions/transactions';
+import { deviceSettings } from '../../storage/device-settings';
 import { Button } from '../../ui/Button';
 import { Choices } from '../../ui/Choices';
 import { Field } from '../../ui/Field';
@@ -26,7 +26,7 @@ import { Status } from '../../ui/Screen';
 import { Text } from '../../ui/Text';
 
 /** Expense first: it is what people record most. */
-const TYPES: readonly TransactionType[] = ['EXPENSE', 'INCOME'];
+const TYPES: readonly Draft['type'][] = ['EXPENSE', 'INCOME'];
 const CALENDAR_LABELS = {
   jalali: 'settings.calendar.jalali',
   gregorian: 'settings.calendar.gregorian',
@@ -48,16 +48,18 @@ export default function NewTransactionScreen() {
   const record = useRecordTransaction();
   const amountRef = useRef<TextInput>(null);
 
-  const [last] = useState(() => readLastPicks(workspace.id));
-  const [draft, setDraft] = useState((): Draft => ({
-    id: newId(),
-    type: 'EXPENSE',
-    amount: '',
-    accountId: last.accountId,
-    categoryId: last.categoryIds?.EXPENSE,
-    day: format.day(format.today(new Date())),
-    note: '',
-  }));
+  const [draft, setDraft] = useState((): Draft => {
+    const last = readLastPicks(deviceSettings, workspace.id);
+    return {
+      id: newId(),
+      type: 'EXPENSE',
+      amount: '',
+      accountId: last.accountId,
+      categoryId: last.categoryIds?.EXPENSE,
+      day: format.day(format.today(new Date())),
+      note: '',
+    };
+  });
   const [errors, setErrors] = useState<DraftErrors>({});
   const [saved, setSaved] = useState<'synced' | 'queued'>();
 
@@ -84,7 +86,7 @@ export default function NewTransactionScreen() {
   const categoryId = typeChoices.some((c) => c.id === draft.categoryId)
     ? draft.categoryId
     : typeChoices[0]?.id;
-  const currency = (account && findCurrency(account.currency)) ?? IRR;
+  const currency = currencyOf(account);
   const unit =
     currency.code === IRR.code
       ? t(`settings.workspace.moneyDisplay.${workspace.moneyDisplay}`)
@@ -93,11 +95,12 @@ export default function NewTransactionScreen() {
   if (accounts.isPending || categories.isPending) {
     return <Status message={t('session.loading')} />;
   }
+  if (workspace.role === 'VIEWER') return <Status alert message={t('transactions.readOnly')} />;
   if (!account) return <Status alert message={t('transactions.noAccount')} />;
 
   function change(fields: Partial<Draft>) {
-    // A changed draft is a new Transaction: it gets its own id.
-    setDraft((current) => ({ ...current, ...fields, id: saved ? newId() : current.id }));
+    // A changed draft is a new Transaction: sending it cannot clash with one sent before.
+    setDraft((current) => ({ ...current, ...fields, id: newId() }));
     setSaved(undefined);
   }
 
@@ -118,13 +121,16 @@ export default function NewTransactionScreen() {
     }
     setErrors({});
     const { input } = read;
-    if (input.type === 'TRANSFER') return;
     record.mutate(
       { ...input, id: draft.id },
       {
         onSuccess: (outcome) => {
-          const picks = { ...last.categoryIds, [input.type]: input.categoryId };
-          writeLastPicks(workspace.id, { accountId: input.accountId, categoryIds: picks });
+          // Read again: an earlier save on this screen may have picked for the other type.
+          const { categoryIds } = readLastPicks(deviceSettings, workspace.id);
+          writeLastPicks(deviceSettings, workspace.id, {
+            accountId: input.accountId,
+            categoryIds: { ...categoryIds, [input.type]: input.categoryId },
+          });
           setDraft((current) => ({ ...current, id: newId(), amount: '', note: '' }));
           setSaved(outcome);
           amountRef.current?.focus();
@@ -140,12 +146,11 @@ export default function NewTransactionScreen() {
           label={t('transactions.form.type')}
           choices={TYPES.map((type) => ({ id: type, label: t(`transactions.type.${type}`) }))}
           selected={draft.type}
-          onSelect={(type) =>
-            change({
-              type: type as TransactionType,
-              categoryId: last.categoryIds?.[type as TransactionType],
-            })
-          }
+          onSelect={(id) => {
+            const type = id as Draft['type'];
+            const { categoryIds } = readLastPicks(deviceSettings, workspace.id);
+            change({ type, categoryId: categoryIds?.[type] });
+          }}
         />
         <Field
           ref={amountRef}

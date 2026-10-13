@@ -1,4 +1,9 @@
-import type { Network } from './device';
+/** Whether the phone is online, and a way to hear when it comes back. */
+export interface Network {
+  isOnline(): boolean;
+  /** Calls `onOnline` whenever the phone comes back online; returns the unsubscribe. */
+  subscribe(onOnline: () => void): () => void;
+}
 
 /** What NetInfo reports about the connection. */
 export interface ConnectionState {
