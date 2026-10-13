@@ -75,7 +75,7 @@ Persian and right-to-left by default, light and dark themes, installable as a PW
 
 Expo Router app in `apps/mobile`, Persian and right-to-left, light and dark themes.
 
-- Run it on a simulator with `pnpm --filter @daric/mobile ios` (or `android`); this generates the native projects (`ios/`, `android/`, not committed) and starts Metro. With the API on another machine, set `EXPO_PUBLIC_API_URL` (default `http://localhost:3000`; an Android emulator reaches the host at `http://10.0.2.2:3000`).
+- Run it on a simulator with `pnpm --filter @daric/mobile ios` (or `android`); this generates the native projects (`ios/`, `android/`, not committed) and starts Metro. The app calls the API on port 3000 of the machine Metro runs on, so simulators, emulators and phones on the same network work as they are; set `EXPO_PUBLIC_API_URL` to use another API.
 - Styles come from `nativeTheme` in `@daric/design-tokens`; use `start`/`end` properties, never `left`/`right`. UI text comes from `@daric/i18n`.
 - Logic that does not need React Native (token store, SQLite store, offline device, fast-entry validation) sits in plain modules with Vitest tests; screens stay thin.
 

@@ -1,11 +1,18 @@
 import { ApiError, createApiClient, memoryTokenStore } from '@daric/api-client';
 import type { ApiClient } from '@daric/api-client';
+import Constants from 'expo-constants';
 import * as SecureStore from 'expo-secure-store';
 import { createContext, use } from 'react';
 import { secureStoreTokens } from '../auth/tokens';
 
-/** Where the API is; set `EXPO_PUBLIC_API_URL` for a phone that cannot reach localhost. */
-const API_URL = process.env['EXPO_PUBLIC_API_URL'] ?? 'http://localhost:3000';
+/**
+ * Where the API is: `EXPO_PUBLIC_API_URL` when set, else port 3000 on the
+ * machine Metro serves the app from. `localhost` would be the phone or
+ * emulator itself, so a development build asks Metro's host instead.
+ */
+const API_URL =
+  process.env['EXPO_PUBLIC_API_URL'] ??
+  `http://${Constants.expoConfig?.hostUri?.split(':')[0] ?? 'localhost'}:3000`;
 /** The refresh token of a logout the API could not be told of yet. */
 const LOGOUT_PENDING = 'daric.logoutPending';
 
