@@ -1,3 +1,4 @@
+import type { SyncState } from '@daric/api-client';
 import { groupByMonth, IRR, money } from '@daric/core';
 import type { Account, Category, Label, MonthGroup, Transaction } from '@daric/core';
 import { isolate } from '@daric/i18n';
@@ -12,7 +13,6 @@ import { useI18n } from '../i18n/locale';
 import { PeriodTotals } from '../rates/PeriodTotals';
 import { useFormatters } from '../settings/settings';
 import { categoryChoices } from './choices';
-import type { SyncState } from './pending';
 
 const SYNC_LABELS = {
   pending: 'transactions.list.pending',

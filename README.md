@@ -11,7 +11,7 @@ Personal and household finance: accounts, transactions, budgets, net worth, repo
 ```
 apps/api               NestJS API (Drizzle + Postgres)
 apps/web               Vite + React web app / PWA
-apps/mobile            Expo app (placeholder)
+apps/mobile            Expo app (Expo Router)
 packages/core          pure TypeScript domain logic
 packages/api-client    typed API client
 packages/offline-queue offline write queue
@@ -70,6 +70,14 @@ Persian and right-to-left by default, light and dark themes, installable as a PW
 - After changing `packages/design-tokens/src/tokens.ts`, regenerate the preset with `pnpm --filter @daric/design-tokens generate` (a test fails until you do).
 - After changing `apps/web/public/favicon.svg`, regenerate the PWA icons with `pnpm --filter @daric/web icons`.
 - The service worker only runs in the production build: try it with `pnpm build` then `pnpm --filter @daric/web preview`.
+
+## Mobile app
+
+Expo Router app in `apps/mobile`, Persian and right-to-left, light and dark themes.
+
+- Run it on a simulator with `pnpm --filter @daric/mobile ios` (or `android`); this generates the native projects (`ios/`, `android/`, not committed) and starts Metro. The app calls the API on port 3000 of the machine Metro runs on, so simulators, emulators and phones on the same network work as they are; set `EXPO_PUBLIC_API_URL` to use another API.
+- Styles come from `nativeTheme` in `@daric/design-tokens`; use `start`/`end` properties, never `left`/`right`. UI text comes from `@daric/i18n`.
+- Logic that does not need React Native (token store, SQLite store, offline device, fast-entry validation) sits in plain modules with Vitest tests; screens stay thin.
 
 ## API
 

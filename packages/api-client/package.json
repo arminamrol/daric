@@ -18,6 +18,7 @@
     "vitest": "^5.0.3"
   },
   "dependencies": {
-    "@daric/core": "workspace:*"
+    "@daric/core": "workspace:*",
+    "@daric/offline-queue": "workspace:*"
   }
 }

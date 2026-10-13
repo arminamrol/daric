@@ -1,6 +1,7 @@
 import { IDBFactory } from 'fake-indexeddb';
 import { describe, expect, it } from 'vitest';
-import { indexedDbStorage, keyValueStore } from './indexeddb';
+import { keyValueStore } from './indexeddb';
+import { keyValueStorage } from './keyvalue';
 import type { Entry } from './queue';
 
 const entry: Entry<{ amount: bigint }, never> = {
@@ -16,13 +17,13 @@ const entry: Entry<{ amount: bigint }, never> = {
 describe('IndexedDB storage', () => {
   it('keeps the entries, bigints included, across openings', async () => {
     const factory = new IDBFactory();
-    await indexedDbStorage(keyValueStore('daric-test', factory)).write([entry]);
-    const reopened = indexedDbStorage(keyValueStore('daric-test', factory));
+    await keyValueStorage(keyValueStore('daric-test', factory)).write([entry]);
+    const reopened = keyValueStorage(keyValueStore('daric-test', factory));
     expect(await reopened.read()).toEqual([entry]);
   });
 
   it('reads nothing before the first write and after clearing', async () => {
-    const storage = indexedDbStorage(keyValueStore('daric-test', new IDBFactory()));
+    const storage = keyValueStorage(keyValueStore('daric-test', new IDBFactory()));
     expect(await storage.read()).toEqual([]);
     await storage.write([entry]);
     await storage.clear();

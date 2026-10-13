@@ -6,7 +6,10 @@ import type {
   ListTransactionsQuery,
   Transaction,
 } from '@daric/core';
-import type { QueuedTransactionChange } from '../offline/offline';
+import type { Entry } from '@daric/offline-queue';
+
+/** A Transaction change waiting in the offline queue; its scope is the Workspace. */
+export type QueuedTransactionChange = Entry<CreateTransactionInput, Transaction>;
 
 /** Where a change shown before the API has it stands: on its way, or waiting for the user. */
 export type SyncState = 'pending' | 'conflict' | 'rejected';

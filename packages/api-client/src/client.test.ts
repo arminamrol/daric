@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
-import { ApiError, createApiClient, transactionConflict } from './index';
+import { ApiError, createApiClient, memoryTokenStore, transactionConflict } from './index';
+import type { TokenStore } from './index';
 
 const user = { id: '01900000-0000-7000-8000-000000000000', email: 'sara@example.com' };
 const preferences = { displayCalendar: 'jalali', digits: 'persian', theme: 'system' } as const;
@@ -37,6 +38,7 @@ function fakeServer(
     (req: Sent) => { status: number; body?: unknown; cookies?: Record<string, string> }
   >,
   initialCookies: Record<string, string> = {},
+  tokens?: TokenStore,
 ) {
   const cookies = new Map(Object.entries(initialCookies));
   const sent: Sent[] = [];
@@ -59,7 +61,11 @@ function fakeServer(
       headers: { 'content-type': 'application/json' },
     });
   };
-  const client = createApiClient({ fetch, readCookie: (name) => cookies.get(name) });
+  const client = createApiClient({
+    fetch,
+    readCookie: (name) => cookies.get(name),
+    ...(tokens && { tokens }),
+  });
   return { client, sent };
 }
 
@@ -1031,5 +1037,159 @@ describe('api-client', () => {
     });
     await client.me();
     expect(sent).toEqual(['https://api.daric.test/v1/me']);
+  });
+  describe('with a token store (the mobile app)', () => {
+    const me = { user: { ...user, emailVerified: true }, preferences, workspaces: [] };
+    const signedIn = { ...session, accessToken: 'access-1', refreshToken: 'refresh-1' };
+
+    function mobile(
+      routes: Parameters<typeof fakeServer>[0],
+      /** Null: signed out. */
+      start: { accessToken: string; refreshToken: string } | null = {
+        accessToken: 'access-1',
+        refreshToken: 'refresh-1',
+      },
+    ) {
+      const tokens = memoryTokenStore(start ?? undefined);
+      return { ...fakeServer(routes, {}, tokens), tokens };
+    }
+
+    it('sends the access token as a bearer header and identifies as the mobile app, without cookies or CSRF', async () => {
+      const { client, sent } = mobile({
+        'GET /v1/me': () => ({ status: 200, body: me }),
+        [`PATCH /v1/workspaces/${workspace.id}`]: () => ({ status: 200, body: workspace }),
+      });
+      await client.me();
+      await client.updateWorkspace(workspace.id, { name: 'Home' });
+      expect(sent.map((r) => r.url)).toEqual(['/v1/me', `/v1/workspaces/${workspace.id}`]);
+      for (const req of sent) {
+        expect(req.headers.get('authorization')).toBe('Bearer access-1');
+        expect(req.headers.get('x-daric-client')).toBe('mobile');
+        expect(req.headers.has('x-csrf-token')).toBe(false);
+        expect(req.credentials).toBe('omit');
+      }
+    });
+
+    it('keeps the tokens a login hands out, and returns the session without them', async () => {
+      const { client, tokens } = mobile(
+        { 'POST /v1/auth/login': () => ({ status: 200, body: signedIn }) },
+        null,
+      );
+      expect(await client.login({ email: user.email, password: 'secret password' })).toEqual(
+        session,
+      );
+      expect(await tokens.read()).toEqual({ accessToken: 'access-1', refreshToken: 'refresh-1' });
+    });
+
+    it('keeps the tokens a sign-up hands out', async () => {
+      const { client, tokens } = mobile(
+        { 'POST /v1/auth/register': () => ({ status: 201, body: signedIn }) },
+        null,
+      );
+      await client.register({ email: user.email, password: 'secret password' });
+      expect(await tokens.read()).toEqual({ accessToken: 'access-1', refreshToken: 'refresh-1' });
+    });
+
+    it('sends no Authorization header while signed out', async () => {
+      const { client, sent } = mobile({ 'GET /v1/me': () => ({ status: 401 }) }, null);
+      await expect(client.me()).rejects.toMatchObject({ status: 401 });
+      expect(sent).toHaveLength(1);
+      expect(sent[0]?.headers.has('authorization')).toBe(false);
+    });
+
+    it('refreshes an expired access token once and repeats the request with the new one', async () => {
+      const { client, sent, tokens } = mobile({
+        'GET /v1/me': (req) =>
+          req.headers.get('authorization') === 'Bearer access-2'
+            ? { status: 200, body: me }
+            : { status: 401 },
+        'POST /v1/auth/refresh': () => ({
+          status: 200,
+          body: { ...signedIn, accessToken: 'access-2', refreshToken: 'refresh-2' },
+        }),
+      });
+      expect(await client.me()).toEqual(me);
+      expect(sent.map((r) => [r.method, r.url, r.body])).toEqual([
+        ['GET', '/v1/me', undefined],
+        ['POST', '/v1/auth/refresh', { refreshToken: 'refresh-1' }],
+        ['GET', '/v1/me', undefined],
+      ]);
+      expect(sent[1]?.headers.has('authorization')).toBe(false);
+      expect(await tokens.read()).toEqual({ accessToken: 'access-2', refreshToken: 'refresh-2' });
+    });
+
+    it('refreshes once for requests that fail together: a refresh token is good for one use', async () => {
+      const { client, sent } = mobile({
+        'GET /v1/me': (req) =>
+          req.headers.get('authorization') === 'Bearer access-2'
+            ? { status: 200, body: me }
+            : { status: 401 },
+        'POST /v1/auth/refresh': () => ({
+          status: 200,
+          body: { ...signedIn, accessToken: 'access-2', refreshToken: 'refresh-2' },
+        }),
+      });
+      await Promise.all([client.me(), client.me(), client.me()]);
+      expect(sent.filter((r) => r.url === '/v1/auth/refresh')).toHaveLength(1);
+    });
+
+    it('forgets the tokens when the refresh token is refused, and fails with the first 401', async () => {
+      const { client, sent, tokens } = mobile({
+        'GET /v1/me': () => ({ status: 401, body: { message: 'expired' } }),
+        'POST /v1/auth/refresh': () => ({ status: 401 }),
+      });
+      const error = await client.me().catch((e: unknown) => e);
+      expect(error).toBeInstanceOf(ApiError);
+      expect(error).toMatchObject({ status: 401, body: { message: 'expired' } });
+      expect(sent).toHaveLength(2);
+      expect(await tokens.read()).toBeUndefined();
+    });
+
+    it('keeps the tokens when the refresh fails for another reason, so a later request tries again', async () => {
+      const { client, tokens } = mobile({
+        'GET /v1/me': () => ({ status: 401 }),
+        'POST /v1/auth/refresh': () => ({ status: 503 }),
+      });
+      await expect(client.me()).rejects.toMatchObject({ status: 401 });
+      expect(await tokens.read()).toEqual({ accessToken: 'access-1', refreshToken: 'refresh-1' });
+    });
+
+    it('does not refresh after a failed login', async () => {
+      const { client, sent } = mobile(
+        { 'POST /v1/auth/login': () => ({ status: 401 }) },
+        { accessToken: 'stale', refreshToken: 'refresh-1' },
+      );
+      await expect(
+        client.login({ email: user.email, password: 'wrong password' }),
+      ).rejects.toMatchObject({ status: 401 });
+      expect(sent.map((r) => r.url)).toEqual(['/v1/auth/login']);
+      expect(sent[0]?.headers.has('authorization')).toBe(false);
+    });
+
+    it('logs out with the refresh token in the body and forgets the tokens', async () => {
+      const { client, sent, tokens } = mobile({ 'POST /v1/auth/logout': () => ({ status: 204 }) });
+      await client.logout();
+      expect(sent[0]?.body).toEqual({ refreshToken: 'refresh-1' });
+      expect(await tokens.read()).toBeUndefined();
+    });
+
+    it('forgets the tokens on logout even when the API cannot be reached', async () => {
+      const tokens = memoryTokenStore({ accessToken: 'access-1', refreshToken: 'refresh-1' });
+      const client = createApiClient({
+        fetch: () => Promise.reject(new TypeError('Network request failed')),
+        tokens,
+      });
+      await expect(client.logout()).rejects.toThrow('Network request failed');
+      expect(await tokens.read()).toBeUndefined();
+    });
+
+    it('downloads an export with the bearer header', async () => {
+      const { client, sent } = mobile({
+        [`GET /v1/workspaces/${workspace.id}/export`]: () => ({ status: 200, body: {} }),
+      });
+      await client.exportWorkspace(workspace.id, 'json');
+      expect(sent[0]?.headers.get('authorization')).toBe('Bearer access-1');
+      expect(sent[0]?.headers.get('x-daric-client')).toBe('mobile');
+    });
   });
 });
