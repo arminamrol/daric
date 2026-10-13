@@ -1,0 +1,27 @@
+{
+  "expo": {
+    "name": "Daric",
+    "slug": "daric",
+    "scheme": "daric",
+    "version": "0.0.0",
+    "orientation": "portrait",
+    "userInterfaceStyle": "automatic",
+    "ios": {
+      "bundleIdentifier": "app.daric.mobile",
+      "supportsTablet": true
+    },
+    "android": {
+      "package": "app.daric.mobile"
+    },
+    "plugins": [
+      "expo-router",
+      "expo-secure-store",
+      "expo-sqlite",
+      "expo-font",
+      ["expo-localization", { "supportsRTL": true, "forcesRTL": true }]
+    ],
+    "experiments": {
+      "typedRoutes": false
+    }
+  }
+}

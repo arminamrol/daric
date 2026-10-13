@@ -18,6 +18,7 @@
     "@daric/design-tokens": "workspace:*",
     "@daric/i18n": "workspace:*",
     "@daric/offline-queue": "workspace:*",
+    "@expo-google-fonts/vazirmatn": "^0.4.1",
     "@react-native-community/netinfo": "12.0.1",
     "@tanstack/react-query": "^5.104.1",
     "expo": "~57.0.28",
@@ -38,6 +39,7 @@
   },
   "devDependencies": {
     "@daric/config": "workspace:*",
+    "@types/node": "^22.20.5",
     "@types/react": "~19.2.4",
     "eslint": "^10.12.0",
     "eslint-plugin-react-hooks": "^7.1.1",

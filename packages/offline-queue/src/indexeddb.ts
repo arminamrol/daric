@@ -1,18 +1,12 @@
-import type { Entry, QueueStorage } from './queue';
-
-/**
- * One IndexedDB object store used as a key-value store. Values are stored by
- * structured clone, so bigint Amounts survive as they are.
- */
-export interface KeyValueStore {
-  get<T>(key: string): Promise<T | undefined>;
-  set(key: string, value: unknown): Promise<void>;
-  delete(key: string): Promise<void>;
-}
+import type { KeyValueStore } from './keyvalue';
 
 const STORE = 'kv';
 
-/** Opens (creating if needed) the database `name` with one key-value store. */
+/**
+ * Opens (creating if needed) the IndexedDB database `name` with one object
+ * store used as a key-value store. Values are stored by structured clone, so
+ * bigint Amounts survive as they are.
+ */
 export function keyValueStore(name: string, factory: IDBFactory = indexedDB): KeyValueStore {
   let db: Promise<IDBDatabase> | undefined;
   const open = () =>
@@ -41,16 +35,5 @@ export function keyValueStore(name: string, factory: IDBFactory = indexedDB): Ke
     get: (key) => run('readonly', (store) => store.get(key)),
     set: (key, value) => run('readwrite', (store) => store.put(value, key)),
     delete: (key) => run('readwrite', (store) => store.delete(key)),
-  };
-}
-
-const ENTRIES = 'entries';
-
-/** Keeps the queue in IndexedDB, for the web app on an Offline Device. */
-export function indexedDbStorage<P, S>(store: KeyValueStore): QueueStorage<P, S> {
-  return {
-    read: async () => (await store.get<Entry<P, S>[]>(ENTRIES)) ?? [],
-    write: (entries) => store.set(ENTRIES, entries),
-    clear: () => store.delete(ENTRIES),
   };
 }

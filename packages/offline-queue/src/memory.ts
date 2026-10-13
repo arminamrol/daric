@@ -1,4 +1,4 @@
-import type { KeyValueStore } from './indexeddb';
+import type { KeyValueStore } from './keyvalue';
 import type { Entry, QueueStorage } from './queue';
 
 /** Keeps the entries in memory only: for tests, and devices that keep no data. */

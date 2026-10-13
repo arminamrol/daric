@@ -3,7 +3,7 @@ import type { ApiClient } from '@daric/api-client';
 import type { CreateTransactionInput, Transaction } from '@daric/core';
 import {
   createOfflineQueue,
-  indexedDbStorage,
+  keyValueStorage,
   keyValueStore,
   memoryStorage,
 } from '@daric/offline-queue';
@@ -76,8 +76,7 @@ export function createOfflineDevice({
   const db = () => (store ??= keyValueStore('daric'));
 
   const memory = memoryStorage<CreateTransactionInput, Transaction>();
-  const persistent = (): QueueStorage<CreateTransactionInput, Transaction> =>
-    indexedDbStorage(db());
+  const persistent = (): QueueStorage<CreateTransactionInput, Transaction> => keyValueStorage(db());
   const storage: QueueStorage<CreateTransactionInput, Transaction> = {
     read: () => (keep ? persistent().read() : memory.read()),
     write: (entries) => (keep ? persistent().write(entries) : memory.write(entries)),
