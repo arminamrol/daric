@@ -112,10 +112,11 @@ export default function TransactionsScreen() {
           <Pressable
             accessibilityRole="button"
             accessibilityLabel={t('transactions.form.title')}
-            style={[
+            // Link passes its own props down through a Slot, which takes one style object.
+            style={StyleSheet.flatten([
               styles.fab,
               { backgroundColor: colors.primary, bottom: insets.bottom + nativeTheme.space(6) },
-            ]}
+            ])}
           >
             <Text size="3xl" bold tone="onPrimary" importantForAccessibility="no">
               +
