@@ -27,6 +27,8 @@ import {
   type CreateTransactionInput,
   type ExportFormat,
   exportFiles,
+  authResultSchema,
+  CLIENT_HEADER,
   CSRF_COOKIE,
   CSRF_HEADER,
   type Label,
@@ -84,6 +86,7 @@ import {
   valuationListSchema,
   valuationSchema,
 } from '@daric/core';
+import type { TokenStore } from './tokens';
 
 /** A non-2xx answer from the API. */
 export class ApiError extends Error {
@@ -127,12 +130,20 @@ export interface ApiClientOptions {
   fetch?: typeof fetch;
   /** Reads a cookie the page can see; defaults to `document.cookie`. */
   readCookie?: (name: string) => string | undefined;
+  /**
+   * Where the mobile app keeps its tokens. Given, the client authenticates
+   * with a bearer header instead of cookies and refreshes the tokens itself.
+   */
+  tokens?: TokenStore;
 }
 
 export interface ApiClient {
   register(input: RegisterInput): Promise<Session>;
   login(input: LoginInput): Promise<Session>;
-  /** Ends this Signed-in Device; the API clears the session cookies. */
+  /**
+   * Ends this Signed-in Device; the API clears the session cookies. With a
+   * token store the tokens are forgotten even when the API cannot be told.
+   */
   logout(): Promise<void>;
   /** Uses the token from a mailed verification link; 400 when it is invalid, used or expired. */
   verifyEmail(token: string): Promise<void>;
@@ -332,14 +343,18 @@ function documentCookie(name: string): string | undefined {
 }
 
 /**
- * The web app's API client (ADR-0006). The browser attaches the httpOnly
- * session cookies; this code never sees a token. The only cookie it reads is
- * the CSRF token, which it echoes in a header on every mutating request.
+ * The API client (ADR-0006). On the web the browser attaches the httpOnly
+ * session cookies and this code never sees a token; the only cookie it reads
+ * is the CSRF token, which it echoes in a header on every mutating request.
+ * Given a token store (the mobile app), it sends the access token as a bearer
+ * header instead and, when the API answers 401, refreshes the tokens once and
+ * repeats the request.
  */
 export function createApiClient(options: ApiClientOptions = {}): ApiClient {
   const baseUrl = options.baseUrl ?? '';
   const doFetch = options.fetch ?? ((input, init) => fetch(input, init));
   const readCookie = options.readCookie ?? documentCookie;
+  const tokens = options.tokens;
 
   async function csrfToken(): Promise<string | undefined> {
     const existing = readCookie(CSRF_COOKIE);
@@ -349,32 +364,130 @@ export function createApiClient(options: ApiClientOptions = {}): ApiClient {
     return readCookie(CSRF_COOKIE);
   }
 
-  async function request<T>(
+  /** How a request proves who sends it; the access token used, if any. */
+  async function authenticate(
+    method: string,
+    headers: Record<string, string>,
+    anonymous: boolean,
+  ): Promise<{ credentials: RequestCredentials; accessToken?: string }> {
+    if (!tokens) {
+      if (method !== 'GET') {
+        const csrf = await csrfToken();
+        if (csrf) headers[CSRF_HEADER] = csrf;
+      }
+      return { credentials: 'include' };
+    }
+    headers[CLIENT_HEADER] = 'mobile';
+    const accessToken = anonymous ? undefined : (await tokens.read())?.accessToken;
+    if (!accessToken) return { credentials: 'omit' };
+    headers['Authorization'] = `Bearer ${accessToken}`;
+    return { credentials: 'omit', accessToken };
+  }
+
+  // One refresh at a time: a refresh token is good for one use, and using it
+  // twice ends the Signed-in Device.
+  let refreshing: Promise<boolean> | undefined;
+
+  /** Gets new tokens after `stale` was refused; whether there are new ones to try. */
+  function refreshed(store: TokenStore, stale: string): Promise<boolean> {
+    return (refreshing ??= (async () => {
+      const held = await store.read();
+      if (!held) return false;
+      // Another request refreshed meanwhile.
+      if (held.accessToken !== stale) return true;
+      const res = await doFetch(`${baseUrl}/v1/auth/refresh`, {
+        method: 'POST',
+        headers: { [CLIENT_HEADER]: 'mobile', 'Content-Type': 'application/json' },
+        credentials: 'omit',
+        body: toJson({ refreshToken: held.refreshToken }),
+      });
+      if (res.status === 401) {
+        // Used, revoked or expired: this device is signed out.
+        await store.write(undefined);
+        return false;
+      }
+      if (!res.ok) return false;
+      const { accessToken, refreshToken } = authResultSchema.parse(await readBody(res));
+      await store.write({ accessToken, refreshToken });
+      return true;
+    })().finally(() => {
+      refreshing = undefined;
+    }));
+  }
+
+  /**
+   * Sends a request, refreshing the tokens once when the access token was
+   * refused. An `anonymous` one (signing in or out) carries no access token.
+   */
+  async function send(
     method: string,
     path: string,
-    schema: { parse(value: unknown): T },
     body?: unknown,
-  ): Promise<T> {
+    { anonymous = false, retry = true } = {},
+  ): Promise<Response> {
     const headers: Record<string, string> = {};
-    if (method !== 'GET') {
-      const csrf = await csrfToken();
-      if (csrf) headers[CSRF_HEADER] = csrf;
-    }
-    const init: RequestInit = { method, headers, credentials: 'include' };
+    const { credentials, accessToken } = await authenticate(method, headers, anonymous);
+    const init: RequestInit = { method, headers, credentials };
     if (body !== undefined) {
       headers['Content-Type'] = 'application/json';
       init.body = toJson(body);
     }
     const res = await doFetch(`${baseUrl}${path}`, init);
+    if (
+      res.status === 401 &&
+      retry &&
+      tokens &&
+      accessToken &&
+      (await refreshed(tokens, accessToken))
+    ) {
+      return send(method, path, body, { retry: false });
+    }
+    return res;
+  }
+
+  async function request<T>(
+    method: string,
+    path: string,
+    schema: { parse(value: unknown): T },
+    body?: unknown,
+    { anonymous = false } = {},
+  ): Promise<T> {
+    const res = await send(method, path, body, { anonymous });
     const parsed = await readBody(res);
     if (!res.ok) throw new ApiError(res.status, parsed);
     return schema.parse(parsed);
   }
 
+  /** Signs in or up; the mobile app keeps the tokens it is handed. */
+  async function signIn(path: string, input: unknown): Promise<Session> {
+    if (!tokens) return request('POST', path, sessionSchema, input);
+    const { accessToken, refreshToken, ...session } = await request(
+      'POST',
+      path,
+      authResultSchema,
+      input,
+      { anonymous: true },
+    );
+    await tokens.write({ accessToken, refreshToken });
+    return session;
+  }
+
+  async function logout(): Promise<void> {
+    if (!tokens) return request('POST', '/v1/auth/logout', noContent);
+    const refreshToken = (await tokens.read())?.refreshToken;
+    try {
+      await request('POST', '/v1/auth/logout', noContent, refreshToken && { refreshToken }, {
+        anonymous: true,
+      });
+    } finally {
+      await tokens.write(undefined);
+    }
+  }
+
   return {
-    register: (input) => request('POST', '/v1/auth/register', sessionSchema, input),
-    login: (input) => request('POST', '/v1/auth/login', sessionSchema, input),
-    logout: () => request('POST', '/v1/auth/logout', noContent),
+    register: (input) => signIn('/v1/auth/register', input),
+    login: (input) => signIn('/v1/auth/login', input),
+    logout,
     verifyEmail: (token) => request('POST', '/v1/auth/email/verify', noContent, { token }),
     resendVerification: () => request('POST', '/v1/auth/email/verification', noContent),
     forgotPassword: (email) => request('POST', '/v1/auth/password/forgot', noContent, { email }),
@@ -549,9 +662,9 @@ export function createApiClient(options: ApiClientOptions = {}): ApiClient {
     skipOccurrence: (workspaceId, ruleId, dueOn) =>
       request('POST', `${occurrencePath(workspaceId, ruleId, dueOn)}/skip`, noContent),
     exportWorkspace: async (workspaceId, format) => {
-      const res = await doFetch(
-        `${baseUrl}/v1/workspaces/${encodeURIComponent(workspaceId)}/export?format=${format}`,
-        { credentials: 'include' },
+      const res = await send(
+        'GET',
+        `/v1/workspaces/${encodeURIComponent(workspaceId)}/export?format=${format}`,
       );
       if (!res.ok) throw new ApiError(res.status, await readBody(res));
       return {

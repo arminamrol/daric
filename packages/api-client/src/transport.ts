@@ -1,7 +1,7 @@
-import { ApiError, transactionConflict } from '@daric/api-client';
-import type { ApiClient } from '@daric/api-client';
 import type { CreateTransactionInput, Transaction } from '@daric/core';
 import type { Change, SendResult, Transport } from '@daric/offline-queue';
+import { ApiError, transactionConflict } from './client';
+import type { ApiClient } from './client';
 
 /** A Transaction change waiting to reach the API; the scope is its Workspace. */
 export type TransactionChange = Change<CreateTransactionInput>;

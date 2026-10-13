@@ -1,13 +1,10 @@
-import type { CreateTransactionInput, Transaction } from '@daric/core';
-import type { Entry } from '@daric/offline-queue';
+import type { QueuedTransactionChange } from '@daric/api-client';
 import { useQueryClient } from '@tanstack/react-query';
 import { createContext, use, useEffect, useMemo, useState, useSyncExternalStore } from 'react';
 import type { ReactNode } from 'react';
 import { useApi } from '../api/api';
 import { createOfflineDevice } from './device';
 import type { OfflineDevice } from './device';
-
-export type QueuedTransactionChange = Entry<CreateTransactionInput, Transaction>;
 
 const OfflineContext = createContext<OfflineDevice | null>(null);
 

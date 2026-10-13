@@ -1,4 +1,5 @@
-import { ApiError } from '@daric/api-client';
+import { ApiError, inputFromTransaction, withWaitingChanges } from '@daric/api-client';
+import type { SyncState } from '@daric/api-client';
 import type {
   CreateTransactionInput,
   ListTransactionsQuery,
@@ -14,8 +15,6 @@ import { useSignedIn } from '../auth/session';
 import { useCategories } from '../categories/categories';
 import { useOfflineDevice, useWaitingChanges } from '../offline/offline';
 import { refreshAfterChange, transactionsKey } from './keys';
-import { inputFromTransaction, withWaitingChanges } from './pending';
-import type { SyncState } from './pending';
 
 /** The edit started from a stale version; `current` is the server's copy. */
 export class EditConflict extends Error {

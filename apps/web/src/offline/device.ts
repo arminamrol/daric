@@ -1,3 +1,4 @@
+import { transactionTransport } from '@daric/api-client';
 import type { ApiClient } from '@daric/api-client';
 import type { CreateTransactionInput, Transaction } from '@daric/core';
 import {
@@ -11,7 +12,6 @@ import { dehydrate, hydrate } from '@tanstack/react-query';
 import type { DehydratedState, QueryClient } from '@tanstack/react-query';
 import { storedFlag } from '../lib/storedFlag';
 import { refreshAfterChange } from '../transactions/keys';
-import { transactionTransport } from './transport';
 
 export type TransactionQueue = OfflineQueue<CreateTransactionInput, Transaction>;
 
