@@ -2,7 +2,7 @@
 
 **What to build:** Users are emailed before their Subscription or Trial ends; after it ends they get a 7-day Grace Period with a banner; then extra Signed-in Devices are signed out and Members of their Workspaces are suspended, and resubscribing restores everything without any data loss.
 
-**Blocked by:** 41, 42, 26, 27
+**Blocked by:** 26, 40.1, 41, 42
 
 **Status:** ready-for-agent
 
