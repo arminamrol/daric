@@ -36,7 +36,8 @@ import { EntitlementsService } from '../billing/entitlements.service';
 import { MailService } from '../mailer/mail.service';
 import { invitationTemplate } from '../mailer/templates';
 import { workspaceColumns } from '../workspaces/workspaces.service';
-import { emailsOf, ownerOf } from './sharing';
+import { emailsOf } from '../../db/user-emails';
+import { ownerOf, roleIn } from './sharing';
 
 /** How long an Invitation can be accepted. */
 export const INVITATION_TTL_DAYS = 7;
@@ -52,16 +53,7 @@ const columns = {
   revokedAt: invitations.revokedAt,
 };
 
-interface Row {
-  id: string;
-  email: string | null;
-  role: Invitation['role'];
-  invitedByUserId: string | null;
-  createdAt: Date;
-  expiresAt: Date;
-  acceptedAt: Date | null;
-  revokedAt: Date | null;
-}
+type Row = Pick<typeof invitations.$inferSelect, keyof typeof columns>;
 
 function statusOf(row: Row, now: Date): InvitationStatus {
   if (row.acceptedAt) return 'ACCEPTED';
@@ -79,7 +71,7 @@ const sharingNotEntitled = () =>
     HttpStatus.PAYMENT_REQUIRED,
   );
 
-const refused = (reason: InvitationRefusal, message: string) =>
+const refusal = (reason: InvitationRefusal, message: string) =>
   new ForbiddenException({ statusCode: 403, message, reason });
 
 /**
@@ -203,15 +195,15 @@ export class InvitationsService {
   }
 
   async preview(token: string): Promise<InvitationPreview> {
-    const found = await this.findPending(this.db, token);
-    if (!found) throw invalidInvitation();
-    const emailOf = await emailsOf(this.db, [found.invitedByUserId]);
+    const invitation = await this.findPending(this.db, token);
+    if (!invitation) throw invalidInvitation();
+    const emailOf = await emailsOf(this.db, [invitation.invitedByUserId]);
     return {
-      workspaceName: found.workspaceName,
-      role: found.role,
-      invitedByEmail: emailOf(found.invitedByUserId),
-      email: found.email,
-      expiresAt: found.expiresAt.toISOString(),
+      workspaceName: invitation.workspaceName,
+      role: invitation.role,
+      invitedByEmail: emailOf(invitation.invitedByUserId),
+      email: invitation.email,
+      expiresAt: invitation.expiresAt.toISOString(),
     };
   }
 
@@ -222,8 +214,8 @@ export class InvitationsService {
    */
   async accept(userId: string, token: string, client: ClientInfo): Promise<AcceptedInvitation> {
     return this.db.transaction(async (tx) => {
-      const found = await this.findPending(tx, token, { lock: true });
-      if (!found) throw invalidInvitation();
+      const invitation = await this.findPending(tx, token, { lock: true });
+      if (!invitation) throw invalidInvitation();
       const user = one(
         await tx
           .select({ email: users.email, verifiedAt: users.emailVerifiedAt })
@@ -231,30 +223,22 @@ export class InvitationsService {
           .where(eq(users.id, userId)),
       );
       if (!user.verifiedAt) {
-        throw refused('EMAIL_NOT_VERIFIED', 'Verify your email before accepting an invitation');
+        throw refusal('EMAIL_NOT_VERIFIED', 'Verify your email before accepting an invitation');
       }
-      if (found.email && found.email !== user.email.toLowerCase()) {
-        throw refused('EMAIL_MISMATCH', 'This invitation is for another email');
+      if (invitation.email && invitation.email !== user.email.toLowerCase()) {
+        throw refusal('EMAIL_MISMATCH', 'This invitation is for another email');
       }
-      const [already] = await tx
-        .select({ id: workspaceMembers.id })
-        .from(workspaceMembers)
-        .where(
-          and(
-            eq(workspaceMembers.workspaceId, found.workspaceId),
-            eq(workspaceMembers.userId, userId),
-          ),
-        );
-      if (already) throw new ConflictException('Already a Member of this Workspace');
-      if (!(await this.sharingAllowed(tx, found.workspaceId))) throw sharingNotEntitled();
+      if (await roleIn(tx, invitation.workspaceId, userId))
+        throw new ConflictException('Already a Member of this Workspace');
+      if (!(await this.sharingAllowed(tx, invitation.workspaceId))) throw sharingNotEntitled();
 
-      const { workspaceId, role } = found;
+      const { workspaceId, role } = invitation;
       await tx.insert(workspaceMembers).values({ workspaceId, userId, role });
       const now = new Date();
       await tx
         .update(invitations)
         .set({ acceptedAt: now, acceptedByUserId: userId })
-        .where(eq(invitations.id, found.id));
+        .where(eq(invitations.id, invitation.id));
       const consent = one(
         await tx
           .insert(userConsents)
@@ -272,7 +256,7 @@ export class InvitationsService {
         actorUserId: userId,
         workspaceId,
         client,
-        metadata: { invitationId: found.id, role },
+        metadata: { invitationId: invitation.id, role },
       });
       await this.audit.record(tx, {
         action: 'consent.grant',
@@ -294,13 +278,20 @@ export class InvitationsService {
     return (await this.entitlements.entitlementsOf(owner)).shareWorkspace;
   }
 
-  /** Refuses an email that is already a Member, or already has a pending Invitation. */
+  /**
+   * Refuses an email that is already a Member, or already has a pending
+   * Invitation. Holds a lock on the Workspace and email until the transaction
+   * ends, so simultaneous Invitations to one email cannot both pass.
+   */
   private async assertInvitable(
     db: Executor,
     workspaceId: string,
     email: string,
     now: Date,
   ): Promise<void> {
+    await db.execute(
+      sql`SELECT pg_advisory_xact_lock(hashtextextended(${`invitation:${workspaceId}:${email}`}, 0))`,
+    );
     const [pending] = await db
       .select({ id: invitations.id })
       .from(invitations)
@@ -319,13 +310,8 @@ export class InvitationsService {
       .from(users)
       .where(sql`lower(${users.email}) = ${email}`);
     if (!user) return;
-    const [member] = await db
-      .select({ id: workspaceMembers.id })
-      .from(workspaceMembers)
-      .where(
-        and(eq(workspaceMembers.workspaceId, workspaceId), eq(workspaceMembers.userId, user.id)),
-      );
-    if (member) throw new ConflictException('This email is already a Member');
+    if (await roleIn(db, workspaceId, user.id))
+      throw new ConflictException('This email is already a Member');
   }
 
   /** The pending Invitation a token belongs to, with its Workspace's name; null otherwise. */

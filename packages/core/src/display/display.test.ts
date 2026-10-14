@@ -12,6 +12,18 @@ const settings: DisplaySettings = {
 };
 
 describe('displayFormatters', () => {
+  it("shows the time of day on a 24-hour clock in the Workspace's timezone and the User's digits", () => {
+    expect(displayFormatters(settings).time(today)).toBe('۱۰:۰۰');
+    const evening = new Date('2026-10-09T17:05:00Z');
+    expect(displayFormatters(settings).time(evening)).toBe('۲۰:۳۵');
+    const latinUtc = displayFormatters({
+      ...settings,
+      workspace: { ...settings.workspace, timezone: 'UTC' },
+      preferences: { ...settings.preferences, digits: 'latin' },
+    });
+    expect(latinUtc.time(today)).toBe('06:30');
+  });
+
   it("shows IRR the way the Workspace shows money, in the User's digits", () => {
     const rial = displayFormatters(settings);
     expect(rial.money(money(12345000n, IRR))).toBe('۱۲٬۳۴۵٬۰۰۰ ریال');

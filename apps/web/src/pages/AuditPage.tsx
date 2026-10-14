@@ -22,7 +22,9 @@ function EntryRow({ entry }: { entry: AuditEntry }) {
         {entry.actorEmail ?? t('audit.nobody')}
       </span>
       <span className="text-sm text-foreground-muted">
-        {isolate(format.date(new Date(entry.createdAt), { style: 'long' }))}
+        {isolate(
+          `${format.date(new Date(entry.createdAt), { style: 'long' })} ${format.time(new Date(entry.createdAt))}`,
+        )}
       </span>
     </li>
   );

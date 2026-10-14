@@ -1,30 +1,9 @@
 import type { AuditAction, WorkspaceRole } from '@daric/core';
-import { and, eq, inArray, isNull } from 'drizzle-orm';
+import { and, eq, isNull } from 'drizzle-orm';
 import type { ClientInfo } from '../../common/request';
-import type { Database, Executor } from '../../db/client';
-import { users, userConsents, workspaceMembers } from '../../db/schema';
+import type { Executor } from '../../db/client';
+import { userConsents, workspaceMembers } from '../../db/schema';
 import type { AuditService } from '../audit/audit.service';
-
-/**
- * Looks up the emails of Users by id: null for no User or one who is gone.
- * Identity tables are out of reach of Workspace scope, so this reads on the
- * owner connection, and only ids the caller already found in the Workspace.
- */
-export async function emailsOf(
-  db: Database,
-  userIds: (string | null)[],
-): Promise<(userId: string | null) => string | null> {
-  const ids = [...new Set(userIds.filter((id): id is string => id !== null))];
-  const rows =
-    ids.length === 0
-      ? []
-      : await db
-          .select({ id: users.id, email: users.email })
-          .from(users)
-          .where(inArray(users.id, ids));
-  const emails = new Map(rows.map((r) => [r.id, r.email]));
-  return (userId) => (userId ? (emails.get(userId) ?? null) : null);
-}
 
 /** The User who owns the Workspace; every Workspace has exactly one. */
 export async function ownerOf(db: Executor, workspaceId: string): Promise<string> {
@@ -34,6 +13,68 @@ export async function ownerOf(db: Executor, workspaceId: string): Promise<string
     .where(and(eq(workspaceMembers.workspaceId, workspaceId), eq(workspaceMembers.role, 'OWNER')));
   if (!owner) throw new Error(`Workspace ${workspaceId} has no Owner`);
   return owner.userId;
+}
+
+/** The User's Role in the Workspace, or null when they are not a Member of it. */
+export async function roleIn(
+  db: Executor,
+  workspaceId: string,
+  userId: string,
+): Promise<WorkspaceRole | null> {
+  const [member] = await db
+    .select({ role: workspaceMembers.role })
+    .from(workspaceMembers)
+    .where(and(eq(workspaceMembers.workspaceId, workspaceId), eq(workspaceMembers.userId, userId)));
+  return member?.role ?? null;
+}
+
+/**
+ * Revokes the User's live sharing Consents matching `where` and audits each.
+ * `workspaceId` is where the audit row goes; null once the Workspace is gone.
+ */
+export async function revokeSharingConsents(
+  tx: Executor,
+  audit: AuditService,
+  {
+    userId,
+    workspaceId,
+    consentId,
+    actorUserId,
+    client,
+  }: {
+    userId: string;
+    workspaceId: string | null;
+    /** Just this one; otherwise the User's live one for `workspaceId`. */
+    consentId?: string;
+    actorUserId: string;
+    client: ClientInfo;
+  },
+): Promise<void> {
+  const revoked = await tx
+    .update(userConsents)
+    .set({ revokedAt: new Date() })
+    .where(
+      and(
+        eq(userConsents.userId, userId),
+        consentId
+          ? eq(userConsents.id, consentId)
+          : workspaceId
+            ? eq(userConsents.workspaceId, workspaceId)
+            : isNull(userConsents.workspaceId),
+        eq(userConsents.purpose, 'WORKSPACE_SHARING'),
+        isNull(userConsents.revokedAt),
+      ),
+    )
+    .returning({ id: userConsents.id });
+  for (const { id } of revoked) {
+    await audit.record(tx, {
+      action: 'consent.revoke',
+      actorUserId,
+      workspaceId,
+      client,
+      metadata: { consentId: id, memberUserId: userId, purpose: 'WORKSPACE_SHARING' },
+    });
+  }
 }
 
 export interface EndSharing {
@@ -58,27 +99,12 @@ export async function endSharing(
   { workspaceId, member, actorUserId, action, client }: EndSharing,
 ): Promise<void> {
   if (member.role === 'OWNER') throw new Error('The Owner cannot leave their Workspace');
-  const revoked = await tx
-    .update(userConsents)
-    .set({ revokedAt: new Date() })
-    .where(
-      and(
-        eq(userConsents.userId, member.userId),
-        eq(userConsents.workspaceId, workspaceId),
-        eq(userConsents.purpose, 'WORKSPACE_SHARING'),
-        isNull(userConsents.revokedAt),
-      ),
-    )
-    .returning({ id: userConsents.id });
-  for (const { id } of revoked) {
-    await audit.record(tx, {
-      action: 'consent.revoke',
-      actorUserId,
-      workspaceId,
-      client,
-      metadata: { consentId: id, memberUserId: member.userId, purpose: 'WORKSPACE_SHARING' },
-    });
-  }
+  await revokeSharingConsents(tx, audit, {
+    userId: member.userId,
+    workspaceId,
+    actorUserId,
+    client,
+  });
   await audit.record(tx, {
     action,
     actorUserId,

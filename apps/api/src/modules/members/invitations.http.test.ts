@@ -208,6 +208,16 @@ describe('Invitations', () => {
     ).toBe(409);
   });
 
+  it('make only one of several simultaneous Invitations to the same email', async () => {
+    const owner = await registerUser(t.url);
+    const results = await Promise.all(
+      Array.from({ length: 5 }, () =>
+        invite(t, owner, owner.workspaceId, { email: 'twice@example.com', role: 'MEMBER' }),
+      ),
+    );
+    expect(results.map((r) => r.status).sort()).toEqual([201, 409, 409, 409, 409]);
+  });
+
   it('record the sharing Consent and audit every step', async () => {
     const owner = await registerUser(t.url);
     const created = await invite(t, owner, owner.workspaceId, { role: 'MEMBER' });

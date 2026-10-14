@@ -13,7 +13,8 @@ import { type Database, one } from '../../db/client';
 import { workspaceMembers } from '../../db/schema';
 import { scopedTx } from '../../db/scope';
 import { AuditService } from '../audit/audit.service';
-import { emailsOf, endSharing } from './sharing';
+import { emailsOf } from '../../db/user-emails';
+import { endSharing } from './sharing';
 
 const columns = {
   id: workspaceMembers.id,
@@ -21,6 +22,7 @@ const columns = {
   role: workspaceMembers.role,
   createdAt: workspaceMembers.createdAt,
 };
+type Row = Pick<typeof workspaceMembers.$inferSelect, keyof typeof columns>;
 
 /** Who belongs to a Workspace, and changing their Roles by the role matrix (docs/plan.md). */
 @Injectable()
@@ -113,11 +115,4 @@ export class MembersService {
       joinedAt: createdAt.toISOString(),
     }));
   }
-}
-
-interface Row {
-  id: string;
-  userId: string;
-  role: Member['role'];
-  createdAt: Date;
 }

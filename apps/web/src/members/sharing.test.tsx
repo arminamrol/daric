@@ -1,3 +1,4 @@
+import { isolate } from '@daric/i18n';
 import { screen, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { describe, expect, it } from 'vitest';
@@ -140,6 +141,8 @@ describe('Audit log page', () => {
 
     const first = (await screen.findByText('تغییر نقش عضو')).closest('li');
     expect(first && within(first).getByText('reza@example.com')).toBeTruthy();
+    // 06:30 UTC is 10:00 in Tehran.
+    expect(first && within(first).getByText(isolate('۱۷ مهر ۱۴۰۵ ۱۰:۰۰'))).toBeTruthy();
     expect(screen.queryByText('ثبت‌نام')).toBeNull();
     await userEvent.click(screen.getByRole('button', { name: 'موارد قدیمی‌تر' }));
     expect(await screen.findByText('ثبت‌نام')).toBeTruthy();

@@ -4,9 +4,9 @@ import { and, desc, eq } from 'drizzle-orm';
 import { DATABASE } from '../../common/di-tokens';
 import { type ClientInfo, isUuid } from '../../common/request';
 import type { Database } from '../../db/client';
-import { userConsents, workspaceMembers, workspaces } from '../../db/schema';
+import { userConsents, workspaces } from '../../db/schema';
 import { AuditService } from '../audit/audit.service';
-import { endSharing } from './sharing';
+import { endSharing, revokeSharingConsents, roleIn } from './sharing';
 
 /**
  * The signed-in User's own Consents. They belong to the User, across
@@ -59,37 +59,23 @@ export class ConsentsService {
       if (!consent) throw new NotFoundException();
       if (consent.revokedAt) return;
       const { workspaceId } = consent;
-      const [member] = workspaceId
-        ? await tx
-            .select({ role: workspaceMembers.role })
-            .from(workspaceMembers)
-            .where(
-              and(
-                eq(workspaceMembers.workspaceId, workspaceId),
-                eq(workspaceMembers.userId, userId),
-              ),
-            )
-        : [];
-      if (workspaceId && member && member.role !== 'OWNER') {
+      const role = workspaceId ? await roleIn(tx, workspaceId, userId) : null;
+      if (workspaceId && role && role !== 'OWNER') {
         await endSharing(tx, this.audit, {
           workspaceId,
-          member: { userId, role: member.role },
+          member: { userId, role },
           actorUserId: userId,
           action: 'member.leave',
           client,
         });
       } else {
         // Its Workspace is gone, or the User is no longer a Member of it.
-        await tx
-          .update(userConsents)
-          .set({ revokedAt: new Date() })
-          .where(eq(userConsents.id, consent.id));
-        await this.audit.record(tx, {
-          action: 'consent.revoke',
-          actorUserId: userId,
+        await revokeSharingConsents(tx, this.audit, {
+          userId,
           workspaceId,
+          consentId: consent.id,
+          actorUserId: userId,
           client,
-          metadata: { consentId: consent.id, purpose: consent.purpose },
         });
       }
     });
