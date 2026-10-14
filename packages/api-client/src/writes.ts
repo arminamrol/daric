@@ -129,6 +129,9 @@ export function isTransactionEntry(
   return parseEntityKey(entry.entityId).entity === 'transaction';
 }
 
+/** A change no API call can carry; sending it again would not help. */
+class UnsendableChange extends Error {}
+
 /** Sends one change of something other than a Transaction; throws to try again later. */
 async function sendEntity(
   api: ApiClient,
@@ -138,12 +141,12 @@ async function sendEntity(
 ): Promise<void> {
   const ws = change.scope;
   if (change.kind === 'delete') {
-    if (entity !== 'budget') throw new Error(`A ${entity} cannot be deleted`);
+    if (entity !== 'budget') throw new UnsendableChange(`A ${entity} cannot be deleted`);
     return api.deleteBudget(ws, id);
   }
   const write = change.payload;
   if (!isEntityWrite(write) || write.entity !== entity) {
-    throw new Error(`The change of ${change.entityId} carries another kind of write`);
+    throw new UnsendableChange(`The change of ${change.entityId} carries another kind of write`);
   }
   const creating = change.kind === 'create';
 
@@ -227,6 +230,7 @@ export function workspaceTransport(
       await sendEntity(api, change, entity, id);
       return { status: 'done' };
     } catch (error) {
+      if (error instanceof UnsendableChange) return { status: 'rejected', reason: error.message };
       const refusal = refusalOf(error);
       if (refusal.status === 404 && change.kind !== 'create') {
         // Deleted meanwhile (only Budgets are): deletes win.

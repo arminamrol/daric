@@ -1,5 +1,5 @@
 import type { CategoryColor, CategoryIcon } from '@daric/core';
-import { categoryPalette, nativeTheme } from '@daric/design-tokens';
+import { categoryPalette, nativeTheme, palette } from '@daric/design-tokens';
 import {
   Baby,
   Book,
@@ -91,7 +91,7 @@ export function CategoryBadge({
       accessibilityElementsHidden
       style={[styles.badge, { width: side, height: side, backgroundColor: categoryPalette[color] }]}
     >
-      <Icon color="#ffffff" size={size === 'sm' ? 16 : 20} strokeWidth={2} />
+      <Icon color={palette.white} size={size === 'sm' ? 16 : 20} strokeWidth={2} />
     </View>
   );
 }

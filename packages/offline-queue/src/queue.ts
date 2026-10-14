@@ -165,13 +165,21 @@ export function createOfflineQueue<P, S>({
       }
 
       if (change.kind === 'update') {
-        const create = waiting.find((e) => e.kind === 'create' && !e.attempted);
+        // Folding sends the edit where the earlier change waits; it may refer to
+        // something made after that (a Label it now carries), so it folds only
+        // when nothing of another entity waits behind.
+        const last = (entry: Entry<P, S>) =>
+          list.every((e) => e.seq <= entry.seq || same(e, scope, entityId));
+        const create = waiting.find((e) => e.kind === 'create' && !e.attempted && last(e));
         if (create?.kind === 'create') {
           const payload = merge(create.payload, change.payload);
           await commit(list.map((e) => (e === create ? { ...e, payload } : e)));
           return create.seq;
         }
-        const edit = waiting.find((e) => e.kind === 'update');
+        // An edit held on a conflict is always settled in place: nothing passes it.
+        const edit = waiting.find(
+          (e) => e.kind === 'update' && (e.status === 'conflict' || last(e)),
+        );
         if (edit?.kind === 'update') {
           // One made against the server copy settles the conflict, replacing the
           // edit held on it; an older one waits on it.

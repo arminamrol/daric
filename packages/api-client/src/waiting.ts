@@ -208,6 +208,8 @@ export function withWaitingBudgets(
   },
 ): Shown<Budget> {
   return overlay<Budget, BudgetFields>(list, entries, 'budget', (id, f, existing) => {
+    const periodOf = (period: Budget['period']) =>
+      period === 'MONTHLY' ? context.month : { kind: 'year' as const, year: context.month.year };
     if (existing) {
       const amount = f.amount ?? existing.amount;
       return {
@@ -216,11 +218,15 @@ export function withWaitingBudgets(
         id,
         labelId: f.labelId === undefined ? existing.labelId : f.labelId,
         amount,
-        progress: { ...existing.progress, ...budgetProgress(amount, existing.progress.spent) },
+        progress: {
+          ...existing.progress,
+          // What was spent so far stays until the API tells it for the new Period.
+          period: f.period ? periodOf(f.period) : existing.progress.period,
+          ...budgetProgress(amount, existing.progress.spent),
+        },
       };
     }
     if (!complete(f, ['categoryId', 'period', 'amount'] as const)) return undefined;
-    const { year } = context.month;
     return {
       id,
       categoryId: f.categoryId,
@@ -230,7 +236,7 @@ export function withWaitingBudgets(
       currency: context.currency,
       version: 1,
       progress: {
-        period: f.period === 'MONTHLY' ? context.month : { kind: 'year', year },
+        period: periodOf(f.period),
         ...budgetProgress(f.amount, 0n),
         ratesUsed: [],
         otherCurrencyExpenses: 0,

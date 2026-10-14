@@ -1,6 +1,6 @@
 import { categoryColors, categoryIcons } from '@daric/core';
 import type { CategoryColor, CategoryIcon } from '@daric/core';
-import { categoryPalette, nativeTheme } from '@daric/design-tokens';
+import { categoryPalette, nativeTheme, palette } from '@daric/design-tokens';
 import { Check } from 'lucide-react-native';
 import { Pressable, StyleSheet, View } from 'react-native';
 import { useI18n } from '../i18n/locale';
@@ -44,7 +44,7 @@ export function IconPicker({
                   : { backgroundColor: colors.surface, borderColor: colors.border },
               ]}
             >
-              <Icon color={on ? '#ffffff' : colors.foreground} size={20} strokeWidth={2} />
+              <Icon color={on ? palette.white : colors.foreground} size={20} strokeWidth={2} />
             </Pressable>
           );
         })}
@@ -85,7 +85,7 @@ export function ColorPicker({
                 on && { borderColor: colors.foreground, borderWidth: 2 },
               ]}
             >
-              {on && <Check color="#ffffff" size={20} strokeWidth={2.5} />}
+              {on && <Check color={palette.white} size={20} strokeWidth={2.5} />}
             </Pressable>
           );
         })}

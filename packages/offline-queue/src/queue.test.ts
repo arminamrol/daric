@@ -505,3 +505,26 @@ describe('partial edits', () => {
     expect(sent).toEqual([edit({ name: 'two', note: 'x' }, 1)]);
   });
 });
+
+describe('changes of several entities', () => {
+  it('folds an edit only when nothing of another entity waits after the change it folds into', async () => {
+    const { server, queue } = setup();
+    server.goOffline();
+    await queue.submit(create('a', 'rent'));
+    await queue.submit(create('b', 'food'));
+    // `a` may now refer to `b`: folding it into the create of `a` would send it before `b` exists.
+    await queue.submit(update('a', 'rent (b)', 1));
+    expect(queue.entries().map((e) => `${e.kind}:${e.entityId}`)).toEqual([
+      'create:a',
+      'create:b',
+      'update:a',
+    ]);
+    await queue.submit(update('a', 'rent (b, May)', 1));
+    // The edit waiting last still takes later edits.
+    expect(queue.entries()).toHaveLength(3);
+    server.goOnline();
+    await queue.replay();
+    expect(server.sent).toEqual(['create:a', 'create:b', 'update:a']);
+    expect(server.records.get('a')).toMatchObject({ name: 'rent (b, May)' });
+  });
+});

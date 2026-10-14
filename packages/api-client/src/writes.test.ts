@@ -242,4 +242,12 @@ describe('workspaceTransport', () => {
       ),
     ).rejects.toThrow(TypeError);
   });
+
+  it('refuses for good a change no API call can carry, so it holds nothing back', async () => {
+    const { transport, calls } = setup();
+    expect(
+      await transport.send({ kind: 'delete', scope: WS, entityId: entityKey('label', ID) }),
+    ).toEqual({ status: 'rejected', reason: 'A label cannot be deleted' });
+    expect(calls).toEqual([]);
+  });
 });
