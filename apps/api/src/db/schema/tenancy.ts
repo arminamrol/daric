@@ -1,5 +1,20 @@
-import { jsonb, pgEnum, pgTable, text, uniqueIndex, uuid, index } from 'drizzle-orm/pg-core';
-import { calendarSystems, moneyDisplays, workspaceRoles, workspaceTypes } from '@daric/core';
+import {
+  index,
+  jsonb,
+  pgEnum,
+  pgTable,
+  text,
+  timestamp,
+  uniqueIndex,
+  uuid,
+} from 'drizzle-orm/pg-core';
+import {
+  assignableRoles,
+  calendarSystems,
+  moneyDisplays,
+  workspaceRoles,
+  workspaceTypes,
+} from '@daric/core';
 import { id, timestamps, version } from './columns';
 import { users } from './identity';
 
@@ -38,5 +53,41 @@ export const workspaceMembers = pgTable(
   (t) => [
     uniqueIndex('workspace_members_workspace_id_user_id_key').on(t.workspaceId, t.userId),
     index('workspace_members_user_id_idx').on(t.userId),
+  ],
+);
+
+export const invitationRole = pgEnum('invitation_role', assignableRoles);
+
+/**
+ * An Owner- or Admin-issued offer to join a Workspace with a Role. Only the
+ * link token's hash is stored. Accepted, revoked or past `expires_at`, it is
+ * spent; rows are kept as the Workspace's history.
+ */
+export const invitations = pgTable(
+  'invitations',
+  {
+    id: id(),
+    workspaceId: uuid('workspace_id')
+      .notNull()
+      .references(() => workspaces.id, { onDelete: 'cascade' }),
+    /** Only a User with this verified email may accept; null for a link anyone may accept once. */
+    email: text('email'),
+    role: invitationRole('role').notNull(),
+    /** SHA-256 of the link token; the token itself is never stored. */
+    tokenHash: text('token_hash').notNull(),
+    invitedByUserId: uuid('invited_by_user_id').references(() => users.id, {
+      onDelete: 'set null',
+    }),
+    expiresAt: timestamp('expires_at', { withTimezone: true }).notNull(),
+    acceptedAt: timestamp('accepted_at', { withTimezone: true }),
+    acceptedByUserId: uuid('accepted_by_user_id').references(() => users.id, {
+      onDelete: 'set null',
+    }),
+    revokedAt: timestamp('revoked_at', { withTimezone: true }),
+    ...timestamps(),
+  },
+  (t) => [
+    uniqueIndex('invitations_token_hash_key').on(t.tokenHash),
+    index('invitations_workspace_id_created_at_idx').on(t.workspaceId, t.createdAt),
   ],
 );

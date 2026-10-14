@@ -8,7 +8,7 @@ import { workspaceMembers, workspaces } from '../../db/schema';
 import { scopedTx } from '../../db/scope';
 import { AuditService } from '../audit/audit.service';
 
-const columns = {
+export const workspaceColumns = {
   id: workspaces.id,
   type: workspaces.type,
   name: workspaces.name,
@@ -28,7 +28,7 @@ export class WorkspacesService {
   /** Every Workspace the User is a Member of, with their Role. Not Workspace-scoped. */
   listForUser(userId: string): Promise<Workspace[]> {
     return this.db
-      .select({ ...columns, role: workspaceMembers.role })
+      .select({ ...workspaceColumns, role: workspaceMembers.role })
       .from(workspaces)
       .innerJoin(
         workspaceMembers,
@@ -42,7 +42,7 @@ export class WorkspacesService {
 
   async get(membership: Membership): Promise<Workspace> {
     const [workspace] = await scopedTx()
-      .select(columns)
+      .select(workspaceColumns)
       .from(workspaces)
       .where(eq(workspaces.id, membership.workspaceId));
     if (!workspace) throw new NotFoundException();

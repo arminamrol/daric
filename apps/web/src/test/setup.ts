@@ -7,6 +7,7 @@ import { resetNetwork } from './network';
 afterEach(() => {
   cleanup();
   localStorage.clear();
+  sessionStorage.clear();
   // A fresh IndexedDB, so nothing one test kept reaches the next.
   globalThis.indexedDB = new IDBFactory();
   resetNetwork();

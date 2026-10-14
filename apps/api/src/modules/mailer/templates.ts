@@ -1,4 +1,4 @@
-import type { Locale } from '@daric/core';
+import type { AssignableRole, Locale } from '@daric/core';
 import { themes } from '@daric/design-tokens';
 import { direction } from '@daric/i18n';
 import type { MailMessage } from './mailer';
@@ -165,6 +165,48 @@ export function passwordChangedTemplate(locale: Locale, forgotLink: string): Tem
           ],
           action: { label: 'This was not me', url: forgotLink },
           outro: ['If this was not you, set a new password right away with the button above.'],
+        },
+  );
+}
+
+/** The words for each Role an Invitation can give, in each language. */
+const ROLE_NAMES: Readonly<Record<Locale, Record<AssignableRole, string>>> = {
+  fa: { ADMIN: 'مدیر', MEMBER: 'عضو', VIEWER: 'بیننده' },
+  en: { ADMIN: 'Admin', MEMBER: 'Member', VIEWER: 'Viewer' },
+};
+
+export function invitationTemplate(
+  locale: Locale,
+  invite: { inviterEmail: string; workspaceName: string; role: AssignableRole },
+  link: string,
+  validDays: number,
+): Template {
+  const role = ROLE_NAMES[locale][invite.role];
+  const days = FRAME[locale].number.format(validDays);
+  return render(
+    locale,
+    locale === 'fa'
+      ? {
+          subject: `دعوت به فضای کاری «${invite.workspaceName}» در دریک`,
+          intro: [
+            `${invite.inviterEmail} شما را دعوت کرده است تا با نقش «${role}» به فضای کاری «${invite.workspaceName}» در دریک بپیوندید.`,
+          ],
+          action: { label: 'دیدن دعوت', url: link },
+          outro: [
+            `این دعوت تا ${days} روز معتبر است و فقط یک بار کار می‌کند. برای پذیرفتن آن باید با همین ایمیل وارد دریک شوید و ایمیل را تأیید کرده باشید.`,
+            'اگر این فرد را نمی‌شناسید، این ایمیل را نادیده بگیرید.',
+          ],
+        }
+      : {
+          subject: `Join "${invite.workspaceName}" on Daric`,
+          intro: [
+            `${invite.inviterEmail} invited you to join the workspace "${invite.workspaceName}" on Daric as ${role}.`,
+          ],
+          action: { label: 'See the invitation', url: link },
+          outro: [
+            `This invitation works for ${days} ${validDays === 1 ? 'day' : 'days'}, and only once. To accept it, sign in to Daric with this email and verify it.`,
+            'If you do not know this person, you can ignore this email.',
+          ],
         },
   );
 }

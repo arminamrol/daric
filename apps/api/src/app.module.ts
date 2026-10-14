@@ -23,6 +23,7 @@ import { LabelsModule } from './modules/labels/labels.module';
 import { MailerModule } from './modules/mailer/mailer.module';
 import { sendsMail } from './modules/mailer/sends-mail';
 import { MeModule } from './modules/me/me.module';
+import { MembersModule } from './modules/members/members.module';
 import { NetWorthModule } from './modules/net-worth/net-worth.module';
 import { ProjectionModule } from './modules/projection/projection.module';
 import { ReportsModule } from './modules/reports/reports.module';
@@ -85,6 +86,7 @@ export class AppModule {
         AuthModule,
         WorkspacesModule,
         MeModule,
+        MembersModule,
         AccountsModule,
         CategoriesModule,
         LabelsModule,

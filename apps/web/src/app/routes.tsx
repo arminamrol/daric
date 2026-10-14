@@ -7,10 +7,14 @@ import { BudgetsPage } from '../pages/BudgetsPage';
 import { CategoriesPage } from '../pages/CategoriesPage';
 import { CategoryFormPage } from '../pages/CategoryFormPage';
 import { ForgotPasswordPage } from '../pages/ForgotPasswordPage';
+import { AuditPage } from '../pages/AuditPage';
+import { ConsentsPage } from '../pages/ConsentsPage';
 import { HomePage } from '../pages/HomePage';
+import { InvitationPage } from '../pages/InvitationPage';
 import { LabelFormPage } from '../pages/LabelFormPage';
 import { LabelsPage } from '../pages/LabelsPage';
 import { LoginPage } from '../pages/LoginPage';
+import { MembersPage } from '../pages/MembersPage';
 import { NetWorthPage } from '../pages/NetWorthPage';
 import { NotFoundPage } from '../pages/NotFoundPage';
 import { PlannedItemFormPage } from '../pages/PlannedItemFormPage';
@@ -66,6 +70,9 @@ export const routes: RouteObject[] = [
           { path: 'rates/:rateId', element: <RateFormPage /> },
           { path: 'settings', element: <SettingsPage /> },
           { path: 'settings/subscription', element: <SubscriptionPage /> },
+          { path: 'settings/members', element: <MembersPage /> },
+          { path: 'settings/consents', element: <ConsentsPage /> },
+          { path: 'settings/audit', element: <AuditPage /> },
         ],
       },
       {
@@ -79,6 +86,7 @@ export const routes: RouteObject[] = [
       },
       // Mailed links open here whether or not the browser is signed in.
       { path: 'verify-email', element: <VerifyEmailPage /> },
+      { path: 'invitation', element: <InvitationPage /> },
       { path: '*', element: <NotFoundPage /> },
     ],
   },

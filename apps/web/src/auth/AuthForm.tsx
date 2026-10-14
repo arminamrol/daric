@@ -8,6 +8,7 @@ import type { FormEvent } from 'react';
 import { Link, useNavigate } from 'react-router';
 import { useApi } from '../api/api';
 import { useI18n } from '../i18n/locale';
+import { pendingInvitation } from '../members/pendingInvitation';
 import { useOfflineDevice } from '../offline/offline';
 import { logoutPending, ME_QUERY_KEY } from './session';
 
@@ -108,7 +109,8 @@ export function AuthForm({ mode }: { mode: Mode }) {
       // The cookies changed; ask the API who is signed in now. Reset, not removed:
       // the header keeps watching the same query and shows the signed-in nav.
       await queryClient.resetQueries({ queryKey: ME_QUERY_KEY });
-      await navigate('/', { replace: true });
+      // Back to an Invitation opened while signed out, else home.
+      await navigate(pendingInvitation.get() ? '/invitation' : '/', { replace: true });
     },
   });
 

@@ -21,3 +21,6 @@ export {
   positiveAmountSchema,
 } from './shared';
 export * from './transaction';
+export * from './member';
+export * from './consent';
+export * from './audit';

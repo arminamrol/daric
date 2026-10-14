@@ -2,7 +2,7 @@ import { sql } from 'drizzle-orm';
 import { afterAll, describe, expect, it } from 'vitest';
 import { seedUserWithWorkspace, testDatabase } from '../test/db';
 import { auditLogs, workspaceMembers, workspaces } from './schema';
-import { runInWorkspace } from './scope';
+import { afterScopedCommit, runInWorkspace } from './scope';
 
 const { db, pool } = testDatabase();
 
@@ -83,6 +83,26 @@ describe('runInWorkspace', () => {
     await expect(
       runInWorkspace(db, a, (tx) => tx.update(auditLogs).set({ action: 'changed' })),
     ).rejects.toMatchObject(pgError(/permission denied/));
+  });
+});
+
+describe('afterScopedCommit', () => {
+  it('runs once the transaction has committed, and never after a rollback', async () => {
+    const a = await seedUserWithWorkspace(db, 'A');
+    const ran: string[] = [];
+    await runInWorkspace(db, a, async () => {
+      afterScopedCommit(() => ran.push('committed'));
+      expect(ran).toEqual([]);
+    });
+    expect(ran).toEqual(['committed']);
+
+    await expect(
+      runInWorkspace(db, a, async () => {
+        afterScopedCommit(() => ran.push('rolled back'));
+        throw new Error('fails');
+      }),
+    ).rejects.toThrow('fails');
+    expect(ran).toEqual(['committed']);
   });
 });
 

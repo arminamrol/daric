@@ -1,13 +1,20 @@
 import { describe, expect, it } from 'vitest';
-import { passwordChangedTemplate, resetPasswordTemplate, verifyEmailTemplate } from './templates';
+import {
+  invitationTemplate,
+  passwordChangedTemplate,
+  resetPasswordTemplate,
+  verifyEmailTemplate,
+} from './templates';
 
 const link = 'https://daric.example/verify-email?token=abc_DEF-123';
+const invite = { inviterEmail: 'sara@example.com', workspaceName: 'Home', role: 'MEMBER' } as const;
 
 describe('email templates', () => {
   it.each([
     ['verification', verifyEmailTemplate('fa', link, 24)],
     ['password reset', resetPasswordTemplate('fa', link, 1)],
     ['password changed', passwordChangedTemplate('fa', link)],
+    ['invitation', invitationTemplate('fa', invite, link, 7)],
   ])('render the %s mail in Persian, right to left, with the link in both bodies', (_, mail) => {
     expect(mail.subject).toMatch(/دریک/);
     expect(mail.text).toContain(link);
@@ -19,6 +26,7 @@ describe('email templates', () => {
     ['verification', verifyEmailTemplate('en', link, 24)],
     ['password reset', resetPasswordTemplate('en', link, 1)],
     ['password changed', passwordChangedTemplate('en', link)],
+    ['invitation', invitationTemplate('en', invite, link, 7)],
   ])('render the %s mail in English, left to right, with the link in both bodies', (_, mail) => {
     expect(mail.subject).toMatch(/Daric/);
     expect(mail.text).toMatch(/^Hello,/);
@@ -42,5 +50,23 @@ describe('email templates', () => {
     const mail = verifyEmailTemplate('fa', 'https://x.example/?a=1&token="><script>', 24);
     expect(mail.html).not.toContain('"><script>');
     expect(mail.html).toContain('&amp;token=&quot;&gt;&lt;script&gt;');
+  });
+
+  it('names who invited, to which Workspace and with which Role', () => {
+    const fa = invitationTemplate('fa', invite, link, 7);
+    expect(fa.text).toContain('sara@example.com');
+    expect(fa.text).toContain('«Home»');
+    expect(fa.text).toContain('«عضو»');
+    expect(fa.text).toContain('۷ روز');
+    const en = invitationTemplate('en', { ...invite, role: 'VIEWER' }, link, 7);
+    expect(en.subject).toBe('Join "Home" on Daric');
+    expect(en.text).toContain('as Viewer');
+    expect(en.text).toContain('works for 7 days');
+  });
+
+  it('escapes a Workspace name in the HTML', () => {
+    const mail = invitationTemplate('en', { ...invite, workspaceName: '<b>x</b>' }, link, 7);
+    expect(mail.html).not.toContain('<b>x</b>');
+    expect(mail.html).toContain('&lt;b&gt;x&lt;/b&gt;');
   });
 });

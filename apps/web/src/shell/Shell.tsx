@@ -8,6 +8,7 @@ import { SyncStatus } from '../transactions/SyncStatus';
 import { ThemeToggle } from '../theme/ThemeToggle';
 import { Logo } from './Logo';
 import { RecurringNavLink } from './RecurringNavLink';
+import { WorkspaceSwitcher } from './WorkspaceSwitcher';
 
 const navLinkClass = ({ isActive }: { isActive: boolean }) =>
   `rounded-md px-3 py-1 text-sm ${isActive ? 'bg-surface-muted font-medium text-foreground' : 'text-foreground-muted hover:text-foreground'}`;
@@ -32,6 +33,7 @@ export function Shell() {
             <p className="text-lg leading-tight font-bold">{t('app.name')}</p>
             <p className="text-xs text-foreground-muted">{t('app.tagline')}</p>
           </div>
+          {signedIn && <WorkspaceSwitcher />}
           {signedIn && (
             <nav aria-label={t('nav.label')} className="flex gap-1">
               <NavLink to="/" end className={navLinkClass}>
