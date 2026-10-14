@@ -1,10 +1,12 @@
 import { ApiError } from '@daric/api-client';
 import type { Me, Workspace } from '@daric/core';
 import { useQuery } from '@tanstack/react-query';
+import { useSyncExternalStore } from 'react';
 import { Navigate, Outlet } from 'react-router';
 import { useApi } from '../api/api';
 import { useI18n } from '../i18n/locale';
 import { storedFlag } from '../lib/storedFlag';
+import { pendingInvitation } from '../members/pendingInvitation';
 
 export const ME_QUERY_KEY = ['me'] as const;
 
@@ -41,14 +43,47 @@ export function useMe() {
   });
 }
 
+const CURRENT_WORKSPACE_KEY = 'daric.workspace';
+const workspaceListeners = new Set<() => void>();
+/** Kept here when localStorage is unavailable, so a choice holds until reload. */
+let unstoredWorkspaceId: string | null = null;
+
+/**
+ * Which of the User's Workspaces this browser shows, remembered in
+ * localStorage. An id the User is no longer a Member of falls back to the first.
+ */
+export const currentWorkspace = {
+  get(): string | null {
+    try {
+      return localStorage.getItem(CURRENT_WORKSPACE_KEY);
+    } catch {
+      return unstoredWorkspaceId;
+    }
+  },
+  set(workspaceId: string | null) {
+    try {
+      if (workspaceId) localStorage.setItem(CURRENT_WORKSPACE_KEY, workspaceId);
+      else localStorage.removeItem(CURRENT_WORKSPACE_KEY);
+    } catch {
+      unstoredWorkspaceId = workspaceId;
+    }
+    for (const listener of workspaceListeners) listener();
+  },
+  subscribe(listener: () => void) {
+    workspaceListeners.add(listener);
+    return () => void workspaceListeners.delete(listener);
+  },
+};
+
 /**
  * The signed-in User and the Workspace they are looking at. Only for pages
  * under `RequireSession`, which renders them once `useMe` has a User.
  */
 export function useSignedIn(): { me: Me; workspace: Workspace } {
   const { data: me } = useMe();
-  // Every User has at least their Personal Workspace; switching Workspaces comes later.
-  const workspace = me?.workspaces[0];
+  const chosen = useSyncExternalStore(currentWorkspace.subscribe, currentWorkspace.get);
+  // Every User has at least their Personal Workspace, listed first.
+  const workspace = me?.workspaces.find((w) => w.id === chosen) ?? me?.workspaces[0];
   if (!me || !workspace) throw new Error('useSignedIn must be used under <RequireSession>');
   return { me, workspace };
 }
@@ -79,10 +114,13 @@ export function RequireSession() {
   return <Outlet />;
 }
 
-/** Layout route for login and sign-up; a signed-in User goes home instead. */
+/** Where a User goes once signed in: back to an Invitation opened while signed out, else home. */
+export const afterSignIn = () => (pendingInvitation.get() ? '/invitation' : '/');
+
+/** Layout route for login and sign-up; a signed-in User goes on (`afterSignIn`) instead. */
 export function GuestOnly() {
   const me = useMe();
   if (me.isPending) return <Loading />;
-  if (me.data) return <Navigate to="/" replace />;
+  if (me.data) return <Navigate to={afterSignIn()} replace />;
   return <Outlet />;
 }

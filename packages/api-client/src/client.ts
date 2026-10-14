@@ -87,6 +87,23 @@ import {
   type UpdateValuationInput,
   valuationListSchema,
   valuationSchema,
+  type AcceptedInvitation,
+  acceptedInvitationSchema,
+  type AuditPage,
+  auditPageSchema,
+  type Consent,
+  consentListSchema,
+  type CreatedInvitation,
+  createdInvitationSchema,
+  type CreateInvitationInput,
+  type InvitationList,
+  invitationListSchema,
+  type InvitationPreview,
+  invitationPreviewSchema,
+  type Member,
+  memberListSchema,
+  memberSchema,
+  type UpdateMemberInput,
 } from '@daric/core';
 import type { TokenStore } from './tokens';
 
@@ -161,6 +178,33 @@ export interface ApiClient {
   updatePreferences(input: UpdateUserPreferencesInput): Promise<UserPreferences>;
   /** The User's Plan, its expiry and their Entitlements, as the server decides them. */
   getSubscription(): Promise<Subscription>;
+  /** Everyone in the Workspace, in the order they joined; any Member may see them. */
+  listMembers(workspaceId: string): Promise<Member[]>;
+  /** Owner or Admin, by the role matrix: an Admin changes only Members and Viewers, to those. */
+  updateMember(workspaceId: string, memberId: string, input: UpdateMemberInput): Promise<Member>;
+  /** Removes a Member by the role matrix, or, on one's own membership, leaves the Workspace. */
+  removeMember(workspaceId: string, memberId: string): Promise<void>;
+  /** Owner or Admin: the Invitations, newest first, and whether the Owner's Plan allows more. */
+  listInvitations(workspaceId: string): Promise<InvitationList>;
+  /**
+   * Owner or Admin. Mails the link if an email is given; the link comes back
+   * this once. 402 when the Workspace's Owner may not share it.
+   */
+  createInvitation(workspaceId: string, input: CreateInvitationInput): Promise<CreatedInvitation>;
+  revokeInvitation(workspaceId: string, invitationId: string): Promise<void>;
+  /** What a pending Invitation offers; 400 when the link is invalid, used, revoked or expired. */
+  previewInvitation(token: string): Promise<InvitationPreview>;
+  /**
+   * Joins the Workspace. 403 with `reason` EMAIL_NOT_VERIFIED or
+   * EMAIL_MISMATCH, 409 when already a Member, 402 when its Owner may no longer share it.
+   */
+  acceptInvitation(token: string): Promise<AcceptedInvitation>;
+  /** The User's Consents, newest first, revoked ones included. */
+  listConsents(): Promise<Consent[]>;
+  /** Revoking workspace sharing leaves that Workspace at once. */
+  revokeConsent(consentId: string): Promise<void>;
+  /** Owner only: the audit log, newest first; pass the previous page's `next` as `before`. */
+  listAudit(workspaceId: string, options?: { before?: string; limit?: number }): Promise<AuditPage>;
   /** Archived Accounts are left out unless `includeArchived`. */
   listAccounts(workspaceId: string, options?: { includeArchived?: boolean }): Promise<Account[]>;
   /** Owner or Admin only. */
@@ -502,6 +546,44 @@ export function createApiClient(options: ApiClientOptions = {}): ApiClient {
     updatePreferences: (input) =>
       request('PATCH', '/v1/me/preferences', userPreferencesSchema, input),
     getSubscription: () => request('GET', '/v1/me/subscription', subscriptionSchema),
+    listMembers: (workspaceId) => request('GET', membersPath(workspaceId), memberListSchema),
+    updateMember: (workspaceId, memberId, input) =>
+      request(
+        'PATCH',
+        `${membersPath(workspaceId)}/${encodeURIComponent(memberId)}`,
+        memberSchema,
+        input,
+      ),
+    removeMember: (workspaceId, memberId) =>
+      request('DELETE', `${membersPath(workspaceId)}/${encodeURIComponent(memberId)}`, noContent),
+    listInvitations: (workspaceId) =>
+      request('GET', invitationsPath(workspaceId), invitationListSchema),
+    createInvitation: (workspaceId, input) =>
+      request('POST', invitationsPath(workspaceId), createdInvitationSchema, input),
+    revokeInvitation: (workspaceId, invitationId) =>
+      request(
+        'POST',
+        `${invitationsPath(workspaceId)}/${encodeURIComponent(invitationId)}/revoke`,
+        noContent,
+      ),
+    previewInvitation: (token) =>
+      request('POST', '/v1/invitations/preview', invitationPreviewSchema, { token }),
+    acceptInvitation: (token) =>
+      request('POST', '/v1/invitations/accept', acceptedInvitationSchema, { token }),
+    listConsents: () => request('GET', '/v1/me/consents', consentListSchema),
+    revokeConsent: (consentId) =>
+      request('POST', `/v1/me/consents/${encodeURIComponent(consentId)}/revoke`, noContent),
+    listAudit: (workspaceId, { before, limit } = {}) => {
+      const params = new URLSearchParams();
+      if (before) params.set('before', before);
+      if (limit !== undefined) params.set('limit', String(limit));
+      const search = params.size > 0 ? `?${params}` : '';
+      return request(
+        'GET',
+        `/v1/workspaces/${encodeURIComponent(workspaceId)}/audit${search}`,
+        auditPageSchema,
+      );
+    },
     listAccounts: (workspaceId, { includeArchived = false } = {}) =>
       request(
         'GET',
@@ -746,6 +828,14 @@ function transactionsPath(workspaceId: string): string {
 
 function categoriesPath(workspaceId: string): string {
   return `/v1/workspaces/${encodeURIComponent(workspaceId)}/categories`;
+}
+
+function membersPath(workspaceId: string): string {
+  return `/v1/workspaces/${encodeURIComponent(workspaceId)}/members`;
+}
+
+function invitationsPath(workspaceId: string): string {
+  return `/v1/workspaces/${encodeURIComponent(workspaceId)}/invitations`;
 }
 
 function accountsPath(workspaceId: string): string {

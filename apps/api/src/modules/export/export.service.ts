@@ -29,7 +29,8 @@ type WorkspaceTable = PgTable & { workspaceId: AnyColumn };
 /**
  * Every entity a Workspace holds, each with every column, in a stable order.
  * A new Workspace table belongs here. Audit logs are left out: they hold other
- * Members' IP addresses.
+ * Members' IP addresses. So are Invitations and Consents: they are about who
+ * shares the Workspace, not its data, and Consents belong to each User.
  */
 const entities: { name: string; table: WorkspaceTable; order: AnyColumn[] }[] = [
   {

@@ -43,7 +43,7 @@ Common columns on domain tables: `id uuid (v7, client-generatable)`, `workspace_
 
 ## API modules
 
-`auth`, `me` (incl. account deletion), under `/v1/workspaces/:wsId`: `workspaces`, `members`, `invitations`, `consents`, `audit`, `accounts`, `valuations`, `currencies`/`exchange-rates`, `categories`, `labels`, `transactions`, `recurring`, `budgets`, `net-worth`, `projection`, `reports`, `export`, `ai`. Per User: `billing` (subscription, checkout, payment callback, payment history). Cross-cutting: WorkspaceGuard + RolesGuard, nestjs-zod validation + OpenAPI, helmet, CORS, throttler, CSRF (web), pino with redaction, pluggable mailer (SMTP; Mailpit in dev), pluggable AiProvider (ADR-0003), pluggable PaymentProvider + EntitlementService (ADR-0008).
+`auth`, `me` (incl. account deletion), under `/v1/workspaces/:wsId`: `workspaces`, `members`, `invitations`, `audit`, `accounts`, `valuations`, `currencies`/`exchange-rates`, `categories`, `labels`, `transactions`, `recurring`, `budgets`, `net-worth`, `projection`, `reports`, `export`, `ai`. Per User: `billing` (subscription, checkout, payment callback, payment history), `consents` (`/v1/me/consents`: a User's Consents span Workspaces); accepting an Invitation is `/v1/invitations/accept`. Cross-cutting: WorkspaceGuard + RolesGuard, nestjs-zod validation + OpenAPI, helmet, CORS, throttler, CSRF (web), pino with redaction, pluggable mailer (SMTP; Mailpit in dev), pluggable AiProvider (ADR-0003), pluggable PaymentProvider + EntitlementService (ADR-0008).
 
 ## Year-end projection (`core/projection`)
 

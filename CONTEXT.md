@@ -15,7 +15,7 @@ A User's membership in a Workspace with a Role (Owner, Admin, Member, Viewer).
 _Avoid_: Collaborator, participant
 
 **Invitation**:
-An Owner-issued, revocable offer for a person to become a Member with a given Role.
+An Owner- or Admin-issued, revocable offer for a person to become a Member with a given Role (an Admin offers only Member or Viewer). Bound to an email, or a link one person may accept.
 
 **Offline Device**:
 A browser or phone on which the User agreed to keep Workspace data for offline use; its data is wiped on logout.

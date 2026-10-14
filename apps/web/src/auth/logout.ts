@@ -1,7 +1,7 @@
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { useApi } from '../api/api';
 import { useOfflineDevice } from '../offline/offline';
-import { logoutPending, ME_QUERY_KEY } from './session';
+import { currentWorkspace, logoutPending, ME_QUERY_KEY } from './session';
 
 /**
  * Ends this Signed-in Device and wipes what it kept: the waiting changes (after
@@ -24,6 +24,7 @@ export function useLogout() {
         throw error;
       } finally {
         await device.wipe();
+        currentWorkspace.set(null);
         // Signed out: the session gate sends the visitor to login. The query
         // the header watches stays; everything else held in memory goes.
         queryClient.setQueryData(ME_QUERY_KEY, null);

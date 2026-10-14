@@ -38,6 +38,8 @@ export interface DisplayFormatters {
   /** A stored rate of `currency` into `base` as typed: in tomans where Toman display asks. */
   rate(rate: string, currency: Currency, base: Currency): string;
   date(instant: Date, options?: Pick<FormatDateOptions, 'style'>): string;
+  /** The time of day of `instant` in the Workspace timezone, on a 24-hour clock (`20:35`). */
+  time(instant: Date): string;
   /** A day with no time of day (a Transaction's), in the display calendar. */
   day(day: IsoDay, options?: Pick<FormatDateOptions, 'style'>): string;
   /** The day `instant` falls on in the Workspace timezone. */
@@ -54,6 +56,13 @@ export interface DisplayFormatters {
 export function displayFormatters(settings: DisplaySettings): DisplayFormatters {
   const { locale, workspace, preferences } = settings;
   const { digits } = preferences;
+  const clock = new Intl.DateTimeFormat('en-GB', {
+    hour: '2-digit',
+    minute: '2-digit',
+    hourCycle: 'h23',
+    timeZone: workspace.timezone,
+  });
+  const inDigits = (s: string) => (digits === 'persian' ? toPersianDigits(s) : s);
   const workspaceCalendar: WorkspaceCalendar = {
     calendar: workspace.calendar,
     timeZone: workspace.timezone,
@@ -73,11 +82,12 @@ export function displayFormatters(settings: DisplaySettings): DisplayFormatters 
         locale,
         digits,
       }),
+    time: (instant) => inDigits(clock.format(instant)),
     day: (day, options) =>
       formatDay(day, { ...options, calendar: preferences.displayCalendar, locale, digits }),
     today: (instant) => todayIn(instant, workspace.timezone),
     currentPeriod: (instant) => monthPeriodOf(instant, workspaceCalendar),
     period: (period) => formatPeriod(period, { calendar: workspace.calendar, locale, digits }),
-    count: (n) => (digits === 'persian' ? toPersianDigits(String(n)) : String(n)),
+    count: (n) => inDigits(String(n)),
   };
 }

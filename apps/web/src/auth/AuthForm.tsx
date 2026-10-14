@@ -9,7 +9,7 @@ import { Link, useNavigate } from 'react-router';
 import { useApi } from '../api/api';
 import { useI18n } from '../i18n/locale';
 import { useOfflineDevice } from '../offline/offline';
-import { logoutPending, ME_QUERY_KEY } from './session';
+import { afterSignIn, logoutPending, ME_QUERY_KEY } from './session';
 
 type Mode = 'login' | 'signup';
 type Field = 'email' | 'password';
@@ -108,7 +108,7 @@ export function AuthForm({ mode }: { mode: Mode }) {
       // The cookies changed; ask the API who is signed in now. Reset, not removed:
       // the header keeps watching the same query and shows the signed-in nav.
       await queryClient.resetQueries({ queryKey: ME_QUERY_KEY });
-      await navigate('/', { replace: true });
+      await navigate(afterSignIn(), { replace: true });
     },
   });
 

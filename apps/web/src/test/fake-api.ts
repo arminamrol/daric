@@ -32,10 +32,18 @@ import {
   trendMonths,
   trendReport,
   mayChangeTransaction,
+  mayChangeRole,
+  mayManageMember,
+  rolesAssignableBy,
   periodDays,
   todayIn,
 } from '@daric/core';
 import type {
+  AuditEntry,
+  Consent,
+  Invitation,
+  InvitationPreview,
+  Member,
   NetWorthSnapshot,
   Account,
   AccountValuation,
@@ -147,6 +155,23 @@ export function fakeApi({
   let nextPlannedItemId = 1;
   /** Unreachable: every call fails as fetch does when the network is down. */
   let offline = false;
+  /** Everyone in the Workspace, in the order they joined; the signed-in User is added below. */
+  let members: Member[] = [];
+  let nextMemberId = 1;
+  /** Newest first, each with the token of its link. */
+  const invitations: (Invitation & { token: string })[] = [];
+  let nextInvitationId = 1;
+  /** Invitations into other Workspaces, by token, as if someone had sent them. */
+  const invitationsElsewhere = new Map<
+    string,
+    { preview: InvitationPreview; workspace: Omit<Workspace, 'role'> }
+  >();
+  /** Other Workspaces the User has joined. */
+  let joined: Workspace[] = [];
+  const consents: Consent[] = [];
+  let nextConsentId = 1;
+  /** Newest first. */
+  let auditEntries: AuditEntry[] = [];
 
   function signedIn(): FakeUser {
     if (!current) throw new ApiError(401, { message: 'Unauthorized' });
@@ -203,11 +228,37 @@ export function fakeApi({
 
   if (signedInAs) current = addUser(signedInAs, testPassword, { locale });
 
-  function inWorkspace(workspaceId: string, minimum: WorkspaceRole = 'VIEWER') {
-    signedIn();
-    if (workspaceId !== workspace.id) throw new ApiError(404, { message: 'Not Found' });
-    if (!hasRole(workspace.role, minimum)) throw new ApiError(403, { message: 'Forbidden' });
+  function addMember(email: string, memberRole: WorkspaceRole, userId?: string): Member {
+    const member: Member = {
+      id: `01900000-0000-7000-8d00-${String(nextMemberId++).padStart(12, '0')}`,
+      userId: userId ?? `01900000-0000-7000-8e00-${String(nextMemberId).padStart(12, '0')}`,
+      email,
+      role: memberRole,
+      joinedAt: '2026-10-01T08:00:00.000Z',
+    };
+    members.push(member);
+    return member;
   }
+  // The Workspace always has its Owner, who is the signed-in User unless told otherwise.
+  if (role !== 'OWNER') addMember('owner@example.com', 'OWNER');
+  if (current) addMember(current.email, role, current.id);
+
+  /** The Workspace the call is for; its data is the one Workspace's, whichever it is. */
+  function inWorkspace(workspaceId: string, minimum: WorkspaceRole = 'VIEWER'): Workspace {
+    signedIn();
+    const found = [workspace, ...joined].find((w) => w.id === workspaceId);
+    if (!found) throw new ApiError(404, { message: 'Not Found' });
+    if (!hasRole(found.role, minimum)) throw new ApiError(403, { message: 'Forbidden' });
+    return found;
+  }
+
+  function findMember(memberId: string): Member {
+    const member = members.find((m) => m.id === memberId);
+    if (!member) throw new ApiError(404, { message: 'Not Found' });
+    return member;
+  }
+
+  const sharingAllowed = () => subscription.entitlements.shareWorkspace;
 
   /** Puts an Account straight into the Workspace, as if created earlier. */
   function addAccount(fields: Partial<Account> & Pick<Account, 'name'>): Account {
@@ -697,7 +748,7 @@ export function fakeApi({
       return {
         user: { id: user.id, email: user.email, emailVerified: user.emailVerified },
         preferences: { ...user.preferences },
-        workspaces: [{ ...workspace }],
+        workspaces: [{ ...workspace }, ...joined.map((w) => ({ ...w }))],
       };
     },
     async updateWorkspace(workspaceId, input) {
@@ -1325,6 +1376,126 @@ export function fakeApi({
       signedIn();
       return structuredClone(subscription);
     },
+    async listMembers(workspaceId) {
+      inWorkspace(workspaceId);
+      return structuredClone(members);
+    },
+    async updateMember(workspaceId, memberId, input) {
+      const { role: actor } = inWorkspace(workspaceId, 'ADMIN');
+      const member = findMember(memberId);
+      if (member.userId === signedIn().id || !mayChangeRole(actor, member.role, input.role)) {
+        throw new ApiError(403, { message: 'Forbidden' });
+      }
+      member.role = input.role;
+      return { ...member };
+    },
+    async removeMember(workspaceId, memberId) {
+      const { role: actor } = inWorkspace(workspaceId);
+      const member = findMember(memberId);
+      const leaving = member.userId === signedIn().id;
+      const allowed = leaving
+        ? member.role !== 'OWNER'
+        : hasRole(actor, 'ADMIN') && mayManageMember(actor, member.role);
+      if (!allowed) throw new ApiError(403, { message: 'Forbidden' });
+      members = members.filter((m) => m.id !== memberId);
+      if (leaving) joined = joined.filter((w) => w.id !== workspaceId);
+    },
+    async listInvitations(workspaceId) {
+      inWorkspace(workspaceId, 'ADMIN');
+      return {
+        sharingAllowed: sharingAllowed(),
+        invitations: invitations.map(({ token: _, ...invitation }) => ({ ...invitation })),
+      };
+    },
+    async createInvitation(workspaceId, input) {
+      const { role: actor } = inWorkspace(workspaceId, 'ADMIN');
+      if (!rolesAssignableBy(actor).includes(input.role)) {
+        throw new ApiError(403, { message: 'Forbidden' });
+      }
+      if (!sharingAllowed()) throw new ApiError(402, { message: 'Payment Required' });
+      const email = input.email ?? null;
+      const taken =
+        email !== null &&
+        (members.some((m) => m.email === email) ||
+          invitations.some((i) => i.email === email && i.status === 'PENDING'));
+      if (taken) throw new ApiError(409, { message: 'Conflict' });
+      const token = `invitation-token-${nextInvitationId}`;
+      const invitation = {
+        id: `01900000-0000-7000-8f00-${String(nextInvitationId++).padStart(12, '0')}`,
+        email,
+        role: input.role,
+        status: 'PENDING' as const,
+        invitedByEmail: signedIn().email,
+        createdAt: new Date().toISOString(),
+        expiresAt: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString(),
+        token,
+      };
+      invitations.unshift(invitation);
+      const { token: _, ...shown } = invitation;
+      return { ...shown, link: `https://daric.example/invitation?token=${token}` };
+    },
+    async revokeInvitation(workspaceId, invitationId) {
+      const { role: actor } = inWorkspace(workspaceId, 'ADMIN');
+      const invitation = invitations.find((i) => i.id === invitationId);
+      if (!invitation) throw new ApiError(404, { message: 'Not Found' });
+      if (!mayManageMember(actor, invitation.role)) {
+        throw new ApiError(403, { message: 'Forbidden' });
+      }
+      if (invitation.status !== 'PENDING') throw new ApiError(409, { message: 'Conflict' });
+      invitation.status = 'REVOKED';
+    },
+    async previewInvitation(token) {
+      signedIn();
+      const found = invitationsElsewhere.get(token);
+      if (!found) throw new ApiError(400, { message: 'The invitation is invalid' });
+      return { ...found.preview };
+    },
+    async acceptInvitation(token) {
+      const user = signedIn();
+      const found = invitationsElsewhere.get(token);
+      if (!found) throw new ApiError(400, { message: 'The invitation is invalid' });
+      if (!user.emailVerified) {
+        throw new ApiError(403, { message: 'Forbidden', reason: 'EMAIL_NOT_VERIFIED' });
+      }
+      if (found.preview.email && found.preview.email !== user.email) {
+        throw new ApiError(403, { message: 'Forbidden', reason: 'EMAIL_MISMATCH' });
+      }
+      if (joined.some((w) => w.id === found.workspace.id)) {
+        throw new ApiError(409, { message: 'Conflict' });
+      }
+      invitationsElsewhere.delete(token);
+      const added: Workspace = { ...found.workspace, role: found.preview.role };
+      joined.push(added);
+      consents.unshift({
+        id: `01900000-0000-7000-8a00-${String(nextConsentId++).padStart(12, '0')}`,
+        purpose: 'WORKSPACE_SHARING',
+        workspace: { id: added.id, name: added.name },
+        policyVersion: '2026-10-14',
+        grantedAt: new Date().toISOString(),
+        revokedAt: null,
+      });
+      return { workspace: { ...added } };
+    },
+    async listConsents() {
+      signedIn();
+      return structuredClone(consents);
+    },
+    async revokeConsent(consentId) {
+      signedIn();
+      const consent = consents.find((c) => c.id === consentId);
+      if (!consent) throw new ApiError(404, { message: 'Not Found' });
+      if (consent.revokedAt) return;
+      consent.revokedAt = new Date().toISOString();
+      const left = consent.workspace?.id;
+      joined = joined.filter((w) => w.id !== left);
+    },
+    async listAudit(workspaceId, { before, limit = 50 } = {}) {
+      inWorkspace(workspaceId, 'OWNER');
+      const start = before ? auditEntries.findIndex((e) => e.id === before) + 1 : 0;
+      const page = auditEntries.slice(start, start + limit);
+      const more = start + limit < auditEntries.length;
+      return { entries: structuredClone(page), next: more ? (page.at(-1)?.id ?? null) : null };
+    },
   };
 
   // Every call fails while offline, as fetch does, before reaching the fake server.
@@ -1385,6 +1556,43 @@ export function fakeApi({
     preferences: () => signedIn().preferences,
     /** Sets what the server answers about the User's Plan. */
     setSubscription: (value: Subscription) => void (subscription = value),
+    /** Puts someone else into the Workspace, as if they had joined earlier. */
+    addMember: (email: string, memberRole: WorkspaceRole) => addMember(email, memberRole),
+    members: () => members,
+    invitations: () => invitations,
+    /** An Invitation into another Workspace, as if mailed to the User; returns its token. */
+    inviteElsewhere: ({
+      workspaceName,
+      role: invitedRole,
+      email = null,
+      invitedByEmail = 'reza@example.com',
+    }: {
+      workspaceName: string;
+      role: InvitationPreview['role'];
+      email?: string | null;
+      invitedByEmail?: string | null;
+    }) => {
+      const token = `elsewhere-token-${invitationsElsewhere.size + 1}`;
+      invitationsElsewhere.set(token, {
+        preview: {
+          workspaceName,
+          role: invitedRole,
+          email,
+          invitedByEmail,
+          expiresAt: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString(),
+        },
+        workspace: {
+          ...workspace,
+          id: `01900000-0000-7000-9000-${String(invitationsElsewhere.size + 2).padStart(12, '0')}`,
+          name: workspaceName,
+        },
+      });
+      return token;
+    },
+    joinedWorkspaces: () => joined,
+    consents: () => consents,
+    /** Sets the audit log, newest first. */
+    setAudit: (entries: AuditEntry[]) => void (auditEntries = entries),
   };
 }
 export type FakeApi = ReturnType<typeof fakeApi>;

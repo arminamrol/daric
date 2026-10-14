@@ -250,6 +250,135 @@ describe('api-client', () => {
     expect(await client.getSubscription()).toEqual(subscription);
   });
 
+  describe('Sharing', () => {
+    const ws = workspace.id;
+    const csrf = { '__Host-daric_csrf': 'csrf-1' };
+    const invitation = {
+      id: '01900000-0000-7000-8000-0000000000c1',
+      email: 'reza@example.com',
+      role: 'MEMBER',
+      status: 'PENDING',
+      invitedByEmail: 'sara@example.com',
+      createdAt: '2026-10-14T08:00:00.000Z',
+      expiresAt: '2026-10-21T08:00:00.000Z',
+    };
+    const member = {
+      id: '01900000-0000-7000-8000-0000000000d1',
+      userId: user.id,
+      email: user.email,
+      role: 'OWNER',
+      joinedAt: '2026-10-01T08:00:00.000Z',
+    };
+
+    it('lists, changes and removes Members', async () => {
+      const { client, sent } = fakeServer(
+        {
+          [`GET /v1/workspaces/${ws}/members`]: () => ({ status: 200, body: [member] }),
+          [`PATCH /v1/workspaces/${ws}/members/${member.id}`]: () => ({
+            status: 200,
+            body: { ...member, role: 'VIEWER' },
+          }),
+          [`DELETE /v1/workspaces/${ws}/members/${member.id}`]: () => ({ status: 204 }),
+        },
+        csrf,
+      );
+      expect(await client.listMembers(ws)).toEqual([member]);
+      expect((await client.updateMember(ws, member.id, { role: 'VIEWER' })).role).toBe('VIEWER');
+      expect(sent[1]?.body).toEqual({ role: 'VIEWER' });
+      await client.removeMember(ws, member.id);
+      expect(sent[2]?.method).toBe('DELETE');
+    });
+
+    it('creates, lists and revokes Invitations', async () => {
+      const link = 'https://daric.example/invitation?token=abc';
+      const { client, sent } = fakeServer(
+        {
+          [`POST /v1/workspaces/${ws}/invitations`]: () => ({
+            status: 201,
+            body: { ...invitation, link },
+          }),
+          [`GET /v1/workspaces/${ws}/invitations`]: () => ({
+            status: 200,
+            body: { sharingAllowed: true, invitations: [invitation] },
+          }),
+          [`POST /v1/workspaces/${ws}/invitations/${invitation.id}/revoke`]: () => ({
+            status: 204,
+          }),
+        },
+        csrf,
+      );
+      const created = await client.createInvitation(ws, {
+        email: 'reza@example.com',
+        role: 'MEMBER',
+      });
+      expect(created.link).toBe(link);
+      expect(sent[0]?.body).toEqual({ email: 'reza@example.com', role: 'MEMBER' });
+      expect(await client.listInvitations(ws)).toEqual({
+        sharingAllowed: true,
+        invitations: [invitation],
+      });
+      await client.revokeInvitation(ws, invitation.id);
+    });
+
+    it('sends an Invitation token in the body to preview and accept it', async () => {
+      const preview = {
+        workspaceName: 'Home',
+        role: 'MEMBER',
+        invitedByEmail: 'sara@example.com',
+        email: null,
+        expiresAt: invitation.expiresAt,
+      };
+      const { client, sent } = fakeServer(
+        {
+          'POST /v1/invitations/preview': () => ({ status: 200, body: preview }),
+          'POST /v1/invitations/accept': () => ({
+            status: 200,
+            body: { workspace: { ...workspace, role: 'MEMBER' } },
+          }),
+        },
+        csrf,
+      );
+      expect(await client.previewInvitation('tok')).toEqual(preview);
+      expect((await client.acceptInvitation('tok')).workspace.role).toBe('MEMBER');
+      expect(sent.map((r) => r.body)).toEqual([{ token: 'tok' }, { token: 'tok' }]);
+      expect(sent.every((r) => !r.url.includes('tok'))).toBe(true);
+    });
+
+    it('lists and revokes Consents', async () => {
+      const consent = {
+        id: '01900000-0000-7000-8000-0000000000e1',
+        purpose: 'WORKSPACE_SHARING',
+        workspace: { id: ws, name: 'Home' },
+        policyVersion: '2026-10-14',
+        grantedAt: '2026-10-14T08:00:00.000Z',
+        revokedAt: null,
+      };
+      const { client, sent } = fakeServer(
+        {
+          'GET /v1/me/consents': () => ({ status: 200, body: [consent] }),
+          [`POST /v1/me/consents/${consent.id}/revoke`]: () => ({ status: 204 }),
+        },
+        csrf,
+      );
+      expect(await client.listConsents()).toEqual([consent]);
+      await client.revokeConsent(consent.id);
+      expect(sent[1]?.method).toBe('POST');
+    });
+
+    it('pages through the audit log', async () => {
+      const { client, sent } = fakeServer({
+        [`GET /v1/workspaces/${ws}/audit`]: () => ({
+          status: 200,
+          body: { entries: [], next: null },
+        }),
+      });
+      await client.listAudit(ws);
+      await client.listAudit(ws, { before: invitation.id, limit: 20 });
+      expect(sent[0]?.url).toMatch(/\/audit$/);
+      expect(sent[1]?.url).toMatch(new RegExp(`/audit\\?before=${invitation.id}&limit=20$`));
+    });
+  });
+
   describe('Accounts', () => {
     const account = {
       id: '01900000-0000-7000-8000-0000000000a1',

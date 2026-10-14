@@ -1,51 +1,8 @@
 import { Injectable } from '@nestjs/common';
+import type { AuditAction } from '@daric/core';
 import type { ClientInfo } from '../../common/request';
 import type { Executor } from '../../db/client';
 import { auditLogs } from '../../db/schema';
-
-export type AuditAction =
-  | 'auth.register'
-  | 'auth.login'
-  | 'auth.login_failed'
-  | 'auth.logout'
-  | 'auth.refresh_reuse'
-  | 'auth.email_verified'
-  | 'auth.password_reset_requested'
-  | 'auth.password_reset'
-  | 'workspace.update'
-  | 'workspace.export'
-  | 'account.create'
-  | 'account.update'
-  | 'category.create'
-  | 'category.update'
-  | 'category.reorder'
-  | 'label.create'
-  | 'label.update'
-  | 'budget.create'
-  | 'budget.update'
-  | 'budget.delete'
-  | 'exchange_rate.create'
-  | 'exchange_rate.update'
-  | 'exchange_rate.delete'
-  | 'valuation.create'
-  | 'valuation.update'
-  | 'valuation.delete'
-  | 'net_worth_snapshot.create'
-  | 'projection_settings.update'
-  | 'planned_item.create'
-  | 'planned_item.update'
-  | 'planned_item.delete'
-  | 'recurring.create'
-  | 'recurring.update'
-  | 'recurring.confirm'
-  | 'recurring.skip'
-  | 'recurring.auto_post'
-  | 'transaction.create'
-  | 'transaction.update'
-  | 'transaction.delete'
-  | 'transaction.restore'
-  | 'transaction.label_attach'
-  | 'transaction.label_detach';
 
 export interface AuditEntry {
   action: AuditAction;
