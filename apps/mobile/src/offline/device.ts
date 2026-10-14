@@ -1,16 +1,17 @@
-import { transactionTransport } from '@daric/api-client';
-import type { ApiClient } from '@daric/api-client';
-import type { CreateTransactionInput, Transaction } from '@daric/core';
+import { mergeWrites, workspaceTransport } from '@daric/api-client';
+import type { ApiClient, WorkspaceWrite } from '@daric/api-client';
+import type { Transaction } from '@daric/core';
 import { createOfflineQueue, keyValueStorage, memoryStorage } from '@daric/offline-queue';
 import type { KeyValueStore, OfflineQueue, QueueStorage } from '@daric/offline-queue';
 import { dehydrate, hydrate } from '@tanstack/react-query';
 import type { DehydratedState, QueryClient } from '@tanstack/react-query';
 import type { Settings } from '../storage/settings';
-import { refreshAfterChange } from '../transactions/keys';
+import { refreshAfterWrite } from '../data/keys';
 import { forgetLastPicks } from '../transactions/last-picks';
 import type { Network } from './network';
 
-export type TransactionQueue = OfflineQueue<CreateTransactionInput, Transaction>;
+/** The queue of everything written in a Workspace, in the order it was written. */
+export type WriteQueue = OfflineQueue<WorkspaceWrite, Transaction>;
 
 /** Whether this phone is an Offline Device; asked at login, yes unless the user says no. */
 const KEEP = 'daric.keepData';
@@ -34,7 +35,7 @@ interface SavedCache {
  * everything is wiped on logout.
  */
 export interface OfflineDevice {
-  queue: TransactionQueue;
+  queue: WriteQueue;
   /** Whether Workspace data is kept on this phone. */
   keeps(): boolean;
   /**
@@ -71,9 +72,9 @@ export function createOfflineDevice({
 }): OfflineDevice {
   let keep = settings.get(KEEP) === 'yes';
 
-  const memory = memoryStorage<CreateTransactionInput, Transaction>();
-  const persistent: QueueStorage<CreateTransactionInput, Transaction> = keyValueStorage(store);
-  const storage: QueueStorage<CreateTransactionInput, Transaction> = {
+  const memory = memoryStorage<WorkspaceWrite, Transaction>();
+  const persistent: QueueStorage<WorkspaceWrite, Transaction> = keyValueStorage(store);
+  const storage: QueueStorage<WorkspaceWrite, Transaction> = {
     read: () => (keep ? persistent.read() : memory.read()),
     write: (entries) => (keep ? persistent.write(entries) : memory.write(entries)),
     clear: async () => {
@@ -84,10 +85,11 @@ export function createOfflineDevice({
 
   const queue = createOfflineQueue({
     storage,
-    transport: transactionTransport(api, (workspaceId) =>
-      refreshAfterChange(queryClient, workspaceId),
+    transport: workspaceTransport(api, (workspaceId, entity) =>
+      refreshAfterWrite(queryClient, workspaceId, entity),
     ),
     isOnline: network.isOnline,
+    merge: mergeWrites,
   });
 
   // Saves run one after another; changes made during one are saved by the next.

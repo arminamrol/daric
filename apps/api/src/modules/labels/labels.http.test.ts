@@ -70,6 +70,30 @@ describe('Labels', () => {
     ]);
   });
 
+  it('create a Label once when the same id is sent twice, answering with what it holds now', async () => {
+    const { api } = await setUp();
+    const id = randomUUID();
+    const first = await api.create({ id, name: 'Travel' });
+    expect(first.status).toBe(201);
+    expect(first.body.id).toBe(id);
+    await api.update(id, { controllable: true });
+    const again = await api.create({ id, name: 'Travel' });
+    expect(again.status).toBe(200);
+    expect(again.body).toEqual({ ...first.body, controllable: true });
+    expect((await api.list()).body).toHaveLength(1);
+  });
+
+  it("refuse an id another Workspace already used, without showing that Workspace's Label", async () => {
+    const a = await setUp();
+    const b = await setUp();
+    const id = randomUUID();
+    await b.api.create({ id, name: 'secret' });
+    const res = await a.api.create({ id, name: 'Travel' });
+    expect(res.status).toBe(409);
+    expect(JSON.stringify(res.body)).not.toContain('secret');
+    expect((await a.api.list()).body).toEqual([]);
+  });
+
   it('rename, flag, archive and bring back a Label', async () => {
     const { api } = await setUp();
     const { body: label } = await api.create({ name: 'Subscriptions' });

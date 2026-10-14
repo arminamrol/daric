@@ -4,6 +4,7 @@ import {
   categoryIcons,
   categoryTree,
   defaultCategories,
+  swapWithNeighbour,
   type CategoryNode,
 } from './categories';
 
@@ -52,5 +53,26 @@ describe('defaultCategories', () => {
         .flatMap(({ name, children = [] }) => [name, ...children.map((c) => c.name)]);
       expect(new Set(names).size).toBe(names.length);
     }
+  });
+});
+
+describe('swapWithNeighbour', () => {
+  const food = node('food');
+  const hidden = node('hidden');
+  const rent = node('rent');
+  const bread = node('bread', { parentId: 'food' });
+  const salary = node('salary', { kind: 'INCOME' });
+  const all = [food, hidden, rent, bread, salary];
+
+  it('swaps with the nearest shown sibling, keeping hidden ones in place', () => {
+    const visible = [food, rent, bread, salary];
+    expect(swapWithNeighbour(all, visible, rent, -1)).toEqual(['rent', 'hidden', 'food']);
+    expect(swapWithNeighbour(all, visible, food, 1)).toEqual(['rent', 'hidden', 'food']);
+  });
+
+  it('answers null at either edge', () => {
+    expect(swapWithNeighbour(all, all, food, -1)).toBeNull();
+    expect(swapWithNeighbour(all, all, bread, 1)).toBeNull();
+    expect(swapWithNeighbour(all, all, salary, 1)).toBeNull();
   });
 });

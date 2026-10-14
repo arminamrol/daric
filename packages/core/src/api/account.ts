@@ -1,7 +1,7 @@
 import { z } from 'zod';
 import { accountClasses, accountTypes } from '../accounts';
 import { amountSchema } from '../money';
-import { currencyCodeSchema, nameSchema, notEmpty } from './shared';
+import { currencyCodeSchema, idSchema, nameSchema, notEmpty } from './shared';
 
 /** An Account as the API returns it; Amounts are in the Account's currency. */
 export const accountSchema = z.object({
@@ -23,6 +23,8 @@ export const accountListSchema = z.array(accountSchema);
 export type AccountWire = z.input<typeof accountSchema>;
 
 export const createAccountInputSchema = z.object({
+  /** Chosen by the client (a UUIDv7), so a replayed create makes nothing new (ADR-0005). */
+  id: idSchema.exactOptional(),
   name: nameSchema,
   type: z.enum(accountTypes),
   class: z.enum(accountClasses),

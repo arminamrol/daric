@@ -28,8 +28,8 @@ import type {
   UpdateRecurringRuleInput,
 } from '@daric/core';
 import { and, asc, eq, inArray, isNull, sql, type SQL } from 'drizzle-orm';
+import { createOnce, unlessMissing, type Created } from '../../common/create-once';
 import { isUuid, type Membership } from '../../common/request';
-import { one } from '../../db/client';
 import {
   accounts,
   categories,
@@ -145,29 +145,36 @@ export class RecurringService {
     return toWire(await this.row(ruleId), await this.today(membership.workspaceId));
   }
 
+  /** Sending the same id again answers with the rule it holds now (`created: false`). */
   async create(
     membership: Membership,
     userId: string,
     input: ParsedCreateRecurringRuleInput,
-  ): Promise<RecurringRuleWire> {
+  ): Promise<Created<RecurringRuleWire>> {
     const { workspaceId } = membership;
     await this.today(workspaceId);
-    await this.assertUsableAccount(input.accountId);
-    await this.assertUsableCategory(input.categoryId, input.type);
-    const tx = scopedTx();
-    const created = one(
-      await tx
-        .insert(recurringRules)
-        .values({ ...input, workspaceId, createdBy: userId })
-        .returning({ id: recurringRules.id }),
+    return createOnce(
+      input.id,
+      (id) => unlessMissing(this.get(membership, id)),
+      async () => {
+        await this.assertUsableAccount(input.accountId);
+        await this.assertUsableCategory(input.categoryId, input.type);
+        const tx = scopedTx();
+        const [created] = await tx
+          .insert(recurringRules)
+          .values({ ...input, workspaceId, createdBy: userId })
+          .onConflictDoNothing({ target: recurringRules.id })
+          .returning({ id: recurringRules.id });
+        if (!created) return undefined;
+        await this.audit.record(tx, {
+          action: 'recurring.create',
+          actorUserId: userId,
+          workspaceId,
+          metadata: { ruleId: created.id },
+        });
+        return this.get(membership, created.id);
+      },
     );
-    await this.audit.record(tx, {
-      action: 'recurring.create',
-      actorUserId: userId,
-      workspaceId,
-      metadata: { ruleId: created.id },
-    });
-    return this.get(membership, created.id);
   }
 
   /**

@@ -1,0 +1,58 @@
+import { hasRole } from '@daric/core';
+import { useRouter } from 'expo-router';
+import type { Href } from 'expo-router';
+import { ScrollView, StyleSheet, View } from 'react-native';
+import { useSignedIn } from '../../auth/session';
+import { useFormatters } from '../../display/formatters';
+import { useI18n } from '../../i18n/locale';
+import { useWaitingWrites } from '../../offline/offline';
+import { useDueOccurrences } from '../../recurring/recurring';
+import { ScreenHeader } from '../../ui/HeaderButton';
+import { ListRow } from '../../ui/ListRow';
+import { useTheme } from '../../ui/theme';
+
+/** The other parts of the app: what the Workspace is made of, and changes not sent yet. */
+export default function MoreScreen() {
+  const { t } = useI18n();
+  const { colors } = useTheme();
+  const router = useRouter();
+  const format = useFormatters();
+  const { workspace } = useSignedIn();
+  const waiting = useWaitingWrites(workspace.id);
+  // Viewers see no Due Occurrences waiting for them to confirm.
+  const due = useDueOccurrences();
+  const dueCount = hasRole(workspace.role, 'MEMBER') ? (due.data?.length ?? 0) : 0;
+
+  const items: { title: string; line?: string | false; href: Href }[] = [
+    { title: t('nav.accounts'), href: '/accounts' },
+    { title: t('nav.categories'), href: '/categories' },
+    { title: t('nav.labels'), href: '/labels' },
+    { title: t('nav.budgets'), href: '/budgets' },
+    {
+      title: t('nav.recurring'),
+      line: dueCount > 0 && t('nav.dueCount', { count: format.count(dueCount) }),
+      href: '/recurring',
+    },
+    {
+      title: t('sync.title'),
+      line: waiting.length > 0 && t('sync.pending'),
+      href: '/sync',
+    },
+  ];
+
+  return (
+    <ScrollView>
+      <ScreenHeader title={t('nav.more')} />
+      {items.map((item, index) => (
+        <View key={String(item.href)}>
+          {index > 0 && <View style={[styles.separator, { backgroundColor: colors.border }]} />}
+          <ListRow title={item.title} lines={[item.line]} onPress={() => router.push(item.href)} />
+        </View>
+      ))}
+    </ScrollView>
+  );
+}
+
+const styles = StyleSheet.create({
+  separator: { height: StyleSheet.hairlineWidth },
+});

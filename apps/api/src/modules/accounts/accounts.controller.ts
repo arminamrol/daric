@@ -1,5 +1,6 @@
-import { Get, Inject, Param, Patch, Post, Query } from '@nestjs/common';
+import { Get, HttpStatus, Inject, Param, Patch, Post, Query, Res } from '@nestjs/common';
 import {
+  ApiConflictResponse,
   ApiCreatedResponse,
   ApiNotFoundResponse,
   ApiOkResponse,
@@ -7,6 +8,7 @@ import {
   ApiTags,
 } from '@nestjs/swagger';
 import { accountSchema, createAccountInputSchema, updateAccountInputSchema } from '@daric/core';
+import type { Response } from 'express';
 import { createZodDto } from 'nestjs-zod';
 import { CurrentMembership, CurrentUserId, type Membership } from '../../common/request';
 import { MinRole } from '../../common/workspace.guard';
@@ -40,12 +42,17 @@ export class AccountsController {
   @Post()
   @MinRole('ADMIN')
   @ApiCreatedResponse({ type: AccountDto })
-  create(
+  @ApiOkResponse({ type: AccountDto, description: 'Already created under this id' })
+  @ApiConflictResponse({ description: 'The id is already used in another Workspace' })
+  async create(
     @CurrentMembership() membership: Membership,
     @CurrentUserId() userId: string,
     @ZodBody(CreateAccountDto) body: CreateAccountDto,
+    @Res({ passthrough: true }) res: Response,
   ) {
-    return this.accounts.create(membership, userId, body);
+    const { created, value } = await this.accounts.create(membership, userId, body);
+    if (!created) res.status(HttpStatus.OK);
+    return value;
   }
 
   @Patch(':accountId')

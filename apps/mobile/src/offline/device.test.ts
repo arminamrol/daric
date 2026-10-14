@@ -1,3 +1,4 @@
+import { entityKey } from '@daric/api-client';
 import type { ApiClient } from '@daric/api-client';
 import type { CreateTransactionInput } from '@daric/core';
 import { memoryKeyValueStore } from '@daric/offline-queue';
@@ -87,6 +88,45 @@ describe('the offline device', () => {
     expect(restarted.keeps()).toBe(true);
     await vi.waitFor(() => expect(restarted.queue.entries()).toHaveLength(1));
     expect(restarted.queue.entries()[0]).toMatchObject({ payload: { amount: 250_000n } });
+  });
+
+  it('sends an Account made offline, with its later edits merged in, before a Transaction on it', async () => {
+    const network = fakeNetwork(false);
+    const calls: string[] = [];
+    const api = {
+      createAccount: vi.fn(async (_: string, input: { id: string; name: string }) => {
+        calls.push(`account ${input.name}`);
+      }),
+      createTransaction: vi.fn(async (_: string, input: CreateTransactionInput) => {
+        calls.push(`transaction on ${input.accountId}`);
+      }),
+    } as unknown as ApiClient;
+    const phone = device({ network, api });
+    const accountId = '01900000-0000-7000-8000-0000000000a9';
+    await phone.queue.submit({
+      kind: 'create',
+      scope: workspaceId,
+      entityId: entityKey('account', accountId),
+      payload: {
+        entity: 'account',
+        fields: { name: 'Cash', type: 'CASH', class: 'ASSET', currency: 'IRR', openingBalance: 0n },
+      },
+    });
+    await phone.queue.submit({
+      kind: 'update',
+      scope: workspaceId,
+      entityId: entityKey('account', accountId),
+      payload: { entity: 'account', fields: { name: 'Wallet' } },
+      baseVersion: 0,
+    });
+    await phone.queue.submit({ ...create('t1'), payload: { ...expense, id: 't1', accountId } });
+
+    const stop = phone.start();
+    await phone.queue.replay(); // the try made at start, while offline
+    network.goOnline();
+    await vi.waitFor(() => expect(phone.queue.entries()).toEqual([]));
+    stop();
+    expect(calls).toEqual(['account Wallet', `transaction on ${accountId}`]);
   });
 
   it('writes changes made before the answer once the answer is yes', async () => {

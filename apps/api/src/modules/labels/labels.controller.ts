@@ -1,4 +1,4 @@
-import { Get, Inject, Param, Patch, Post, Query } from '@nestjs/common';
+import { Get, HttpStatus, Inject, Param, Patch, Post, Query, Res } from '@nestjs/common';
 import {
   ApiBadRequestResponse,
   ApiConflictResponse,
@@ -9,6 +9,7 @@ import {
   ApiTags,
 } from '@nestjs/swagger';
 import { createLabelInputSchema, labelSchema, updateLabelInputSchema } from '@daric/core';
+import type { Response } from 'express';
 import { createZodDto } from 'nestjs-zod';
 import { CurrentMembership, CurrentUserId, type Membership } from '../../common/request';
 import { MinRole } from '../../common/workspace.guard';
@@ -42,14 +43,18 @@ export class LabelsController {
   @Post()
   @MinRole('ADMIN')
   @ApiCreatedResponse({ type: LabelDto })
+  @ApiOkResponse({ type: LabelDto, description: 'Already created under this id' })
   @ApiBadRequestResponse({ description: 'Invalid input' })
   @ApiConflictResponse({ description: NAME_TAKEN })
-  create(
+  async create(
     @CurrentMembership() membership: Membership,
     @CurrentUserId() userId: string,
     @ZodBody(CreateLabelDto) body: CreateLabelDto,
+    @Res({ passthrough: true }) res: Response,
   ) {
-    return this.labels.create(membership, userId, body);
+    const { created, value } = await this.labels.create(membership, userId, body);
+    if (!created) res.status(HttpStatus.OK);
+    return value;
   }
 
   @Patch(':labelId')

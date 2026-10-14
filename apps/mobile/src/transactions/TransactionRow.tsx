@@ -3,17 +3,11 @@ import { money } from '@daric/core';
 import type { Account, DisplayFormatters, Transaction } from '@daric/core';
 import { nativeTheme } from '@daric/design-tokens';
 import { isolate } from '@daric/i18n';
-import type { PlainMessageKey } from '@daric/i18n';
 import { StyleSheet, View } from 'react-native';
 import { useI18n } from '../i18n/locale';
+import { SYNC_LABELS, SyncMark } from '../ui/SyncMark';
 import { Text } from '../ui/Text';
-import { currencyOf } from './transactions';
-
-const SYNC_LABELS = {
-  pending: 'transactions.list.pending',
-  conflict: 'transactions.list.conflict',
-  rejected: 'transactions.list.rejected',
-} as const satisfies Record<SyncState, PlainMessageKey>;
+import { currencyOf } from '../accounts/accounts';
 
 /** One Transaction in the list, read out as one item: what, where, when, how much and whether it was sent. */
 export function TransactionRow({
@@ -73,11 +67,7 @@ export function TransactionRow({
             {transaction.note}
           </Text>
         )}
-        {mark && (
-          <Text size="xs" tone={state === 'pending' ? 'foregroundMuted' : 'danger'}>
-            {mark}
-          </Text>
-        )}
+        <SyncMark state={state} />
       </View>
       <Text bold tone={tone} style={styles.amount}>
         {shown}

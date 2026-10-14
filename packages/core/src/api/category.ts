@@ -1,6 +1,6 @@
 import { z } from 'zod';
 import { categoryColors, categoryIcons, categoryKinds } from '../categories';
-import { nameSchema, notEmpty } from './shared';
+import { idSchema, nameSchema, notEmpty } from './shared';
 
 /** A Category as the API returns it. Lists come ordered by `position` within each parent. */
 export const categorySchema = z.object({
@@ -20,6 +20,8 @@ export type Category = z.infer<typeof categorySchema>;
 export const categoryListSchema = z.array(categorySchema);
 
 export const createCategoryInputSchema = z.object({
+  /** Chosen by the client (a UUIDv7), so a replayed create makes nothing new (ADR-0005). */
+  id: idSchema.exactOptional(),
   kind: z.enum(categoryKinds),
   parentId: z.uuid().nullable().default(null),
   name: nameSchema,

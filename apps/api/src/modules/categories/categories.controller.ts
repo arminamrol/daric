@@ -1,4 +1,4 @@
-import { Get, Inject, Param, Patch, Post, Put, Query } from '@nestjs/common';
+import { Get, HttpStatus, Inject, Param, Patch, Post, Put, Query, Res } from '@nestjs/common';
 import {
   ApiBadRequestResponse,
   ApiConflictResponse,
@@ -14,6 +14,7 @@ import {
   reorderCategoriesInputSchema,
   updateCategoryInputSchema,
 } from '@daric/core';
+import type { Response } from 'express';
 import { createZodDto } from 'nestjs-zod';
 import { CurrentMembership, CurrentUserId, type Membership } from '../../common/request';
 import { MinRole } from '../../common/workspace.guard';
@@ -69,14 +70,18 @@ export class CategoriesController {
   @Post()
   @MinRole('ADMIN')
   @ApiCreatedResponse({ type: CategoryDto })
+  @ApiOkResponse({ type: CategoryDto, description: 'Already created under this id' })
   @ApiBadRequestResponse({ description: parentRules })
   @ApiConflictResponse({ description: archiveRules })
-  create(
+  async create(
     @CurrentMembership() membership: Membership,
     @CurrentUserId() userId: string,
     @ZodBody(CreateCategoryDto) body: CreateCategoryDto,
+    @Res({ passthrough: true }) res: Response,
   ) {
-    return this.categories.create(membership, userId, body);
+    const { created, value } = await this.categories.create(membership, userId, body);
+    if (!created) res.status(HttpStatus.OK);
+    return value;
   }
 
   @Patch(':categoryId')

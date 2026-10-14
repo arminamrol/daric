@@ -1,4 +1,4 @@
-import { categoryTree, hasRole } from '@daric/core';
+import { categoryTree, hasRole, swapWithNeighbour } from '@daric/core';
 import type { Category, CategoryKind } from '@daric/core';
 import { ChevronDown, ChevronUp } from 'lucide-react';
 import { isolate } from '@daric/i18n';
@@ -9,7 +9,6 @@ import { CategoryBadge } from '../categories/CategoryBadge';
 import {
   KIND_ORDER,
   kindParam,
-  swapWithNeighbour,
   useCategories,
   useReorderCategories,
 } from '../categories/categories';

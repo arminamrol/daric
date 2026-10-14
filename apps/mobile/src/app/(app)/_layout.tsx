@@ -1,26 +1,27 @@
-import { Redirect, Stack } from 'expo-router';
-import { Pressable } from 'react-native';
+import { Redirect, Stack, useRouter } from 'expo-router';
 import { useLogout, useMe } from '../../auth/session';
 import { useI18n } from '../../i18n/locale';
 import { FONT } from '../../ui/fonts';
+import { HeaderButton } from '../../ui/HeaderButton';
 import { Status } from '../../ui/Screen';
-import { Text } from '../../ui/Text';
 import { ThemeProvider, useTheme } from '../../ui/theme';
 
 function LogoutButton() {
   const { t } = useI18n();
   const logout = useLogout();
   return (
-    <Pressable
-      accessibilityRole="button"
-      accessibilityLabel={t('nav.logout')}
+    <HeaderButton
+      label={t('nav.logout')}
       disabled={logout.isPending}
       onPress={() => logout.mutate()}
-      hitSlop={12}
-    >
-      <Text>{t('nav.logout')}</Text>
-    </Pressable>
+    />
   );
+}
+
+function MoreButton() {
+  const { t } = useI18n();
+  const router = useRouter();
+  return <HeaderButton label={t('nav.more')} onPress={() => router.push('/more')} />;
 }
 
 function SignedInStack() {
@@ -37,7 +38,11 @@ function SignedInStack() {
     >
       <Stack.Screen
         name="index"
-        options={{ title: t('transactions.title'), headerRight: () => <LogoutButton /> }}
+        options={{
+          title: t('transactions.title'),
+          headerLeft: () => <MoreButton />,
+          headerRight: () => <LogoutButton />,
+        }}
       />
       <Stack.Screen
         name="new"

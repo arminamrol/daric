@@ -1,12 +1,7 @@
-import { parseAmount, parseDisplayDay } from '@daric/core';
-import type {
-  CalendarSystem,
-  CreateTransactionInput,
-  Currency,
-  MoneyDisplay,
-  ParseAmountError,
-} from '@daric/core';
+import { parseDisplayDay } from '@daric/core';
+import type { CalendarSystem, CreateTransactionInput, Currency, MoneyDisplay } from '@daric/core';
 import type { PlainMessageKey } from '@daric/i18n';
+import { readAmount } from '../forms/amount';
 
 /** What the fast-entry fields hold. */
 export interface Draft {
@@ -29,13 +24,6 @@ export interface DraftErrors {
   day?: PlainMessageKey;
 }
 
-const AMOUNT_ERRORS: Record<ParseAmountError, PlainMessageKey> = {
-  empty: 'transactions.error.amountRequired',
-  invalid: 'accounts.error.amountInvalid',
-  too_many_decimals: 'accounts.error.amountTooPrecise',
-  out_of_range: 'accounts.error.amountTooLarge',
-};
-
 /** The Transaction a draft describes, or what is wrong with its fields. */
 export function readDraft(
   draft: Draft,
@@ -48,15 +36,17 @@ export function readDraft(
 ):
   | { ok: true; input: Extract<CreateTransactionInput, { type: 'EXPENSE' | 'INCOME' }> }
   | { ok: false; errors: DraftErrors } {
-  const parsed = parseAmount(draft.amount, context.currency, { display: context.moneyDisplay });
+  const amount = readAmount(draft.amount, context, {
+    required: 'transactions.error.amountRequired',
+    positive: 'transactions.error.amountPositive',
+  });
   const occurredOn = parseDisplayDay(draft.day, context.displayCalendar);
   const errors: DraftErrors = {};
-  if (!parsed.ok) errors.amount = AMOUNT_ERRORS[parsed.error];
-  else if (parsed.money.amount <= 0n) errors.amount = 'transactions.error.amountPositive';
+  if (!amount.ok) errors.amount = amount.error;
   if (!draft.accountId) errors.account = 'transactions.noAccount';
   if (!draft.categoryId) errors.category = 'transactions.error.category';
   if (!occurredOn) errors.day = 'transactions.error.day';
-  if (errors.amount || !parsed.ok || !draft.accountId || !draft.categoryId || !occurredOn) {
+  if (!amount.ok || !draft.accountId || !draft.categoryId || !occurredOn) {
     return { ok: false, errors };
   }
   return {
@@ -66,7 +56,7 @@ export function readDraft(
       type: draft.type,
       accountId: draft.accountId,
       categoryId: draft.categoryId,
-      amount: parsed.money.amount,
+      amount: amount.amount,
       occurredOn,
       note: draft.note.trim() || null,
       labelIds: [],

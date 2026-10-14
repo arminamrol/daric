@@ -52,6 +52,8 @@ const ENDS_BEFORE_START = { message: 'A rule cannot end before it starts', path:
  */
 export const createRecurringRuleInputSchema = z
   .strictObject({
+    /** Chosen by the client (a UUIDv7), so a replayed create makes nothing new (ADR-0005). */
+    id: idSchema.exactOptional(),
     name: nameSchema,
     type: z.enum(transactionTypes),
     accountId: idSchema,

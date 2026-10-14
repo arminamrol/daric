@@ -82,6 +82,30 @@ describe('Accounts', () => {
     expect(read.body).toEqual(res.body);
   });
 
+  it('create an Account once when the same id is sent twice, answering with what it holds now', async () => {
+    const a = await registerUser(t.url);
+    const id = randomUUID();
+    const first = await create(a.token, a.workspaceId, { ...melli, id });
+    expect(first.status).toBe(201);
+    expect(first.body.id).toBe(id);
+    await update(a.token, a.workspaceId, id, { name: 'Melli card' });
+    const again = await create(a.token, a.workspaceId, { ...melli, id });
+    expect(again.status).toBe(200);
+    expect(again.body).toEqual({ ...first.body, name: 'Melli card' });
+    expect((await list(a.token, a.workspaceId)).body).toHaveLength(1);
+  });
+
+  it("refuse an id another Workspace already used, without showing that Workspace's Account", async () => {
+    const a = await registerUser(t.url);
+    const b = await registerUser(t.url);
+    const id = randomUUID();
+    await create(b.token, b.workspaceId, { ...melli, id, name: 'secret' });
+    const res = await create(a.token, a.workspaceId, { ...melli, id });
+    expect(res.status).toBe(409);
+    expect(JSON.stringify(res.body)).not.toContain('secret');
+    expect((await list(a.token, a.workspaceId)).body).toEqual([]);
+  });
+
   it('keep Amounts beyond 2^53 exact', async () => {
     const a = await registerUser(t.url);
     const big = '9223372036854775807';
