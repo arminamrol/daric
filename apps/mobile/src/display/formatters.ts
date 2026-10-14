@@ -27,5 +27,5 @@ export function useCurrencyList() {
   const { t } = useI18n();
   const format = useFormatters();
   return (codes: readonly string[]) =>
-    codes.map((code) => format.currency(currencyByCode(code))).join(t('totals.separator'));
+    codes.map((code) => format.currency(currencyByCode(code))).join(t('list.separator'));
 }

@@ -2,6 +2,7 @@ import { LogOut } from 'lucide-react';
 import { NavLink, Outlet } from 'react-router';
 import { useLogout } from '../auth/logout';
 import { useMe } from '../auth/session';
+import { LanguageToggle } from '../i18n/LanguageToggle';
 import { useI18n } from '../i18n/locale';
 import { SyncStatus } from '../transactions/SyncStatus';
 import { ThemeToggle } from '../theme/ThemeToggle';
@@ -69,6 +70,8 @@ export function Shell() {
               </NavLink>
             </nav>
           )}
+          {/* A signed-in User chooses it in Settings. */}
+          {!signedIn && <LanguageToggle />}
           <ThemeToggle />
           {signedIn && (
             <button

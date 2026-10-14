@@ -2,6 +2,7 @@ import { calendarSystems, digitSystems } from '@daric/core';
 import type { CalendarSystem, Digits, UserPreferences } from '@daric/core';
 import type { PlainMessageKey } from '@daric/i18n';
 import { useId } from 'react';
+import { LanguageToggle } from '../i18n/LanguageToggle';
 import { useI18n } from '../i18n/locale';
 import { ThemeToggle } from '../theme/ThemeToggle';
 import { ChoiceGroup } from '../ui/ChoiceGroup';
@@ -13,7 +14,7 @@ const DIGIT_LABELS: Record<Digits, PlainMessageKey> = {
   latin: 'settings.preferences.digits.latin',
 };
 
-/** The User's own display calendar, digits and theme; each choice is saved as it is made. */
+/** The User's own language, display calendar, digits and theme; each choice is saved as it is made. */
 export function PreferencesForm({ preferences }: { preferences: UserPreferences }) {
   const { t } = useI18n();
   const id = useId();
@@ -35,6 +36,7 @@ export function PreferencesForm({ preferences }: { preferences: UserPreferences 
         onSubmit={(e) => e.preventDefault()}
         className="flex flex-col gap-5"
       >
+        <LanguageToggle hideLegend={false} />
         <ChoiceGroup<CalendarSystem>
           legend={t('settings.preferences.calendar')}
           choices={calendarSystems.map((value) => ({

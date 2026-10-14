@@ -18,6 +18,7 @@
     "@daric/design-tokens": "workspace:*",
     "@daric/i18n": "workspace:*",
     "@daric/offline-queue": "workspace:*",
+    "@expo-google-fonts/inter": "^0.4.2",
     "@expo-google-fonts/vazirmatn": "^0.4.1",
     "@react-native-community/netinfo": "12.0.1",
     "@tanstack/react-query": "^5.104.1",

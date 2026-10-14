@@ -75,7 +75,7 @@ export const alertClass = 'rounded-md bg-surface-muted px-3 py-2 text-sm text-da
  * unless ticked, since a shared browser would otherwise hold financial data.
  */
 export function AuthForm({ mode }: { mode: Mode }) {
-  const { t } = useI18n();
+  const { t, locale } = useI18n();
   const api = useApi();
   const queryClient = useQueryClient();
   const navigate = useNavigate();
@@ -101,7 +101,7 @@ export function AuthForm({ mode }: { mode: Mode }) {
       keepData: _,
       ...input
     }: LoginInput & { keepData: boolean }): Promise<Session> =>
-      mode === 'signup' ? api.register(input) : api.login(input),
+      mode === 'signup' ? api.register({ ...input, locale }) : api.login(input),
     onSuccess: async (_, { keepData }) => {
       logoutPending.set(false);
       await device.setKeep(keepData);

@@ -148,7 +148,7 @@ function TrendTable({ report }: { report: Report }) {
                   {t('reports.trendMissing', {
                     currencies: point.missing
                       .map((code) => format.currency(currencyByCode(code)))
-                      .join(t('totals.separator')),
+                      .join(t('list.separator')),
                   })}
                 </span>
               )}

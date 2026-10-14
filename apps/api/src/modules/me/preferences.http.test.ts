@@ -20,24 +20,40 @@ describe('User preferences', () => {
   const patch = (token: string, body: unknown) =>
     call(t.url, 'PATCH', '/v1/me/preferences', { token, body });
 
-  it('start as Jalali dates, Persian digits and the system theme', async () => {
+  it('start in Persian, with Jalali dates, Persian digits and the system theme', async () => {
     const a = await registerUser(t.url);
     expect((await me(a.token)).body.preferences).toEqual({
+      locale: 'fa',
       displayCalendar: 'jalali',
       digits: 'persian',
       theme: 'system',
     });
   });
 
-  it('let the User change their display calendar, digits and theme', async () => {
+  it('start in English, with Gregorian dates and Latin digits and a Gregorian Personal Workspace, for a User who signs up in English', async () => {
+    const res = await call(t.url, 'POST', '/v1/auth/register', {
+      body: { email: uniqueEmail(), password: testPassword, locale: 'en' },
+    });
+    expect(res.status).toBe(201);
+    expect((await me(res.body.accessToken)).body.preferences).toEqual({
+      locale: 'en',
+      displayCalendar: 'gregorian',
+      digits: 'latin',
+      theme: 'system',
+    });
+    expect((await me(res.body.accessToken)).body.workspaces[0].calendar).toBe('gregorian');
+  });
+
+  it('let the User change their language, display calendar, digits and theme', async () => {
     const a = await registerUser(t.url);
     const res = await patch(a.token, {
+      locale: 'en',
       displayCalendar: 'gregorian',
       digits: 'latin',
       theme: 'dark',
     });
     expect(res.status).toBe(200);
-    const expected = { displayCalendar: 'gregorian', digits: 'latin', theme: 'dark' };
+    const expected = { locale: 'en', displayCalendar: 'gregorian', digits: 'latin', theme: 'dark' };
     expect(res.body).toEqual(expected);
     expect((await me(a.token)).body.preferences).toEqual(expected);
   });
@@ -46,7 +62,12 @@ describe('User preferences', () => {
     const a = await registerUser(t.url);
     await patch(a.token, { theme: 'light' });
     const res = await patch(a.token, { digits: 'latin' });
-    expect(res.body).toEqual({ displayCalendar: 'jalali', digits: 'latin', theme: 'light' });
+    expect(res.body).toEqual({
+      locale: 'fa',
+      displayCalendar: 'jalali',
+      digits: 'latin',
+      theme: 'light',
+    });
   });
 
   it('leave the Workspace Calendar alone when the display calendar changes', async () => {
@@ -66,6 +87,7 @@ describe('User preferences', () => {
     ['an unknown calendar', { displayCalendar: 'hijri' }],
     ['unknown digits', { digits: 'roman' }],
     ['an unknown theme', { theme: 'sepia' }],
+    ['an unknown language', { locale: 'de' }],
     ['an empty body', {}],
   ])('reject %s', async (_, body) => {
     const a = await registerUser(t.url);

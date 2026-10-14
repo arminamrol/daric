@@ -5,8 +5,8 @@ import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import type { AppRequest } from '../../common/request';
 import { RolesGuard, WorkspaceGuard } from '../../common/workspace.guard';
 import { auditLogs, categories, workspaceMembers } from '../../db/schema';
-import { call, registerUser, startTestApp, type TestApp } from '../../test/app';
-import { testDatabase } from '../../test/db';
+import { call, registerUser, startTestApp, testPassword, type TestApp } from '../../test/app';
+import { testDatabase, uniqueEmail } from '../../test/db';
 
 const { db, pool } = testDatabase();
 afterAll(() => pool.end());
@@ -68,20 +68,34 @@ describe('Categories', () => {
       const tops = body.filter((c) => c.parentId === null);
       for (const kind of ['INCOME', 'EXPENSE']) {
         expect(tops.filter((c) => c.kind === kind).map((c) => [c.name, c.position])).toEqual(
-          defaultCategories.filter((d) => d.kind === kind).map((d, i) => [d.name, i]),
+          defaultCategories.filter((d) => d.kind === kind).map((d, i) => [d.name.fa, i]),
         );
       }
       for (const parent of defaultCategories) {
-        const top = tops.find((c) => c.name === parent.name && c.kind === parent.kind);
+        const top = tops.find((c) => c.name === parent.name.fa && c.kind === parent.kind);
         const children = body.filter((c) => c.parentId === top?.id);
         expect(children.map((c) => [c.name, c.kind, c.position])).toEqual(
-          (parent.children ?? []).map((c, i) => [c.name, parent.kind, i]),
+          (parent.children ?? []).map((c, i) => [c.name.fa, parent.kind, i]),
         );
         // Listed right after their parent.
         const at = body.indexOf(top as Wire);
         expect(children.map((c) => body.indexOf(c))).toEqual(children.map((_, i) => at + 1 + i));
       }
       expect(body.every((c) => !c.archived)).toBe(true);
+    });
+
+    it('are the English defaults for a User who signs up in English', async () => {
+      const reg = await call(t.url, 'POST', '/v1/auth/register', {
+        body: { email: uniqueEmail(), password: testPassword, locale: 'en' },
+      });
+      const me = await call(t.url, 'GET', '/v1/me', { token: reg.body.accessToken });
+      const res = await list(reg.body.accessToken, me.body.workspaces[0].id);
+      const names = (res.body as Wire[]).map((c) => c.name).sort();
+      expect(names).toEqual(
+        defaultCategories
+          .flatMap((d) => [d.name.en, ...(d.children ?? []).map((c) => c.name.en)])
+          .sort(),
+      );
     });
 
     it('belong to that Workspace only', async () => {

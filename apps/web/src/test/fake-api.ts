@@ -47,6 +47,7 @@ import type {
   DueOccurrence,
   ExportFormat,
   Label,
+  Locale,
   PlannedItem,
   ProjectionMode,
   RecurringRule,
@@ -78,7 +79,8 @@ type MailedLinkPurpose = 'verify' | 'reset';
 export function fakeApi({
   signedInAs,
   role = 'OWNER',
-}: { signedInAs?: string; role?: WorkspaceRole } = {}) {
+  locale = 'fa',
+}: { signedInAs?: string; role?: WorkspaceRole; locale?: Locale } = {}) {
   const users = new Map<string, FakeUser>();
   let current: FakeUser | undefined;
   /** Tokens of links "mailed" to Users, until used or replaced; newest last. */
@@ -139,14 +141,13 @@ export function fakeApi({
   function addUser(
     email: string,
     password = testPassword,
-    { emailVerified = true } = {},
+    { emailVerified = true, locale = 'fa' }: { emailVerified?: boolean; locale?: Locale } = {},
   ): FakeUser {
     const id = `01900000-0000-7000-8000-${String(nextId++).padStart(12, '0')}`;
-    const preferences: UserPreferences = {
-      displayCalendar: 'jalali',
-      digits: 'persian',
-      theme: 'system',
-    };
+    const preferences: UserPreferences =
+      locale === 'fa'
+        ? { locale, displayCalendar: 'jalali', digits: 'persian', theme: 'system' }
+        : { locale, displayCalendar: 'gregorian', digits: 'latin', theme: 'system' };
     const user = { id, email, password, preferences, emailVerified };
     users.set(email, user);
     return user;
@@ -184,7 +185,7 @@ export function fakeApi({
     };
   }
 
-  if (signedInAs) current = addUser(signedInAs);
+  if (signedInAs) current = addUser(signedInAs, testPassword, { locale });
 
   function inWorkspace(workspaceId: string, minimum: WorkspaceRole = 'VIEWER') {
     signedIn();
@@ -642,9 +643,9 @@ export function fakeApi({
   }
 
   const endpoints: ApiClient = {
-    async register({ email, password }) {
+    async register({ email, password, locale }) {
       if (users.has(email)) throw new ApiError(409, { message: 'Email is already registered' });
-      const user = addUser(email, password, { emailVerified: false });
+      const user = addUser(email, password, { emailVerified: false, ...(locale && { locale }) });
       mailLink(email, 'verify');
       return session(user);
     },

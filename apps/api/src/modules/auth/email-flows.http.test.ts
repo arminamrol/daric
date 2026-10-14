@@ -57,6 +57,16 @@ describe('email verification', () => {
     expect(await emailVerified(token)).toBe(false);
   });
 
+  it('mails it in English to a User who signs up in English', async () => {
+    const email = uniqueEmail();
+    await call(t.url, 'POST', '/v1/auth/register', {
+      body: { email, password: testPassword, locale: 'en' },
+    });
+    const mail = t.mail.last(email);
+    expect(mail.subject).toBe('Verify your email for Daric');
+    expect(mail.html).toMatch(/<html lang="en" dir="ltr">/);
+  });
+
   it('verifies the email with the mailed token, once', async () => {
     const { email, token, userId } = await registerUser(t.url);
     const body = { token: t.mail.lastToken(email) };
@@ -177,6 +187,17 @@ describe('password reset', () => {
       body: { ...body, password: 'yet another passphrase' },
     });
     expect(again.status).toBe(400);
+  });
+
+  it("mails the reset link and the change notice in the User's language", async () => {
+    const { email, token } = await registerUser(t.url);
+    await call(t.url, 'PATCH', '/v1/me/preferences', { token, body: { locale: 'en' } });
+    await forgot(email);
+    expect(t.mail.last(email).subject).toBe('Reset your Daric password');
+    await call(t.url, 'POST', '/v1/auth/password/reset', {
+      body: { token: t.mail.lastToken(email), password: newPassword },
+    });
+    expect(t.mail.last(email).subject).toBe('Your Daric password was changed');
   });
 
   it('lets only one of two concurrent resets with one token through', async () => {

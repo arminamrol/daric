@@ -3,7 +3,6 @@ import { useState } from 'react';
 import { StyleSheet, View } from 'react-native';
 import Svg, { Line, Text as SvgText } from 'react-native-svg';
 import { useI18n } from '../i18n/locale';
-import { FONT } from '../ui/fonts';
 import { useTheme } from '../ui/theme';
 import type { PlotBox, Tick } from './geometry';
 
@@ -35,7 +34,7 @@ export function Chart({
   draw: (box: PlotBox) => { ticks: readonly Tick[]; marks: ReactNode };
 }) {
   const { colors } = useTheme();
-  const { dir } = useI18n();
+  const { dir, font } = useI18n();
   const [width, setWidth] = useState(0);
   const rtl = dir === 'rtl';
   const box: PlotBox = { width, height, inset: INSET, rtl };
@@ -73,7 +72,7 @@ export function Chart({
                 x={rtl ? width : 0}
                 y={tick.y - 4}
                 textAnchor={rtl ? 'end' : 'start'}
-                fontFamily={FONT.regular}
+                fontFamily={font.regular}
                 fontSize={11}
                 fill={colors.foregroundMuted}
                 {...(layer === 'halo' && { stroke: colors.surface, strokeWidth: 3 })}
@@ -94,7 +93,7 @@ export function Chart({
               x={x}
               y={height - 2}
               textAnchor={anchor}
-              fontFamily={FONT.regular}
+              fontFamily={font.regular}
               fontSize={11}
               fill={colors.foregroundMuted}
             >

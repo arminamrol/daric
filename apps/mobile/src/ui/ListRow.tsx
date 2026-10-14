@@ -36,7 +36,7 @@ export function ListRow({
   const shownLines = lines.filter((line): line is string => Boolean(line));
   const label = [actionLabel ?? title, trailing, ...shownLines, state && t(SYNC_LABELS[state])]
     .filter(Boolean)
-    .join('، ');
+    .join(t('list.separator'));
   const content = (
     <>
       {leading}

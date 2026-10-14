@@ -3,7 +3,6 @@ import { forwardRef } from 'react';
 import { StyleSheet, TextInput, View } from 'react-native';
 import type { TextInputProps } from 'react-native';
 import { useI18n } from '../i18n/locale';
-import { FONT } from './fonts';
 import { Text } from './Text';
 import { useTheme } from './theme';
 
@@ -13,7 +12,7 @@ export const Field = forwardRef<
   TextInputProps & { label: string; hint?: string | undefined; error?: string | undefined }
 >(function Field({ label, hint, error, style, ...props }, ref) {
   const { colors } = useTheme();
-  const { dir } = useI18n();
+  const { dir, font } = useI18n();
   const description = [hint, error].filter(Boolean).join('. ');
   return (
     <View style={styles.field}>
@@ -32,6 +31,7 @@ export const Field = forwardRef<
             color: colors.foreground,
             backgroundColor: colors.surface,
             borderColor: error ? colors.danger : colors.border,
+            fontFamily: font.regular,
             writingDirection: dir,
           },
           style,
@@ -55,7 +55,6 @@ const styles = StyleSheet.create({
   field: { gap: nativeTheme.space(1) },
   input: {
     ...nativeTheme.text.base,
-    fontFamily: FONT.regular,
     minHeight: 48,
     borderWidth: 1,
     borderRadius: nativeTheme.radius.md,

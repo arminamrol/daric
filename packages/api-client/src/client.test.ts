@@ -3,7 +3,12 @@ import { ApiError, createApiClient, memoryTokenStore, transactionConflict } from
 import type { TokenStore } from './index';
 
 const user = { id: '01900000-0000-7000-8000-000000000000', email: 'sara@example.com' };
-const preferences = { displayCalendar: 'jalali', digits: 'persian', theme: 'system' } as const;
+const preferences = {
+  locale: 'fa',
+  displayCalendar: 'jalali',
+  digits: 'persian',
+  theme: 'system',
+} as const;
 const workspace = {
   id: '01900000-0000-7000-9000-000000000001',
   type: 'PERSONAL',

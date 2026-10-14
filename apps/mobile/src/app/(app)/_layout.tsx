@@ -1,7 +1,6 @@
 import { Redirect, Stack, useRouter } from 'expo-router';
 import { useLogout, useMe } from '../../auth/session';
 import { useI18n } from '../../i18n/locale';
-import { FONT } from '../../ui/fonts';
 import { HeaderButton } from '../../ui/HeaderButton';
 import { Status } from '../../ui/Screen';
 import { ThemeProvider, useTheme } from '../../ui/theme';
@@ -25,14 +24,14 @@ function MoreButton() {
 }
 
 function SignedInStack() {
-  const { t } = useI18n();
+  const { t, font } = useI18n();
   const { colors } = useTheme();
   return (
     <Stack
       screenOptions={{
         headerStyle: { backgroundColor: colors.surface },
         headerTintColor: colors.foreground,
-        headerTitleStyle: { fontFamily: FONT.bold },
+        headerTitleStyle: { fontFamily: font.bold },
         contentStyle: { backgroundColor: colors.background },
       }}
     >

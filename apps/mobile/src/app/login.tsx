@@ -7,6 +7,7 @@ import { KeyboardAvoidingView, ScrollView, StyleSheet, Switch, View } from 'reac
 import type { TextInput } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useLogin, useMe } from '../auth/session';
+import { LanguageChoices } from '../i18n/LanguageChoices';
 import { useI18n } from '../i18n/locale';
 import { Button } from '../ui/Button';
 import { Field } from '../ui/Field';
@@ -101,6 +102,7 @@ export default function LoginScreen() {
               onPress={submit}
               disabled={login.isPending}
             />
+            <LanguageChoices />
           </ScrollView>
         </KeyboardAvoidingView>
       </SafeAreaView>

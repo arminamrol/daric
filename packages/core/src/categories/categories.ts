@@ -1,3 +1,5 @@
+import type { Locale } from '../locale';
+
 /** Whether a Category classifies Income or Expense; fixed once created. */
 export const categoryKinds = ['INCOME', 'EXPENSE'] as const;
 export type CategoryKind = (typeof categoryKinds)[number];
@@ -99,71 +101,119 @@ export function swapWithNeighbour<T extends CategoryNode>(
 
 interface DefaultCategory {
   readonly kind: CategoryKind;
-  readonly name: string;
+  /** In each language: a new Workspace gets them in its creator's. */
+  readonly name: Readonly<Record<Locale, string>>;
   readonly icon: CategoryIcon;
   readonly color: CategoryColor;
   readonly children?: readonly Omit<DefaultCategory, 'kind' | 'children'>[];
 }
 
-/** The Persian Categories every new Workspace starts with; the User may change them all. */
+/** The Categories every new Workspace starts with; the User may change them all. */
 export const defaultCategories: readonly DefaultCategory[] = [
   {
     kind: 'EXPENSE',
-    name: 'خوراک',
+    name: { fa: 'خوراک', en: 'Food' },
     icon: 'utensils',
     color: 'orange',
     children: [
-      { name: 'خواربار', icon: 'shopping-cart', color: 'orange' },
-      { name: 'رستوران و کافه', icon: 'coffee', color: 'orange' },
+      { name: { fa: 'خواربار', en: 'Groceries' }, icon: 'shopping-cart', color: 'orange' },
+      {
+        name: { fa: 'رستوران و کافه', en: 'Restaurants and cafés' },
+        icon: 'coffee',
+        color: 'orange',
+      },
     ],
   },
   {
     kind: 'EXPENSE',
-    name: 'مسکن',
+    name: { fa: 'مسکن', en: 'Housing' },
     icon: 'home',
     color: 'brown',
     children: [
-      { name: 'اجاره', icon: 'key', color: 'brown' },
-      { name: 'شارژ ساختمان', icon: 'receipt', color: 'brown' },
-      { name: 'تعمیرات', icon: 'wrench', color: 'brown' },
+      { name: { fa: 'اجاره', en: 'Rent' }, icon: 'key', color: 'brown' },
+      { name: { fa: 'شارژ ساختمان', en: 'Building charges' }, icon: 'receipt', color: 'brown' },
+      { name: { fa: 'تعمیرات', en: 'Repairs' }, icon: 'wrench', color: 'brown' },
     ],
   },
   {
     kind: 'EXPENSE',
-    name: 'قبض‌ها',
+    name: { fa: 'قبض‌ها', en: 'Bills' },
     icon: 'zap',
     color: 'amber',
     children: [
-      { name: 'آب، برق و گاز', icon: 'zap', color: 'amber' },
-      { name: 'اینترنت و موبایل', icon: 'wifi', color: 'amber' },
+      {
+        name: { fa: 'آب، برق و گاز', en: 'Water, electricity and gas' },
+        icon: 'zap',
+        color: 'amber',
+      },
+      { name: { fa: 'اینترنت و موبایل', en: 'Internet and mobile' }, icon: 'wifi', color: 'amber' },
     ],
   },
   {
     kind: 'EXPENSE',
-    name: 'رفت‌وآمد',
+    name: { fa: 'رفت‌وآمد', en: 'Transport' },
     icon: 'car',
     color: 'blue',
     children: [
-      { name: 'سوخت', icon: 'fuel', color: 'blue' },
-      { name: 'تاکسی و حمل‌ونقل عمومی', icon: 'bus', color: 'blue' },
+      { name: { fa: 'سوخت', en: 'Fuel' }, icon: 'fuel', color: 'blue' },
+      {
+        name: { fa: 'تاکسی و حمل‌ونقل عمومی', en: 'Taxis and public transport' },
+        icon: 'bus',
+        color: 'blue',
+      },
     ],
   },
   {
     kind: 'EXPENSE',
-    name: 'سلامت',
+    name: { fa: 'سلامت', en: 'Health' },
     icon: 'heart-pulse',
     color: 'red',
-    children: [{ name: 'دارو', icon: 'pill', color: 'red' }],
+    children: [{ name: { fa: 'دارو', en: 'Medicine' }, icon: 'pill', color: 'red' }],
   },
-  { kind: 'EXPENSE', name: 'خرید و پوشاک', icon: 'shirt', color: 'pink' },
-  { kind: 'EXPENSE', name: 'آموزش', icon: 'graduation-cap', color: 'indigo' },
-  { kind: 'EXPENSE', name: 'تفریح و سفر', icon: 'plane', color: 'teal' },
-  { kind: 'EXPENSE', name: 'هدیه و نیکوکاری', icon: 'gift', color: 'violet' },
-  { kind: 'EXPENSE', name: 'سایر هزینه‌ها', icon: 'circle-ellipsis', color: 'slate' },
-  { kind: 'INCOME', name: 'حقوق', icon: 'briefcase', color: 'green' },
-  { kind: 'INCOME', name: 'کار آزاد', icon: 'laptop', color: 'teal' },
-  { kind: 'INCOME', name: 'سود سپرده', icon: 'piggy-bank', color: 'sky' },
-  { kind: 'INCOME', name: 'اجاره‌بها', icon: 'key', color: 'brown' },
-  { kind: 'INCOME', name: 'هدیه', icon: 'gift', color: 'violet' },
-  { kind: 'INCOME', name: 'سایر درآمدها', icon: 'circle-ellipsis', color: 'slate' },
+  {
+    kind: 'EXPENSE',
+    name: { fa: 'خرید و پوشاک', en: 'Shopping and clothing' },
+    icon: 'shirt',
+    color: 'pink',
+  },
+  {
+    kind: 'EXPENSE',
+    name: { fa: 'آموزش', en: 'Education' },
+    icon: 'graduation-cap',
+    color: 'indigo',
+  },
+  {
+    kind: 'EXPENSE',
+    name: { fa: 'تفریح و سفر', en: 'Leisure and travel' },
+    icon: 'plane',
+    color: 'teal',
+  },
+  {
+    kind: 'EXPENSE',
+    name: { fa: 'هدیه و نیکوکاری', en: 'Gifts and charity' },
+    icon: 'gift',
+    color: 'violet',
+  },
+  {
+    kind: 'EXPENSE',
+    name: { fa: 'سایر هزینه‌ها', en: 'Other expenses' },
+    icon: 'circle-ellipsis',
+    color: 'slate',
+  },
+  { kind: 'INCOME', name: { fa: 'حقوق', en: 'Salary' }, icon: 'briefcase', color: 'green' },
+  { kind: 'INCOME', name: { fa: 'کار آزاد', en: 'Freelance' }, icon: 'laptop', color: 'teal' },
+  {
+    kind: 'INCOME',
+    name: { fa: 'سود سپرده', en: 'Deposit interest' },
+    icon: 'piggy-bank',
+    color: 'sky',
+  },
+  { kind: 'INCOME', name: { fa: 'اجاره‌بها', en: 'Rental income' }, icon: 'key', color: 'brown' },
+  { kind: 'INCOME', name: { fa: 'هدیه', en: 'Gifts' }, icon: 'gift', color: 'violet' },
+  {
+    kind: 'INCOME',
+    name: { fa: 'سایر درآمدها', en: 'Other income' },
+    icon: 'circle-ellipsis',
+    color: 'slate',
+  },
 ];

@@ -11,11 +11,17 @@
     <link rel="apple-touch-icon" href="/apple-touch-icon-180x180.png" />
     <title>دریک</title>
     <script>
-      // Apply a chosen theme before first paint; see src/theme/theme.ts.
+      // Apply a chosen theme and language before first paint; see src/theme/theme.ts and
+      // src/i18n/locale.tsx.
       try {
         var theme = localStorage.getItem('daric.theme');
         if (theme === 'light' || theme === 'dark') {
           document.documentElement.setAttribute('data-theme', theme);
+        }
+        if (localStorage.getItem('daric.locale') === 'en') {
+          document.documentElement.lang = 'en';
+          document.documentElement.dir = 'ltr';
+          document.title = 'Daric';
         }
       } catch (e) {}
     </script>

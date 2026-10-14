@@ -127,7 +127,9 @@ function DueItem({
   const label = t('due.item', { name: isolate(name), date: isolate(day) });
   return (
     <View
-      accessibilityLabel={canConfirm ? undefined : [label, shown(occurrence.amount)].join('، ')}
+      accessibilityLabel={
+        canConfirm ? undefined : [label, shown(occurrence.amount)].join(t('list.separator'))
+      }
       accessible={!canConfirm}
       style={[styles.item, { borderColor: colors.border, backgroundColor: colors.surface }]}
     >

@@ -1,6 +1,6 @@
 import { z } from 'zod';
 import { calendarSystems, canonicalTimeZone } from '../calendar';
-import { digitSystems } from '../locale';
+import { digitSystems, locales } from '../locale';
 import { moneyDisplays } from '../money';
 import { userSchema } from './auth';
 import { currencyCodeSchema, currencyCodes, notEmpty } from './shared';
@@ -64,6 +64,8 @@ export type ThemePreference = (typeof themePreferences)[number];
 
 /** How one User likes things drawn, in every Workspace; it never changes what is stored. */
 export const userPreferencesSchema = z.object({
+  /** The language, which also sets the layout direction and font. */
+  locale: z.enum(locales),
   /** Changes how dates are shown, never how Periods are bucketed. */
   displayCalendar: z.enum(calendarSystems),
   digits: z.enum(digitSystems),
@@ -73,6 +75,7 @@ export type UserPreferences = z.infer<typeof userPreferencesSchema>;
 
 export const updateUserPreferencesInputSchema = z
   .object({
+    locale: z.enum(locales).exactOptional(),
     displayCalendar: z.enum(calendarSystems).exactOptional(),
     digits: z.enum(digitSystems).exactOptional(),
     theme: z.enum(themePreferences).exactOptional(),

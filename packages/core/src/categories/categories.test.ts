@@ -1,4 +1,5 @@
 import { describe, expect, it } from 'vitest';
+import { locales } from '../locale';
 import {
   categoryColors,
   categoryIcons,
@@ -42,15 +43,20 @@ describe('defaultCategories', () => {
     }
   });
 
-  it('use known icons and colors and distinct names within a kind', () => {
+  it('use known icons and colors', () => {
     for (const category of all) {
       expect(categoryIcons).toContain(category.icon);
       expect(categoryColors).toContain(category.color);
     }
+  });
+
+  it.each(locales)('have distinct names within a kind in %s', (locale) => {
     for (const kind of ['INCOME', 'EXPENSE'] as const) {
       const names = defaultCategories
         .filter((c) => c.kind === kind)
-        .flatMap(({ name, children = [] }) => [name, ...children.map((c) => c.name)]);
+        .flatMap(({ name, children = [] }) => [name, ...children.map((c) => c.name)])
+        .map((name) => name[locale].trim());
+      expect(names.every(Boolean)).toBe(true);
       expect(new Set(names).size).toBe(names.length);
     }
   });

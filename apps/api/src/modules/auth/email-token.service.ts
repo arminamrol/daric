@@ -1,3 +1,4 @@
+import type { Locale } from '@daric/core';
 import { randomBytes } from 'node:crypto';
 import { Injectable } from '@nestjs/common';
 import { and, count, eq, gt, isNull } from 'drizzle-orm';
@@ -12,6 +13,8 @@ export type EmailTokenPurpose = (typeof emailTokens.purpose.enumValues)[number];
 export interface Recipient {
   id: string;
   email: string;
+  /** The language mail to them is written in. */
+  locale: Locale;
 }
 
 /** How long a mailed link works. */

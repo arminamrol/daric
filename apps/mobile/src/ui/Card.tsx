@@ -1,6 +1,7 @@
 import { nativeTheme } from '@daric/design-tokens';
 import type { ReactNode } from 'react';
 import { StyleSheet, View } from 'react-native';
+import { useI18n } from '../i18n/locale';
 import { Text } from './Text';
 import { useTheme } from './theme';
 
@@ -56,10 +57,11 @@ export function Figure({
   /** One of a list of figures: `label` and `value` on one line. */
   row?: boolean;
 }) {
+  const { t } = useI18n();
   return (
     <View
       accessible
-      accessibilityLabel={[label, value, note].filter(Boolean).join('، ')}
+      accessibilityLabel={[label, value, note].filter(Boolean).join(t('list.separator'))}
       style={row ? styles.row : styles.figure}
     >
       <Text size="sm" tone="foregroundMuted" style={row && styles.grow}>

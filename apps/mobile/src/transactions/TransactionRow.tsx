@@ -54,7 +54,7 @@ export function TransactionRow({
       accessible
       accessibilityLabel={[title, shown, where, day, transaction.note, mark]
         .filter(Boolean)
-        .join('، ')}
+        .join(t('list.separator'))}
       style={styles.row}
     >
       <View style={styles.main}>

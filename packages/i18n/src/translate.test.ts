@@ -13,10 +13,10 @@ describe('createTranslator', () => {
     expect(t('notFound.description', { path: '/reports' })).toBe('صفحه‌ای با نشانی /reports نیست.');
   });
 
-  it('translates into English, falling back to Persian for messages English does not have yet', () => {
+  it('translates into English', () => {
     const t = createTranslator('en');
     expect(t('app.name')).toBe('Daric');
-    expect(t('notFound.description', { path: '/reports' })).toBe('صفحه‌ای با نشانی /reports نیست.');
+    expect(t('notFound.description', { path: '/reports' })).toBe('There is no page at /reports.');
   });
 
   it('rejects unknown keys and missing or extra params at compile time', () => {
