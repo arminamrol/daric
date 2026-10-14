@@ -11,7 +11,7 @@ import { ScreenHeader } from '../../ui/HeaderButton';
 import { ListRow } from '../../ui/ListRow';
 import { useTheme } from '../../ui/theme';
 
-/** The other parts of the app: what the Workspace is made of, and changes not sent yet. */
+/** The other parts of the app: insights, what the Workspace is made of, and changes not sent yet. */
 export default function MoreScreen() {
   const { t } = useI18n();
   const { colors } = useTheme();
@@ -24,6 +24,9 @@ export default function MoreScreen() {
   const dueCount = hasRole(workspace.role, 'MEMBER') ? (due.data?.length ?? 0) : 0;
 
   const items: { title: string; line?: string | false; href: Href }[] = [
+    { title: t('nav.netWorth'), href: '/net-worth' },
+    { title: t('nav.projection'), href: '/projection' },
+    { title: t('nav.reports'), href: '/reports' },
     { title: t('nav.accounts'), href: '/accounts' },
     { title: t('nav.categories'), href: '/categories' },
     { title: t('nav.labels'), href: '/labels' },

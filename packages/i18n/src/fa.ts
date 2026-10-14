@@ -286,6 +286,8 @@ export const fa = {
   'netWorth.snapshotTaken': 'دارایی خالص امروز ثبت شد.',
   'netWorth.snapshotFailed': 'ثبت نشد. دوباره تلاش کنید.',
   'netWorth.chart': 'نمودار دارایی خالص از {from} تا {to}، به {base}',
+  'netWorth.chartSummary':
+    'نمودار دارایی خالص از {from} تا {to}، به {base}: از {first} به {last} رسیده است؛ کمترین {lowest} در {lowestDay} و بیشترین {highest} در {highestDay}.',
   'netWorth.showTable': 'نمایش به صورت جدول',
   'netWorth.historyTable': 'تاریخچهٔ دارایی خالص',
   'netWorth.day': 'تاریخ',
@@ -350,6 +352,8 @@ export const fa = {
   'plannedItems.empty': 'هنوز قلمی برنامه‌ریزی نشده است.',
   'plannedItems.loadFailed': 'اقلام برنامه‌ریزی‌شده بارگذاری نشدند. صفحه را دوباره باز کنید.',
   'plannedItems.notFound': 'این قلم برنامه‌ریزی‌شده پیدا نشد.',
+  'plannedItems.readOnly':
+    'فقط مالک و مدیر فضای کاری می‌توانند اقلام برنامه‌ریزی‌شده را بسازند یا تغییر دهند.',
   'plannedItems.back': 'بازگشت به پیش‌بینی',
   'plannedItems.new': 'قلم تازه',
   'plannedItems.edit': 'ویرایش {name}',
@@ -569,6 +573,9 @@ export const fa = {
   'reports.trend': 'درآمد و هزینهٔ ماه‌ها',
   'reports.trendIntro': 'هر ماه با نرخ‌های همان ماه به ارز پایه برگردانده شده است.',
   'reports.trendChart': 'نمودار ستونی درآمد و هزینه از {from} تا {to}، به {base}',
+  'reports.trendSummary':
+    'نمودار ستونی درآمد و هزینه از {from} تا {to}، به {base}: بیشترین درآمد {income} در {incomeMonth} و بیشترین هزینه {expense} در {expenseMonth}.',
+  'reports.figure': '{name}: {amount}',
   'reports.trendTable': 'درآمد و هزینهٔ ماه‌ها',
   'reports.showTable': 'نمایش به صورت جدول',
   'reports.monthColumn': 'ماه',

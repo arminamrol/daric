@@ -1,6 +1,5 @@
 import { money, recurrenceFrequencies } from '@daric/core';
 import type { Account, Category, RecurrenceFrequency, RecurringRule } from '@daric/core';
-import type { PlainMessageKey } from '@daric/i18n';
 import { useRouter } from 'expo-router';
 import { useMemo, useRef, useState } from 'react';
 import type { RefObject } from 'react';
@@ -10,6 +9,7 @@ import { useSignedIn } from '../auth/session';
 import { categoryChoices } from '../categories/categories';
 import { created, edited, newId, useWrite } from '../data/writes';
 import { useFormatters } from '../display/formatters';
+import { CALENDAR_LABELS } from '../display/labels';
 import { changedFields } from '../forms/changes';
 import { useI18n } from '../i18n/locale';
 import { Button } from '../ui/Button';
@@ -30,10 +30,6 @@ const FIELD_ORDER: readonly RuleField[] = [
   'start',
   'end',
 ];
-const CALENDAR_LABELS = {
-  jalali: 'settings.calendar.jalali',
-  gregorian: 'settings.calendar.gregorian',
-} as const satisfies Record<string, PlainMessageKey>;
 
 /**
  * Makes a Recurring Rule, or changes and archives `rule`. The Amount is in

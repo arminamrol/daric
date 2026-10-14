@@ -5,6 +5,9 @@ import { readAccountDraft } from '../accounts/form';
 import { readBudgetDraft } from '../budgets/form';
 import { archiveProblem, parentChoices, readCategoryDraft } from '../categories/form';
 import { readLabelDraft } from '../labels/form';
+import { readValuationDraft } from '../net-worth/form';
+import { readPlannedItemDraft } from '../projection/form';
+import type { PlannedItemDraft } from '../projection/form';
 import { readRuleDraft } from '../recurring/form';
 import type { RuleDraft } from '../recurring/form';
 import { readAmount } from './amount';
@@ -225,6 +228,90 @@ describe('readRuleDraft', () => {
     expect(readRuleDraft({ ...draft, start: 'x' }, context)).toMatchObject({
       ok: false,
       errors: { start: 'transactions.error.day' },
+    });
+  });
+});
+
+describe('readPlannedItemDraft', () => {
+  const draft: PlannedItemDraft = {
+    name: ' اجاره ',
+    kind: 'FIXED_MONTHLY',
+    type: 'EXPENSE',
+    categoryId: 'c1',
+    amount: '۵۰۰۰',
+    start: '۱۴۰۵/۰۱/۰۱',
+    end: '',
+  };
+  const context = { ...money, displayCalendar: 'jalali', categoryIds: ['c1'] } as const;
+
+  it('reads a Fixed Monthly item that runs on', () => {
+    expect(readPlannedItemDraft(draft, context)).toEqual({
+      ok: true,
+      fields: {
+        name: 'اجاره',
+        categoryId: 'c1',
+        amount: 5000n,
+        startOn: '2026-03-21',
+        endOn: null,
+      },
+    });
+  });
+
+  it('needs a Category for a Fixed Monthly item, but not for a One-Off, which never ends', () => {
+    expect(readPlannedItemDraft({ ...draft, categoryId: null }, context)).toMatchObject({
+      ok: false,
+      errors: { category: 'plannedItems.error.category' },
+    });
+    expect(
+      readPlannedItemDraft(
+        { ...draft, kind: 'ONE_OFF', categoryId: null, end: '۱۴۰۵/۰۲/۰۱' },
+        context,
+      ),
+    ).toMatchObject({ ok: true, fields: { categoryId: null, endOn: null } });
+  });
+
+  it('refuses a Category it may not use, an end before the start and a missing name', () => {
+    expect(
+      readPlannedItemDraft({ ...draft, name: ' ', categoryId: 'gone', end: '۱۴۰۴/۱۲/۰۱' }, context),
+    ).toEqual({
+      ok: false,
+      errors: {
+        name: 'plannedItems.error.name',
+        category: 'plannedItems.error.category',
+        end: 'plannedItems.error.endBeforeStart',
+      },
+    });
+  });
+
+  it('needs a positive Amount and real days', () => {
+    expect(readPlannedItemDraft({ ...draft, amount: '0', start: 'x' }, context)).toEqual({
+      ok: false,
+      errors: { amount: 'transactions.error.amountPositive', start: 'transactions.error.day' },
+    });
+  });
+});
+
+describe('readValuationDraft', () => {
+  const context = { ...money, displayCalendar: 'jalali' } as const;
+
+  it('reads a value of zero or more on a day', () => {
+    expect(readValuationDraft({ amount: '۱۲۰۰', day: '۱۴۰۵/۰۱/۰۱' }, context)).toEqual({
+      ok: true,
+      fields: { amount: 1200n, valuedOn: '2026-03-21' },
+    });
+    expect(readValuationDraft({ amount: '0', day: '۱۴۰۵/۰۱/۰۱' }, context)).toMatchObject({
+      ok: true,
+    });
+  });
+
+  it('refuses nothing typed, a negative value and a day that is not one', () => {
+    expect(readValuationDraft({ amount: '', day: 'x' }, context)).toEqual({
+      ok: false,
+      errors: { amount: 'valuations.error.amountRequired', day: 'transactions.error.day' },
+    });
+    expect(readValuationDraft({ amount: '-1', day: '۱۴۰۵/۰۱/۰۱' }, context)).toEqual({
+      ok: false,
+      errors: { amount: 'valuations.error.negative' },
     });
   });
 });
