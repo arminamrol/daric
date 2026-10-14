@@ -1,4 +1,5 @@
 import { z } from 'zod';
+import { locales } from '../locale';
 
 /** Emails are compared case-insensitively, so they are stored trimmed and lowercased. */
 export const emailSchema = z.string().trim().toLowerCase().pipe(z.email().max(254));
@@ -9,6 +10,8 @@ export const passwordSchema = z.string().min(8).max(128);
 export const registerInputSchema = z.object({
   email: emailSchema,
   password: passwordSchema,
+  /** The language the User signed up in; Persian if not given. */
+  locale: z.enum(locales).exactOptional(),
 });
 export type RegisterInput = z.infer<typeof registerInputSchema>;
 

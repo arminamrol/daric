@@ -85,7 +85,7 @@ export function Assumptions({
   const { mode, remaining, window, monthsUsed } = projection;
   const averaging = mode !== 'MANUAL';
   const used = window.slice(window.length - monthsUsed);
-  const months = used.map((p) => isolate(format.period(p))).join(t('totals.separator'));
+  const months = used.map((p) => isolate(format.period(p))).join(t('list.separator'));
   const occurrences = (count: number, total: bigint) =>
     t('projection.occurrences', { count: format.count(count), total: isolate(shown(total)) });
 

@@ -76,7 +76,7 @@ export function BudgetCard({
         accessibilityLabel={[
           onPress ? t('budgets.edit', { name: isolate(name) }) : name,
           periodOf,
-        ].join('، ')}
+        ].join(t('list.separator'))}
         disabled={!onPress}
         onPress={onPress}
         style={styles.head}

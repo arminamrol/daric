@@ -113,6 +113,13 @@
       "when": 1791805924933,
       "tag": "0015_email_tokens",
       "breakpoints": true
+    },
+    {
+      "idx": 16,
+      "version": "7",
+      "when": 1791970254352,
+      "tag": "0016_user_locale",
+      "breakpoints": true
     }
   ]
 }

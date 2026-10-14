@@ -87,6 +87,10 @@
   --daric-chart-expense: #1d4ed8;
 }
 
+:root:lang(en) {
+  --font-sans: Inter, system-ui, sans-serif;
+}
+
 :root[data-theme='dark'] {
   color-scheme: dark;
   --daric-background: #0a1328;

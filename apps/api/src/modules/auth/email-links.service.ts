@@ -71,7 +71,12 @@ export class EmailLinksService {
     const message = await this.db.transaction(async (tx) => {
       const user = one(
         await tx
-          .select({ id: users.id, email: users.email, verifiedAt: users.emailVerifiedAt })
+          .select({
+            id: users.id,
+            email: users.email,
+            locale: users.locale,
+            verifiedAt: users.emailVerifiedAt,
+          })
           .from(users)
           .where(eq(users.id, userId))
           .for('update'),
@@ -103,7 +108,7 @@ export class EmailLinksService {
   async forgotPassword(email: string, client: ClientInfo): Promise<void> {
     const message = await this.db.transaction(async (tx) => {
       const [user] = await tx
-        .select({ id: users.id, email: users.email })
+        .select({ id: users.id, email: users.email, locale: users.locale })
         .from(authIdentities)
         .innerJoin(users, eq(users.id, authIdentities.userId))
         .where(and(eq(authIdentities.provider, 'PASSWORD'), eq(authIdentities.identifier, email)));
@@ -139,7 +144,10 @@ export class EmailLinksService {
       await this.tokens.revokeAllForUser(tx, userId);
       await this.emailTokens.voidOutstanding(tx, userId, 'RESET_PASSWORD');
       await this.audit.record(tx, { action: 'auth.password_reset', actorUserId: userId, client });
-      return { to: user.email, ...passwordChangedTemplate(this.link('/forgot-password')) };
+      return {
+        to: user.email,
+        ...passwordChangedTemplate(user.locale, this.link('/forgot-password')),
+      };
     });
     this.deliver(message);
   }
@@ -153,7 +161,10 @@ export class EmailLinksService {
     const token = await this.emailTokens.issue(tx, user, purpose);
     if (!token) return null;
     const { path, template } = LINK_MAILS[purpose];
-    return { to: user.email, ...template(this.link(path, token), EMAIL_TOKEN_TTL_HOURS[purpose]) };
+    return {
+      to: user.email,
+      ...template(user.locale, this.link(path, token), EMAIL_TOKEN_TTL_HOURS[purpose]),
+    };
   }
 
   private link(path: string, token?: string): string {
@@ -170,6 +181,9 @@ async function markVerified(db: Executor, userId: string): Promise<Recipient> {
     .set({ emailVerifiedAt: new Date() })
     .where(and(eq(users.id, userId), isNull(users.emailVerifiedAt)));
   return one(
-    await db.select({ id: users.id, email: users.email }).from(users).where(eq(users.id, userId)),
+    await db
+      .select({ id: users.id, email: users.email, locale: users.locale })
+      .from(users)
+      .where(eq(users.id, userId)),
   );
 }

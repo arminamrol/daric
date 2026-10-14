@@ -1,9 +1,11 @@
 import { hasRole } from '@daric/core';
+import { nativeTheme } from '@daric/design-tokens';
 import { useRouter } from 'expo-router';
 import type { Href } from 'expo-router';
 import { ScrollView, StyleSheet, View } from 'react-native';
 import { useSignedIn } from '../../auth/session';
 import { useFormatters } from '../../display/formatters';
+import { LanguageChoices } from '../../i18n/LanguageChoices';
 import { useI18n } from '../../i18n/locale';
 import { useWaitingWrites } from '../../offline/offline';
 import { useDueOccurrences } from '../../recurring/recurring';
@@ -11,7 +13,10 @@ import { ScreenHeader } from '../../ui/HeaderButton';
 import { ListRow } from '../../ui/ListRow';
 import { useTheme } from '../../ui/theme';
 
-/** The other parts of the app: insights, what the Workspace is made of, and changes not sent yet. */
+/**
+ * The other parts of the app: insights, what the Workspace is made of, changes
+ * not sent yet, and the language.
+ */
 export default function MoreScreen() {
   const { t } = useI18n();
   const { colors } = useTheme();
@@ -52,10 +57,17 @@ export default function MoreScreen() {
           <ListRow title={item.title} lines={[item.line]} onPress={() => router.push(item.href)} />
         </View>
       ))}
+      <View style={[styles.settings, { borderTopColor: colors.border }]}>
+        <LanguageChoices />
+      </View>
     </ScrollView>
   );
 }
 
 const styles = StyleSheet.create({
   separator: { height: StyleSheet.hairlineWidth },
+  settings: {
+    borderTopWidth: StyleSheet.hairlineWidth,
+    padding: nativeTheme.space(4),
+  },
 });

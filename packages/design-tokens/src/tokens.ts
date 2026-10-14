@@ -117,8 +117,14 @@ export const radius = { sm: 4, md: 8, lg: 12, xl: 16, full: 9999 } as const;
 export type TextSize = 'xs' | 'sm' | 'base' | 'lg' | 'xl' | '2xl' | '3xl';
 
 export const typography = {
-  /** Self-hosted Vazirmatn first (covers Persian and Latin), then system fallbacks. */
-  fontFamily: ['Vazirmatn', 'Tahoma', 'system-ui', 'sans-serif'],
+  /**
+   * Self-hosted fonts first, then system fallbacks, per language: Vazirmatn
+   * (which covers Latin too) for Persian, Inter for English.
+   */
+  fontFamily: {
+    fa: ['Vazirmatn', 'Tahoma', 'system-ui', 'sans-serif'],
+    en: ['Inter', 'system-ui', 'sans-serif'],
+  },
   /** Font size and line height in pixels; Persian script gets generous leading. */
   size: {
     xs: { fontSize: 12, lineHeight: 20 },

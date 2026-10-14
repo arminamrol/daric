@@ -31,6 +31,7 @@
   "dependencies": {
     "@daric/core": "workspace:*",
     "@daric/design-tokens": "workspace:*",
+    "@daric/i18n": "workspace:*",
     "@nestjs/common": "^11.2.7",
     "@nestjs/core": "^11.2.7",
     "@nestjs/platform-express": "^11.2.7",

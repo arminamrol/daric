@@ -27,7 +27,7 @@ export function tailwindCss(): string {
     `--color-black: ${palette.black};`,
     ...paletteVariables('gold'),
     ...paletteVariables('navy'),
-    `--font-sans: ${typography.fontFamily.join(', ')};`,
+    `--font-sans: ${typography.fontFamily.fa.join(', ')};`,
     `--spacing: ${rem(spacingUnit)};`,
     ...Object.entries(typography.size).flatMap(([size, { fontSize, lineHeight }]) => [
       `--text-${size}: ${rem(fontSize)};`,
@@ -50,6 +50,7 @@ export function tailwindCss(): string {
       cssRule('@theme', theme),
       cssRule('@theme inline', semantic),
       cssRule(':root', themeVariables('light', themes.light)),
+      cssRule(':root:lang(en)', [`--font-sans: ${typography.fontFamily.en.join(', ')};`]),
       cssRule(":root[data-theme='dark']", themeVariables('dark', themes.dark)),
       [
         '@media (prefers-color-scheme: dark) {',

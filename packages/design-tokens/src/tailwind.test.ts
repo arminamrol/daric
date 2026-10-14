@@ -25,6 +25,16 @@ describe('tailwindCss', () => {
     );
   });
 
+  it('sets type in Vazirmatn, or in Inter on a page in English', () => {
+    const blocks = tailwindCss().split('\n\n');
+    expect(blocks.find((b) => b.startsWith('@theme {'))).toContain(
+      '--font-sans: Vazirmatn, Tahoma, system-ui, sans-serif;',
+    );
+    expect(blocks.find((b) => b.startsWith(':root:lang(en) {'))).toContain(
+      '--font-sans: Inter, system-ui, sans-serif;',
+    );
+  });
+
   it('replaces Tailwind default colors with the Daric palette', () => {
     const css = tailwindCss();
     expect(css).toContain('--color-*: initial;');

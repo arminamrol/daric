@@ -10,7 +10,7 @@ export interface NativeTextStyle {
   readonly lineHeight: number;
 }
 
-const [fontFamily] = typography.fontFamily;
+const [fontFamily] = typography.fontFamily.fa;
 
 const text = Object.fromEntries(
   Object.entries(typography.size).map(([size, { fontSize, lineHeight }]) => [

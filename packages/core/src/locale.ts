@@ -1,4 +1,6 @@
-export type Locale = 'fa' | 'en';
+/** The languages Daric speaks; Persian first, as the default. */
+export const locales = ['fa', 'en'] as const;
+export type Locale = (typeof locales)[number];
 /** The digit shapes numbers are shown in. */
 export const digitSystems = ['persian', 'latin'] as const;
 export type Digits = (typeof digitSystems)[number];

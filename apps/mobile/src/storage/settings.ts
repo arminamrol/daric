@@ -1,5 +1,5 @@
 /**
- * Small device-local values read synchronously at start: the "keep data"
+ * Small device-local values read synchronously at start: the language, the "keep data"
  * answer, the last picks of fast entry, the layout-direction reload marker.
  */
 export interface Settings {

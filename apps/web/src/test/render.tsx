@@ -1,5 +1,4 @@
 import type { ApiClient } from '@daric/api-client';
-import type { Locale } from '@daric/core';
 import { render } from '@testing-library/react';
 import { RouterProvider, createMemoryRouter } from 'react-router';
 import { AppProviders } from '../app/providers';
@@ -12,12 +11,11 @@ import { fakeApi } from './fake-api';
  */
 export function renderApp({
   path = '/',
-  locale,
   api = fakeApi({ signedInAs: 'sara@example.com' }).api,
-}: { path?: string; locale?: Locale; api?: ApiClient } = {}) {
+}: { path?: string; api?: ApiClient } = {}) {
   const router = createMemoryRouter(routes, { initialEntries: [path] });
   const view = render(
-    <AppProviders locale={locale} api={api}>
+    <AppProviders api={api}>
       <RouterProvider router={router} />
     </AppProviders>,
   );

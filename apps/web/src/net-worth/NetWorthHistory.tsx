@@ -51,7 +51,7 @@ function HistoryTable({ snapshots }: { snapshots: NetWorthSnapshotSummary[] }) {
                     {t('netWorth.incomplete', {
                       currencies: s.missing
                         .map((code) => format.currency(currencyByCode(code)))
-                        .join(t('totals.separator')),
+                        .join(t('list.separator')),
                     })}
                   </span>
                 )}

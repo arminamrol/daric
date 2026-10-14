@@ -6,6 +6,6 @@
 
 **Status:** ready-for-agent
 
-- [ ] Complete en dictionary; missing-key check in CI
-- [ ] Language switch in settings; direction flips on web and mobile
-- [ ] Visual check of key screens in LTR
+- [x] Complete en dictionary; missing-key check in CI
+- [x] Language switch in settings; direction flips on web and mobile
+- [x] Visual check of key screens in LTR (web; mobile not run on a device)

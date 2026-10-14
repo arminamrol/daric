@@ -1,5 +1,5 @@
 import { ConflictException, Inject, Injectable, UnauthorizedException } from '@nestjs/common';
-import type { LoginInput, RegisterInput, User } from '@daric/core';
+import type { Locale, LoginInput, RegisterInput, User } from '@daric/core';
 import { and, eq } from 'drizzle-orm';
 import { isUniqueViolation } from '../../common/db-errors';
 import type { ClientInfo } from '../../common/request';
@@ -70,14 +70,20 @@ export class AuthService {
   }
 
   /**
-   * Creates the User, their Personal Workspace with its default Categories and
-   * Owner membership in one transaction, then mails them a verification link.
+   * Creates the User, their Personal Workspace with its default Categories (in
+   * the User's language) and Owner membership in one transaction, then mails
+   * them a verification link.
    */
   async register(input: RegisterInput, client: ClientInfo): Promise<SignedIn> {
     const secretHash = await hashPassword(input.password);
     try {
       const { result, mail } = await this.db.transaction(async (tx) => {
-        const user = one(await tx.insert(users).values({ email: input.email }).returning());
+        const user = one(
+          await tx
+            .insert(users)
+            .values({ email: input.email, ...initialPreferences(input.locale) })
+            .returning(),
+        );
         await tx.insert(authIdentities).values({
           userId: user.id,
           provider: 'PASSWORD',
@@ -87,13 +93,13 @@ export class AuthService {
         const workspace = one(
           await tx
             .insert(workspaces)
-            .values({ type: 'PERSONAL', name: 'Personal' })
+            .values({ type: 'PERSONAL', name: 'Personal', calendar: user.displayCalendar })
             .returning({ id: workspaces.id }),
         );
         await tx
           .insert(workspaceMembers)
           .values({ workspaceId: workspace.id, userId: user.id, role: 'OWNER' });
-        await seedDefaultCategories(tx, workspace.id);
+        await seedDefaultCategories(tx, workspace.id, user.locale);
         await this.audit.record(tx, {
           action: 'auth.register',
           actorUserId: user.id,
@@ -139,4 +145,15 @@ export class AuthService {
       return signedIn(found, await this.tokens.issue(tx, found.id));
     });
   }
+}
+
+/**
+ * Preferences of a new User: Persian with Jalali dates and Persian digits, or
+ * Gregorian dates and Latin digits for one who signs up in English. Their
+ * Personal Workspace counts Periods in the same calendar.
+ */
+function initialPreferences(locale: Locale = 'fa') {
+  return locale === 'fa'
+    ? { locale }
+    : { locale, displayCalendar: 'gregorian' as const, digits: 'latin' as const };
 }

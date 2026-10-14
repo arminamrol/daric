@@ -21,6 +21,7 @@ class UserPreferencesDto extends createZodDto(userPreferencesSchema) {}
 class UpdateUserPreferencesDto extends createZodDto(updateUserPreferencesInputSchema) {}
 
 const preferenceColumns = {
+  locale: users.locale,
   displayCalendar: users.displayCalendar,
   digits: users.digits,
   theme: users.theme,

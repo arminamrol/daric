@@ -76,7 +76,7 @@ export function PeriodTotals({ period, totals }: { period: Period; totals: Curre
                   }),
               ]
                 .filter(Boolean)
-                .join(t('totals.separator')),
+                .join(t('list.separator')),
             })}
           </p>
         ))}

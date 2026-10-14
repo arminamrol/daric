@@ -2,11 +2,15 @@
 export const fa = {
   'app.name': 'دریک',
   'app.tagline': 'دخل و خرج، بودجه و دارایی‌ها در یک جا',
+  'list.separator': '، ',
   'shell.skipToContent': 'رفتن به محتوای اصلی',
   'theme.title': 'ظاهر',
   'theme.system': 'سیستم',
   'theme.light': 'روشن',
   'theme.dark': 'تیره',
+  'language.title': 'زبان',
+  'language.fa': 'فارسی',
+  'language.en': 'English',
   'nav.label': 'بخش‌ها',
   'nav.home': 'خانه',
   'nav.accounts': 'حساب‌ها',
@@ -261,7 +265,6 @@ export const fa = {
   'totals.addRate': 'وارد کردن نرخ',
   'totals.byCurrency': 'به تفکیک ارز',
   'totals.currencyLine': '{currency}: {amounts}',
-  'totals.separator': '، ',
   'netWorth.title': 'دارایی خالص',
   'netWorth.intro':
     'دارایی‌ها منهای بدهی‌ها، امروز ({day})، به {base}. ارزش هر حساب آخرین ارزش‌گذاری آن است و اگر نداشته باشد، مانده‌اش.',

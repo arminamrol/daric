@@ -151,7 +151,7 @@ function Assumptions({ projection, nameOf }: { projection: ProjectionReport; nam
   const { mode, remaining, window, monthsUsed } = projection;
   const averaging = mode !== 'MANUAL';
   const used = window.slice(window.length - monthsUsed);
-  const months = used.map((p) => isolate(format.period(p))).join(t('totals.separator'));
+  const months = used.map((p) => isolate(format.period(p))).join(t('list.separator'));
   const averages = projection.categories.filter((c) => c.average !== 0n);
 
   return (

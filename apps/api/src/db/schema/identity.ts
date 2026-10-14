@@ -1,8 +1,9 @@
 import { sql } from 'drizzle-orm';
 import { index, pgEnum, pgTable, text, timestamp, uniqueIndex, uuid } from 'drizzle-orm/pg-core';
-import { calendarSystems, digitSystems, themePreferences } from '@daric/core';
+import { calendarSystems, digitSystems, locales, themePreferences } from '@daric/core';
 import { id, timestamps } from './columns';
 
+export const userLocale = pgEnum('locale', locales);
 export const displayCalendar = pgEnum('display_calendar', calendarSystems);
 export const digitSystem = pgEnum('digit_system', digitSystems);
 export const themePreference = pgEnum('theme_preference', themePreferences);
@@ -13,6 +14,7 @@ export const users = pgTable(
     id: id(),
     email: text('email').notNull(),
     /** Preferences: how this User likes things drawn, in every Workspace. */
+    locale: userLocale('locale').notNull().default('fa'),
     displayCalendar: displayCalendar('display_calendar').notNull().default('jalali'),
     digits: digitSystem('digits').notNull().default('persian'),
     theme: themePreference('theme').notNull().default('system'),
