@@ -9,6 +9,17 @@ export const labelsKey = (workspaceId: string) => ['labels', workspaceId] as con
 export const budgetsKey = (workspaceId: string) => ['budgets', workspaceId] as const;
 /** Recurring Rules and Due Occurrences. */
 export const recurringKey = (workspaceId: string) => ['recurring', workspaceId] as const;
+/**
+ * Worked out by the API from everything else, so read afresh whenever their
+ * screen opens rather than after each write; changed only online.
+ */
+export const netWorthKey = (workspaceId: string) => ['net-worth', workspaceId] as const;
+export const snapshotsKey = (workspaceId: string) => ['net-worth-snapshots', workspaceId] as const;
+export const valuationsKey = (workspaceId: string, accountId: string) =>
+  ['valuations', workspaceId, accountId] as const;
+/** The Projection, its settings and the Planned Items. */
+export const projectionKey = (workspaceId: string) => ['projection', workspaceId] as const;
+export const reportsKey = (workspaceId: string) => ['reports', workspaceId] as const;
 
 /**
  * What a write changes besides its own list: a Transaction moves balances

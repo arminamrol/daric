@@ -1,12 +1,12 @@
 import { IRR } from '@daric/core';
 import { nativeTheme } from '@daric/design-tokens';
 import { isolate } from '@daric/i18n';
-import type { PlainMessageKey } from '@daric/i18n';
 import { useMemo, useRef, useState } from 'react';
 import { KeyboardAvoidingView, ScrollView, StyleSheet } from 'react-native';
 import type { TextInput } from 'react-native';
 import { useSignedIn } from '../../auth/session';
 import { useFormatters } from '../../display/formatters';
+import { CALENDAR_LABELS } from '../../display/labels';
 import { useI18n } from '../../i18n/locale';
 import { readDraft } from '../../transactions/draft';
 import type { Draft, DraftErrors } from '../../transactions/draft';
@@ -23,10 +23,6 @@ import { Text } from '../../ui/Text';
 
 /** Expense first: it is what people record most. */
 const TYPES: readonly Draft['type'][] = ['EXPENSE', 'INCOME'];
-const CALENDAR_LABELS = {
-  jalali: 'settings.calendar.jalali',
-  gregorian: 'settings.calendar.gregorian',
-} as const satisfies Record<string, PlainMessageKey>;
 
 /**
  * Fast entry of an Income or Expense: the amount is focused and the keyboard's

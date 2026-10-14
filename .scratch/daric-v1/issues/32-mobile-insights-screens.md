@@ -4,7 +4,7 @@
 
 **Blocked by:** 31, 21, 23, 25
 
-**Status:** ready-for-agent
+**Status:** in-progress
 
 - [ ] react-native-svg based charts with accessible summaries
 - [ ] Parity with web for these features
