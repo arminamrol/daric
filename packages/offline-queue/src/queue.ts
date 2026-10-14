@@ -83,6 +83,12 @@ export interface OfflineQueueOptions<P, S> {
   transport: Transport<P, S>;
   /** Whether the device believes it is online; nothing is sent while it is not. */
   isOnline?: () => boolean;
+  /**
+   * The payload of an edit folded into an earlier change of the same entity:
+   * by default the later one replaces it, as when every payload is whole.
+   * Payloads naming only the fields they change merge them instead.
+   */
+  merge?: (earlier: P, later: P) => P;
 }
 
 /**
@@ -97,6 +103,7 @@ export function createOfflineQueue<P, S>({
   storage,
   transport,
   isOnline = () => true,
+  merge = (_, later) => later,
 }: OfflineQueueOptions<P, S>): OfflineQueue<P, S> {
   let list: readonly Entry<P, S>[] = [];
   let nextSeq = 1;
@@ -159,23 +166,27 @@ export function createOfflineQueue<P, S>({
 
       if (change.kind === 'update') {
         const create = waiting.find((e) => e.kind === 'create' && !e.attempted);
-        if (create) {
-          await commit(list.map((e) => (e === create ? { ...e, payload: change.payload } : e)));
+        if (create?.kind === 'create') {
+          const payload = merge(create.payload, change.payload);
+          await commit(list.map((e) => (e === create ? { ...e, payload } : e)));
           return create.seq;
         }
         const edit = waiting.find((e) => e.kind === 'update');
-        if (edit) {
-          // One made against the server copy settles the conflict; an older one waits on it.
-          const settles = edit.status !== 'conflict' || change.baseVersion >= edit.version;
+        if (edit?.kind === 'update') {
+          // One made against the server copy settles the conflict, replacing the
+          // edit held on it; an older one waits on it.
+          const conflict = edit.status === 'conflict';
+          const settles = !conflict || change.baseVersion >= edit.version;
           const merged: Entry<P, S> = settles
             ? {
                 ...change,
-                baseVersion: edit.status === 'conflict' ? change.baseVersion : edit.baseVersion,
+                payload: conflict ? change.payload : merge(edit.payload, change.payload),
+                baseVersion: conflict ? change.baseVersion : edit.baseVersion,
                 status: 'pending',
                 seq: edit.seq,
                 attempted: edit.attempted,
               }
-            : { ...edit, payload: change.payload };
+            : { ...edit, payload: merge(edit.payload, change.payload) };
           await commit(list.map((e) => (e === edit ? merged : e)));
           return edit.seq;
         }

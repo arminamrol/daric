@@ -29,6 +29,7 @@ import type {
 } from '@daric/core';
 import { and, asc, eq, gte, isNull, lt, sql, type SQL } from 'drizzle-orm';
 import { isUniqueViolation } from '../../common/db-errors';
+import { createOnce, unlessMissing, type Created } from '../../common/create-once';
 import { isUuid, type Membership } from '../../common/request';
 import { one } from '../../db/client';
 import {
@@ -192,33 +193,40 @@ export class BudgetsService {
     return one(await this.withProgress(membership, [await this.row(budgetId)], month));
   }
 
+  /** Sending the same id again answers with the Budget it holds now (`created: false`). */
   async create(
     membership: Membership,
     userId: string,
     input: CreateBudgetInput,
     month: MonthPeriod | undefined,
-  ): Promise<BudgetWire> {
+  ): Promise<Created<BudgetWire>> {
     const { workspaceId } = membership;
     const { baseCurrency } = await this.workspace(workspaceId);
-    const labelId = input.labelId ?? null;
-    await this.assertActiveExpenseCategory(input.categoryId);
-    if (labelId) await this.assertActiveLabel(labelId);
-    const tx = scopedTx();
-    const created = one(
-      await this.write(() =>
-        tx
-          .insert(budgets)
-          .values({ ...input, labelId, workspaceId, currency: baseCurrency })
-          .returning({ id: budgets.id }),
-      ),
+    return createOnce(
+      input.id,
+      (id) => unlessMissing(this.get(membership, id, month)),
+      async () => {
+        const labelId = input.labelId ?? null;
+        await this.assertActiveExpenseCategory(input.categoryId);
+        if (labelId) await this.assertActiveLabel(labelId);
+        const tx = scopedTx();
+        const [created] = await this.write(() =>
+          tx
+            .insert(budgets)
+            .values({ ...input, labelId, workspaceId, currency: baseCurrency })
+            .onConflictDoNothing({ target: budgets.id })
+            .returning({ id: budgets.id }),
+        );
+        if (!created) return undefined;
+        await this.audit.record(tx, {
+          action: 'budget.create',
+          actorUserId: userId,
+          workspaceId,
+          metadata: { budgetId: created.id },
+        });
+        return this.get(membership, created.id, month);
+      },
     );
-    await this.audit.record(tx, {
-      action: 'budget.create',
-      actorUserId: userId,
-      workspaceId,
-      metadata: { budgetId: created.id },
-    });
-    return this.get(membership, created.id, month);
   }
 
   async update(

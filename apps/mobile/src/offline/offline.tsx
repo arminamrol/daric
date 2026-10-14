@@ -1,4 +1,4 @@
-import type { QueuedTransactionChange } from '@daric/api-client';
+import type { QueuedWrite } from '@daric/api-client';
 import NetInfo from '@react-native-community/netinfo';
 import { useQueryClient } from '@tanstack/react-query';
 import { openDatabaseSync } from 'expo-sqlite';
@@ -55,8 +55,8 @@ export function useOfflineDevice(): OfflineDevice {
   return device;
 }
 
-/** The Transaction changes of a Workspace still waiting to reach the API, oldest first. */
-export function useWaitingChanges(workspaceId: string): readonly QueuedTransactionChange[] {
+/** The changes of a Workspace still waiting to reach the API, oldest first. */
+export function useWaitingWrites(workspaceId: string): readonly QueuedWrite[] {
   const { queue } = useOfflineDevice();
   const entries = useSyncExternalStore(queue.subscribe, queue.entries);
   return useMemo(() => entries.filter((e) => e.scope === workspaceId), [entries, workspaceId]);

@@ -16,8 +16,8 @@ import type {
   UpdateCategoryInput,
 } from '@daric/core';
 import { and, eq, inArray, isNull, max, sql, type SQL } from 'drizzle-orm';
+import { createOnce, unlessMissing, type Created } from '../../common/create-once';
 import { isUuid, type Membership } from '../../common/request';
-import { one } from '../../db/client';
 import { categories, workspaces } from '../../db/schema';
 import { scopedTx } from '../../db/scope';
 import { AuditService } from '../audit/audit.service';
@@ -147,11 +147,15 @@ export class CategoriesService {
     return last === null ? 0 : last + 1;
   }
 
+  /**
+   * Sending the same id again answers with the Category it holds now
+   * (`created: false`), even if its parent was archived since.
+   */
   async create(
     membership: Membership,
     userId: string,
     input: CreateCategoryInput,
-  ): Promise<Category> {
+  ): Promise<Created<Category>> {
     const { workspaceId } = membership;
     const tx = scopedTx();
     // Row-level security would refuse the insert anyway; answer 404 like every other route.
@@ -160,30 +164,36 @@ export class CategoriesService {
       .from(workspaces)
       .where(eq(workspaces.id, workspaceId));
     if (!visible) throw new NotFoundException();
-    const parentId = input.parentId ?? null;
-    if (parentId !== null) {
-      const parent = (await this.lock([parentId])).get(parentId);
-      this.assertParent(input.kind, parent);
-      this.assertNotArchived(parent);
-    }
-    const created = one(
-      await tx
-        .insert(categories)
-        .values({
-          ...input,
-          parentId,
+    return createOnce(
+      input.id,
+      (id) => unlessMissing(this.get(id)),
+      async () => {
+        const parentId = input.parentId ?? null;
+        if (parentId !== null) {
+          const parent = (await this.lock([parentId])).get(parentId);
+          this.assertParent(input.kind, parent);
+          this.assertNotArchived(parent);
+        }
+        const [created] = await tx
+          .insert(categories)
+          .values({
+            ...input,
+            parentId,
+            workspaceId,
+            position: await this.nextPosition(input.kind, parentId),
+          })
+          .onConflictDoNothing({ target: categories.id })
+          .returning({ id: categories.id });
+        if (!created) return undefined;
+        await this.audit.record(tx, {
+          action: 'category.create',
+          actorUserId: userId,
           workspaceId,
-          position: await this.nextPosition(input.kind, parentId),
-        })
-        .returning({ id: categories.id }),
+          metadata: { categoryId: created.id },
+        });
+        return this.get(created.id);
+      },
     );
-    await this.audit.record(tx, {
-      action: 'category.create',
-      actorUserId: userId,
-      workspaceId,
-      metadata: { categoryId: created.id },
-    });
-    return this.get(created.id);
   }
 
   async update(

@@ -2,8 +2,8 @@ import { Inject, Injectable, NotFoundException } from '@nestjs/common';
 import { accountBalance, amountToWire, flowEffect, money } from '@daric/core';
 import type { AccountWire, CreateAccountInput, UpdateAccountInput } from '@daric/core';
 import { and, eq, isNull, lte, sql, type SQL, type SQLWrapper } from 'drizzle-orm';
+import { createOnce, unlessMissing, type Created } from '../../common/create-once';
 import { isUuid, type Membership } from '../../common/request';
-import { one } from '../../db/client';
 import { accounts, currencies, transactions, workspaces } from '../../db/schema';
 import { scopedTx } from '../../db/scope';
 import { AuditService } from '../audit/audit.service';
@@ -130,11 +130,12 @@ export class AccountsService {
     return toWire(row);
   }
 
+  /** Sending the same id again answers with the Account it holds now (`created: false`). */
   async create(
     membership: Membership,
     userId: string,
     input: CreateAccountInput,
-  ): Promise<AccountWire> {
+  ): Promise<Created<AccountWire>> {
     const { workspaceId } = membership;
     const tx = scopedTx();
     // Row-level security would refuse the insert anyway; answer 404 like every other route.
@@ -143,19 +144,25 @@ export class AccountsService {
       .from(workspaces)
       .where(eq(workspaces.id, workspaceId));
     if (!visible) throw new NotFoundException();
-    const created = one(
-      await tx
-        .insert(accounts)
-        .values({ ...input, workspaceId })
-        .returning({ id: accounts.id }),
+    return createOnce(
+      input.id,
+      (id) => unlessMissing(this.get(id)),
+      async () => {
+        const [created] = await tx
+          .insert(accounts)
+          .values({ ...input, workspaceId })
+          .onConflictDoNothing({ target: accounts.id })
+          .returning({ id: accounts.id });
+        if (!created) return undefined;
+        await this.audit.record(tx, {
+          action: 'account.create',
+          actorUserId: userId,
+          workspaceId,
+          metadata: { accountId: created.id },
+        });
+        return this.get(created.id);
+      },
     );
-    await this.audit.record(tx, {
-      action: 'account.create',
-      actorUserId: userId,
-      workspaceId,
-      metadata: { accountId: created.id },
-    });
-    return this.get(created.id);
   }
 
   async update(

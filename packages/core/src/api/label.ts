@@ -1,5 +1,5 @@
 import { z } from 'zod';
-import { nameSchema, notEmpty } from './shared';
+import { idSchema, nameSchema, notEmpty } from './shared';
 
 /** A Label as the API returns it. Lists come ordered by name. */
 export const labelSchema = z.object({
@@ -15,6 +15,8 @@ export type Label = z.infer<typeof labelSchema>;
 export const labelListSchema = z.array(labelSchema);
 
 export const createLabelInputSchema = z.strictObject({
+  /** Chosen by the client (a UUIDv7), so a replayed create makes nothing new (ADR-0005). */
+  id: idSchema.exactOptional(),
   name: nameSchema,
   controllable: z.boolean().default(false),
 });

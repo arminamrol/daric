@@ -128,6 +128,36 @@ describe('Budgets', () => {
     expect((await api.list()).body).toEqual([res.body]);
   });
 
+  it('set a Budget once when the same id is sent twice, even after its Category was archived', async () => {
+    const { user, api, category } = await setUp();
+    const id = randomUUID();
+    const body = { id, categoryId: category.id, period: 'MONTHLY', amount: '1000' };
+    const first = await api.create(body);
+    expect(first.status).toBe(201);
+    expect(first.body.id).toBe(id);
+    await api.archive('categories', category.id);
+    const again = await api.create(body);
+    expect(again.status).toBe(200);
+    expect(again.body).toEqual(first.body);
+    expect(await storedBudgets(user.workspaceId)).toHaveLength(1);
+  });
+
+  it("refuse an id another Workspace already used, without showing that Workspace's Budget", async () => {
+    const a = await setUp();
+    const b = await setUp();
+    const id = randomUUID();
+    await b.api.create({ id, categoryId: b.category.id, period: 'MONTHLY', amount: '777' });
+    const res = await a.api.create({
+      id,
+      categoryId: a.category.id,
+      period: 'MONTHLY',
+      amount: '1',
+    });
+    expect(res.status).toBe(409);
+    expect(JSON.stringify(res.body)).not.toContain('777');
+    expect(await storedBudgets(a.user.workspaceId)).toEqual([]);
+  });
+
   it("count a parent Category's children, only in the month, and never Income or Transfers", async () => {
     const { api, account, category } = await setUp();
     const groceries = await api.category({ ...food, name: 'Groceries', parentId: category.id });

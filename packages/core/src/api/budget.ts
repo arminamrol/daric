@@ -60,6 +60,8 @@ export const budgetListSchema = z.array(budgetSchema);
  * Label, per month or year. The limit is in the Workspace's Base Currency.
  */
 export const createBudgetInputSchema = z.strictObject({
+  /** Chosen by the client (a UUIDv7), so a replayed create makes nothing new (ADR-0005). */
+  id: idSchema.exactOptional(),
   categoryId: idSchema,
   labelId: idSchema.nullable().default(null),
   period: z.enum(budgetPeriods),

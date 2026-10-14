@@ -111,6 +111,31 @@ describe('Recurring Rules', () => {
     expect((await api.due()).body.occurrences).toEqual([]);
   });
 
+  it('make a rule once when the same id is sent twice, even after its Account was archived', async () => {
+    const { api, account, rent } = await setUp();
+    const id = randomUUID();
+    const body = { ...rent, id, startOn: addDays(today, 10) };
+    const first = await api.create(body);
+    expect(first.status).toBe(201);
+    expect(first.body.id).toBe(id);
+    await api.archive('accounts', account.id);
+    const again = await api.create(body);
+    expect(again.status).toBe(200);
+    expect(again.body).toEqual(first.body);
+    expect((await api.list()).body).toHaveLength(1);
+  });
+
+  it("refuse an id another Workspace already used, without showing that Workspace's rule", async () => {
+    const a = await setUp();
+    const b = await setUp();
+    const id = randomUUID();
+    await b.api.create({ ...b.rent, id, name: 'secret', startOn: today });
+    const res = await a.api.create({ ...a.rent, id, startOn: today });
+    expect(res.status).toBe(409);
+    expect(JSON.stringify(res.body)).not.toContain('secret');
+    expect((await a.api.list()).body).toEqual([]);
+  });
+
   it('list every missed occurrence as due, oldest first across rules', async () => {
     const { api, account, rent } = await setUp();
     const salary = await api.category(salaryCategory);

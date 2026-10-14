@@ -2,8 +2,8 @@ import { ConflictException, Inject, Injectable, NotFoundException } from '@nestj
 import type { CreateLabelInput, Label, UpdateLabelInput } from '@daric/core';
 import { asc, eq, isNull, sql, type SQL } from 'drizzle-orm';
 import { isUniqueViolation } from '../../common/db-errors';
+import { createOnce, unlessMissing, type Created } from '../../common/create-once';
 import { isUuid, type Membership } from '../../common/request';
-import { one } from '../../db/client';
 import { labels, workspaces } from '../../db/schema';
 import { scopedTx } from '../../db/scope';
 import { AuditService } from '../audit/audit.service';
@@ -48,7 +48,12 @@ export class LabelsService {
     return label;
   }
 
-  async create(membership: Membership, userId: string, input: CreateLabelInput): Promise<Label> {
+  /** Sending the same id again answers with the Label it holds now (`created: false`). */
+  async create(
+    membership: Membership,
+    userId: string,
+    input: CreateLabelInput,
+  ): Promise<Created<Label>> {
     const { workspaceId } = membership;
     const tx = scopedTx();
     // Row-level security would refuse the insert anyway; answer 404 like every other route.
@@ -57,21 +62,27 @@ export class LabelsService {
       .from(workspaces)
       .where(eq(workspaces.id, workspaceId));
     if (!visible) throw new NotFoundException();
-    const created = one(
-      await this.write(() =>
-        tx
-          .insert(labels)
-          .values({ ...input, workspaceId })
-          .returning({ id: labels.id }),
-      ),
+    return createOnce(
+      input.id,
+      (id) => unlessMissing(this.get(id)),
+      async () => {
+        const [created] = await this.write(() =>
+          tx
+            .insert(labels)
+            .values({ ...input, workspaceId })
+            .onConflictDoNothing({ target: labels.id })
+            .returning({ id: labels.id }),
+        );
+        if (!created) return undefined;
+        await this.audit.record(tx, {
+          action: 'label.create',
+          actorUserId: userId,
+          workspaceId,
+          metadata: { labelId: created.id },
+        });
+        return this.get(created.id);
+      },
     );
-    await this.audit.record(tx, {
-      action: 'label.create',
-      actorUserId: userId,
-      workspaceId,
-      metadata: { labelId: created.id },
-    });
-    return this.get(created.id);
   }
 
   async update(

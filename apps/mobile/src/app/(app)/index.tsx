@@ -9,14 +9,11 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useSignedIn } from '../../auth/session';
 import { useFormatters } from '../../display/formatters';
 import { useI18n } from '../../i18n/locale';
-import { useWaitingChanges } from '../../offline/offline';
+import { currencyOf, useAccounts } from '../../accounts/accounts';
+import { useCategories } from '../../categories/categories';
+import { useWaitingWrites } from '../../offline/offline';
 import { TransactionRow } from '../../transactions/TransactionRow';
-import {
-  currencyOf,
-  useAccounts,
-  useCategories,
-  useTransactions,
-} from '../../transactions/transactions';
+import { useTransactions } from '../../transactions/transactions';
 import { Status } from '../../ui/Screen';
 import { Text } from '../../ui/Text';
 import { useTheme } from '../../ui/theme';
@@ -33,7 +30,7 @@ export default function TransactionsScreen() {
   const list = useTransactions(filters);
   const accounts = useAccounts({ includeArchived: true });
   const categories = useCategories();
-  const waiting = useWaitingChanges(workspace.id);
+  const waiting = useWaitingWrites(workspace.id);
   const canRecord = workspace.role !== 'VIEWER';
 
   const accountMap = useMemo(
@@ -67,12 +64,17 @@ export default function TransactionsScreen() {
   return (
     <View style={styles.fill}>
       {waiting.length > 0 && (
-        <View
-          style={[styles.notice, { backgroundColor: colors.surfaceMuted }]}
-          accessibilityLiveRegion="polite"
-        >
-          <Text size="sm">{t('sync.pending')}</Text>
-        </View>
+        <Link href="/sync" asChild>
+          <Pressable
+            accessibilityRole="link"
+            accessibilityLabel={t('sync.open')}
+            accessibilityHint={t('sync.pending')}
+            accessibilityLiveRegion="polite"
+            style={StyleSheet.flatten([styles.notice, { backgroundColor: colors.surfaceMuted }])}
+          >
+            <Text size="sm">{t('sync.pending')}</Text>
+          </Pressable>
+        </Link>
       )}
       <SectionList
         sections={sections}

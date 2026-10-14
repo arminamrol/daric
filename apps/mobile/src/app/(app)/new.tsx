@@ -11,13 +11,9 @@ import { useI18n } from '../../i18n/locale';
 import { readDraft } from '../../transactions/draft';
 import type { Draft, DraftErrors } from '../../transactions/draft';
 import { readLastPicks, writeLastPicks } from '../../transactions/last-picks';
-import {
-  currencyOf,
-  newId,
-  useAccounts,
-  useCategories,
-  useRecordTransaction,
-} from '../../transactions/transactions';
+import { currencyOf, useAccounts } from '../../accounts/accounts';
+import { useCategories } from '../../categories/categories';
+import { newId, useWrite } from '../../data/writes';
 import { deviceSettings } from '../../storage/device-settings';
 import { Button } from '../../ui/Button';
 import { Choices } from '../../ui/Choices';
@@ -45,7 +41,7 @@ export default function NewTransactionScreen() {
   const { me, workspace } = useSignedIn();
   const accounts = useAccounts();
   const categories = useCategories();
-  const record = useRecordTransaction();
+  const record = useWrite();
   const amountRef = useRef<TextInput>(null);
 
   const [draft, setDraft] = useState((): Draft => {
@@ -122,7 +118,7 @@ export default function NewTransactionScreen() {
     setErrors({});
     const { input } = read;
     record.mutate(
-      { ...input, id: draft.id },
+      { kind: 'create', entityId: draft.id, payload: { ...input, id: draft.id } },
       {
         onSuccess: (outcome) => {
           // Read again: an earlier save on this screen may have picked for the other type.

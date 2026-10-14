@@ -449,3 +449,59 @@ describe('offline queue', () => {
     ]);
   });
 });
+
+describe('partial edits', () => {
+  /** Each change names only the fields it sets. */
+  type Fields = Partial<Record<'name' | 'note', string>>;
+
+  function setupPartial() {
+    let down = true;
+    const sent: Change<Fields>[] = [];
+    const queue = createOfflineQueue<Fields, never>({
+      storage: memoryStorage(),
+      transport: {
+        async send(change) {
+          if (down) throw offline();
+          sent.push(change);
+          return { status: 'done', version: 2 };
+        },
+      },
+      isOnline: () => !down,
+      merge: (earlier, later) => ({ ...earlier, ...later }),
+    });
+    return { queue, sent, goOnline: () => void (down = false) };
+  }
+
+  it('merges an edit into a create not sent yet', async () => {
+    const { queue, sent, goOnline } = setupPartial();
+    await queue.submit({ kind: 'create', scope: 'ws', entityId: 'a', payload: { name: 'rent' } });
+    await queue.submit({
+      kind: 'update',
+      scope: 'ws',
+      entityId: 'a',
+      payload: { note: 'May' },
+      baseVersion: 1,
+    });
+    goOnline();
+    await queue.replay();
+    expect(sent).toEqual([
+      { kind: 'create', scope: 'ws', entityId: 'a', payload: { name: 'rent', note: 'May' } },
+    ]);
+  });
+
+  it('merges edits piling up offline, keeping the first base version', async () => {
+    const { queue, sent, goOnline } = setupPartial();
+    const edit = (payload: Fields, baseVersion: number): Change<Fields> => ({
+      kind: 'update',
+      scope: 'ws',
+      entityId: 'a',
+      payload,
+      baseVersion,
+    });
+    await queue.submit(edit({ name: 'one', note: 'x' }, 1));
+    await queue.submit(edit({ name: 'two' }, 2));
+    goOnline();
+    await queue.replay();
+    expect(sent).toEqual([edit({ name: 'two', note: 'x' }, 1)]);
+  });
+});

@@ -116,6 +116,33 @@ describe('Categories', () => {
     expect(read.body).toEqual(first.body);
   });
 
+  it('create a Category once when the same id is sent twice, even after its parent was archived', async () => {
+    const a = await emptyWorkspace();
+    const { body: parent } = await create(a.token, a.workspaceId);
+    const id = randomUUID();
+    const child = { ...food, name: 'Bread', parentId: parent.id, id };
+    const first = await create(a.token, a.workspaceId, child);
+    expect(first.status).toBe(201);
+    expect(first.body.id).toBe(id);
+    await update(a.token, a.workspaceId, id, { archived: true });
+    await update(a.token, a.workspaceId, parent.id, { archived: true });
+    const again = await create(a.token, a.workspaceId, child);
+    expect(again.status).toBe(200);
+    expect(again.body).toEqual({ ...first.body, archived: true });
+    expect((await list(a.token, a.workspaceId, '?includeArchived=true')).body).toHaveLength(2);
+  });
+
+  it("refuse an id another Workspace already used, without showing that Workspace's Category", async () => {
+    const a = await emptyWorkspace();
+    const b = await emptyWorkspace();
+    const id = randomUUID();
+    await create(b.token, b.workspaceId, { ...food, id, name: 'secret' });
+    const res = await create(a.token, a.workspaceId, { ...food, id });
+    expect(res.status).toBe(409);
+    expect(JSON.stringify(res.body)).not.toContain('secret');
+    expect((await list(a.token, a.workspaceId)).body).toEqual([]);
+  });
+
   it('let the Owner create a child under a top-level Category of the same kind', async () => {
     const a = await emptyWorkspace();
     const { body: parent } = await create(a.token, a.workspaceId);

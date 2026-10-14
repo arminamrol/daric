@@ -76,6 +76,27 @@ export function categoryTree<T extends CategoryNode>(categories: readonly T[]) {
   }));
 }
 
+/**
+ * The ids of `category`'s siblings (archived ones included, from `all`) after
+ * swapping it with its nearest `visible` sibling in `direction`, or null at
+ * the edge: the order a reorder sends when only some siblings are shown.
+ */
+export function swapWithNeighbour<T extends CategoryNode>(
+  all: readonly T[],
+  visible: readonly T[],
+  category: T,
+  direction: -1 | 1,
+): string[] | null {
+  const isSibling = (c: T) => c.kind === category.kind && c.parentId === category.parentId;
+  const shown = visible.filter(isSibling);
+  const neighbour = shown[shown.findIndex((c) => c.id === category.id) + direction];
+  if (!neighbour) return null;
+  return all
+    .filter(isSibling)
+    .map((c) => c.id)
+    .map((id) => (id === category.id ? neighbour.id : id === neighbour.id ? category.id : id));
+}
+
 interface DefaultCategory {
   readonly kind: CategoryKind;
   readonly name: string;

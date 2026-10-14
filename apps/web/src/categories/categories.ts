@@ -1,5 +1,4 @@
 import type {
-  Category,
   CategoryKind,
   CreateCategoryInput,
   ReorderCategoriesInput,
@@ -71,24 +70,4 @@ export function useReorderCategories() {
     mutationFn: (input: ReorderCategoriesInput) => api.reorderCategories(workspace.id, input),
     onSuccess: refresh,
   });
-}
-
-/**
- * The ids of `category`'s siblings (archived ones included) after swapping it
- * with its nearest `visible` sibling in `direction`, or null at the edge.
- */
-export function swapWithNeighbour(
-  all: readonly Category[],
-  visible: readonly Category[],
-  category: Category,
-  direction: -1 | 1,
-): string[] | null {
-  const isSibling = (c: Category) => c.kind === category.kind && c.parentId === category.parentId;
-  const shown = visible.filter(isSibling);
-  const neighbour = shown[shown.findIndex((c) => c.id === category.id) + direction];
-  if (!neighbour) return null;
-  return all
-    .filter(isSibling)
-    .map((c) => c.id)
-    .map((id) => (id === category.id ? neighbour.id : id === neighbour.id ? category.id : id));
 }

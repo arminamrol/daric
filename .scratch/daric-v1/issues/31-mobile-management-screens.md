@@ -4,7 +4,7 @@
 
 **Blocked by:** 30, 17, 18
 
-**Status:** ready-for-agent
+**Status:** in-progress
 
 - [ ] Screens for each area using shared core logic only
 - [ ] Offline queue covers these writes

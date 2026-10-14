@@ -78,6 +78,7 @@ Expo Router app in `apps/mobile`, Persian and right-to-left, light and dark them
 - Run it on a simulator with `pnpm --filter @daric/mobile ios` (or `android`); this generates the native projects (`ios/`, `android/`, not committed) and starts Metro. The app calls the API on port 3000 of the machine Metro runs on, so simulators, emulators and phones on the same network work as they are; set `EXPO_PUBLIC_API_URL` to use another API.
 - Styles come from `nativeTheme` in `@daric/design-tokens`; use `start`/`end` properties, never `left`/`right`. UI text comes from `@daric/i18n`.
 - Logic that does not need React Native (token store, SQLite store, offline device, fast-entry validation) sits in plain modules with Vitest tests; screens stay thin.
+- Every write (Transactions, Accounts, Categories and their order, Labels, Budgets, Recurring Rules, confirming or skipping Due Occurrences) goes through one offline queue per phone, so it shows at once and reaches the API in the order it was made. Use `useWrite()` with `created`/`edited`/`deleted` from `src/data/writes.ts`; list hooks show waiting changes with `withWaiting…` from `@daric/api-client`. Adding `react-native-svg` (Category icons) means a native rebuild: run `ios`/`android` again after pulling.
 
 ## API
 

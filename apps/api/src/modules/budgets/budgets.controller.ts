@@ -8,6 +8,7 @@ import {
   Patch,
   Post,
   Query,
+  Res,
 } from '@nestjs/common';
 import {
   ApiBadRequestResponse,
@@ -28,6 +29,7 @@ import {
   type UpdateBudgetInput,
   updateBudgetInputSchema,
 } from '@daric/core';
+import type { Response } from 'express';
 import { createZodDto, ZodValidationPipe } from 'nestjs-zod';
 import { CurrentMembership, CurrentUserId, type Membership } from '../../common/request';
 import { MinRole } from '../../common/workspace.guard';
@@ -83,15 +85,19 @@ export class BudgetsController {
   @MinRole('ADMIN')
   @monthQuery
   @ApiCreatedResponse({ type: BudgetDto, description: 'In the Base Currency' })
+  @ApiOkResponse({ type: BudgetDto, description: 'Already created under this id' })
   @ApiBadRequestResponse({ description: invalidInput })
   @ApiConflictResponse({ description: BUDGET_TAKEN })
-  create(
+  async create(
     @CurrentMembership() membership: Membership,
     @CurrentUserId() userId: string,
     @ZodBody(CreateBudgetDto) body: CreateBudgetInput,
     @Query(new ZodValidationPipe(ProgressMonthQueryDto)) query: ProgressMonthQueryDto,
+    @Res({ passthrough: true }) res: Response,
   ) {
-    return this.budgets.create(membership, userId, body, query.month);
+    const { created, value } = await this.budgets.create(membership, userId, body, query.month);
+    if (!created) res.status(HttpStatus.OK);
+    return value;
   }
 
   @Patch(':budgetId')

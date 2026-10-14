@@ -99,13 +99,17 @@ export class RecurringController {
   @Post()
   @MinRole('ADMIN')
   @ApiCreatedResponse({ type: RecurringRuleDto })
+  @ApiOkResponse({ type: RecurringRuleDto, description: 'Already created under this id' })
   @ApiBadRequestResponse({ description: invalidRule })
-  create(
+  async create(
     @CurrentMembership() membership: Membership,
     @CurrentUserId() userId: string,
     @ZodBody(CreateRecurringRuleDto) body: ParsedCreateRecurringRuleInput,
+    @Res({ passthrough: true }) res: Response,
   ) {
-    return this.recurring.create(membership, userId, body);
+    const { created, value } = await this.recurring.create(membership, userId, body);
+    if (!created) res.status(HttpStatus.OK);
+    return value;
   }
 
   @Patch(':ruleId')
