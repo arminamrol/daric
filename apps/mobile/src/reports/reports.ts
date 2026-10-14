@@ -1,4 +1,4 @@
-import { currencyByCode, money, periodParam } from '@daric/core';
+import { periodParam } from '@daric/core';
 import type { Period } from '@daric/core';
 import { keepPreviousData, useQuery } from '@tanstack/react-query';
 import { useApi } from '../api/api';
@@ -16,13 +16,6 @@ export function useReport(period: Period) {
     queryFn: () => api.getReport(workspace.id, { period }),
     placeholderData: keepPreviousData,
   });
-}
-
-/** An Amount in a report's Base Currency, as shown. */
-export function useShownInBase(baseCurrency: string) {
-  const format = useFormatters();
-  const base = currencyByCode(baseCurrency);
-  return (amount: bigint) => format.money(money(amount, base));
 }
 
 /** A whole percent, as shown. */

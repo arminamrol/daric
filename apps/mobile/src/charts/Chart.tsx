@@ -13,7 +13,8 @@ const INSET = 16;
 /**
  * A chart drawn with react-native-svg as wide as its place: the marks `draw`
  * places in the box it is given, over grid lines at its ticks with their
- * values (`tickLabel`) written just above them. It is read out as one image
+ * values (`tickLabel`) written just above them, haloed so they stay legible
+ * over marks, and when the time runs from and to (`span`) under its ends. It is read out as one image
  * described by `summary`; the list of figures beside it carries the numbers.
  * A touch reports where across the chart it fell, for showing that point.
  */
@@ -21,12 +22,15 @@ export function Chart({
   height,
   summary,
   tickLabel,
+  span,
   onTouch,
   draw,
 }: {
   height: number;
   summary: string;
   tickLabel: (value: number) => string;
+  /** The first and last time shown, written under the start and end of the plot. */
+  span: { from: string; to: string };
   onTouch?: ((x: number, box: PlotBox) => void) | undefined;
   draw: (box: PlotBox) => { ticks: readonly Tick[]; marks: ReactNode };
 }) {
@@ -61,17 +65,40 @@ export function Chart({
             />
           ))}
           {plot.marks}
-          {plot.ticks.map((tick) => (
+          {plot.ticks.flatMap((tick) =>
+            // A halo in the background color first, so a label stays legible over marks.
+            (['halo', 'label'] as const).map((layer) => (
+              <SvgText
+                key={`${layer}-${tick.value}`}
+                x={rtl ? width : 0}
+                y={tick.y - 4}
+                textAnchor={rtl ? 'end' : 'start'}
+                fontFamily={FONT.regular}
+                fontSize={11}
+                fill={colors.foregroundMuted}
+                {...(layer === 'halo' && { stroke: colors.surface, strokeWidth: 3 })}
+              >
+                {tickLabel(tick.value)}
+              </SvgText>
+            )),
+          )}
+          {/* The oldest time is at the start: the left, or the right when reading right to left. */}
+          {(
+            [
+              [span.from, rtl ? width : 0, rtl ? 'end' : 'start'],
+              [span.to, rtl ? 0 : width, rtl ? 'start' : 'end'],
+            ] as const
+          ).map(([text, x, anchor]) => (
             <SvgText
-              key={`label-${tick.value}`}
-              x={rtl ? width : 0}
-              y={tick.y - 4}
-              textAnchor={rtl ? 'end' : 'start'}
+              key={`span-${anchor}`}
+              x={x}
+              y={height - 2}
+              textAnchor={anchor}
               fontFamily={FONT.regular}
               fontSize={11}
               fill={colors.foregroundMuted}
             >
-              {tickLabel(tick.value)}
+              {text}
             </SvgText>
           ))}
         </Svg>

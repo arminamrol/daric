@@ -8,7 +8,7 @@ import { useState } from 'react';
 import { StyleSheet, View } from 'react-native';
 import { useSignedIn } from '../../../auth/session';
 import { projectionKey } from '../../../data/keys';
-import { useFormatters } from '../../../display/formatters';
+import { useFormatters, useShownInBase } from '../../../display/formatters';
 import { useI18n } from '../../../i18n/locale';
 import { Assumptions } from '../../../projection/Assumptions';
 import { useCategoryNames } from '../../../projection/names';
@@ -61,24 +61,22 @@ function ModeSwitch({
 
 function TypeTotals({ type, projection }: { type: TransactionType; projection: ProjectionReport }) {
   const { t } = useI18n();
-  const format = useFormatters();
-  const shown = (amount: bigint) =>
-    format.money(money(amount, currencyByCode(projection.baseCurrency)));
+  const shown = useShownInBase(projection.baseCurrency);
   const figures = projection[FIGURES_OF[type]];
   const { mode } = projection;
   return (
     <Card>
       <Heading small>{t(`projection.type.${type}`)}</Heading>
       <Figure large label={t('projection.projected')} value={shown(figures.projected)} />
-      <Figure inline label={t('projection.actual')} value={shown(figures.actual)} />
+      <Figure row label={t('projection.actual')} value={shown(figures.actual)} />
       {mode !== 'MANUAL' && (
         <>
-          <Figure inline label={t('projection.variable')} value={shown(figures.variable)} />
-          <Figure inline label={t('projection.recurring')} value={shown(figures.recurring)} />
+          <Figure row label={t('projection.variable')} value={shown(figures.variable)} />
+          <Figure row label={t('projection.recurring')} value={shown(figures.recurring)} />
         </>
       )}
       {mode !== 'AUTOMATIC' && (
-        <Figure inline label={t('projection.planned')} value={shown(figures.planned)} />
+        <Figure row label={t('projection.planned')} value={shown(figures.planned)} />
       )}
     </Card>
   );
@@ -94,9 +92,7 @@ function CategoryBreakdown({
   nameOf: NameOf;
 }) {
   const { t } = useI18n();
-  const format = useFormatters();
-  const shown = (amount: bigint) =>
-    format.money(money(amount, currencyByCode(projection.baseCurrency)));
+  const shown = useShownInBase(projection.baseCurrency);
   const detail = (line: ProjectionReport['categories'][number]) => {
     const amounts = {
       actual: isolate(shown(line.actual)),

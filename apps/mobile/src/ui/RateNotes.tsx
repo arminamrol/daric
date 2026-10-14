@@ -4,7 +4,6 @@ import { nativeTheme } from '@daric/design-tokens';
 import { isolate } from '@daric/i18n';
 import { TriangleAlert } from 'lucide-react-native';
 import { StyleSheet, View } from 'react-native';
-import { useSignedIn } from '../auth/session';
 import { useFormatters } from '../display/formatters';
 import { useI18n } from '../i18n/locale';
 import { Text } from './Text';
@@ -19,15 +18,17 @@ export function RateNotes({
   ratesUsed,
   missing,
   day,
+  baseCurrency,
 }: {
   ratesUsed: readonly ExchangeRate[];
   missing: readonly string[];
   day: IsoDay;
+  /** The total's own, which may lag the Workspace's. */
+  baseCurrency: string;
 }) {
   const { t } = useI18n();
   const format = useFormatters();
-  const { workspace } = useSignedIn();
-  const base = currencyByCode(workspace.baseCurrency);
+  const base = currencyByCode(baseCurrency);
   if (ratesUsed.length === 0 && missing.length === 0) return null;
 
   return (

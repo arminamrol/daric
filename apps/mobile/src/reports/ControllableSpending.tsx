@@ -1,15 +1,10 @@
-import {
-  controllableSavings,
-  currencyByCode,
-  DEFAULT_SAVINGS_PERCENT,
-  periodParam,
-} from '@daric/core';
+import { controllableSavings, DEFAULT_SAVINGS_PERCENT, periodParam } from '@daric/core';
 import type { Label, Report } from '@daric/core';
 import { nativeTheme } from '@daric/design-tokens';
 import { useRouter } from 'expo-router';
 import { useState } from 'react';
 import { StyleSheet, View } from 'react-native';
-import { useFormatters } from '../display/formatters';
+import { useCurrencyList, useFormatters, useShownInBase } from '../display/formatters';
 import { useI18n } from '../i18n/locale';
 import { Button } from '../ui/Button';
 import { Card, Figure, Heading, Rows } from '../ui/Card';
@@ -17,7 +12,7 @@ import { ListRow } from '../ui/ListRow';
 import { Stepper } from '../ui/Stepper';
 import { Text } from '../ui/Text';
 import { useTheme } from '../ui/theme';
-import { useShare, useShownInBase } from './reports';
+import { useShare } from './reports';
 import { ShareBar } from './ShareBar';
 
 /** The savings move in steps of this many percent. */
@@ -94,6 +89,7 @@ export function ControllableSpending({
   const { colors } = useTheme();
   const format = useFormatters();
   const router = useRouter();
+  const currencyList = useCurrencyList();
   const { controllable } = report;
   const shown = useShownInBase(report.baseCurrency);
   const share = useShare();
@@ -140,7 +136,7 @@ export function ControllableSpending({
                 {controllable.labels.map((line) => (
                   <Figure
                     key={line.labelId}
-                    inline
+                    row
                     label={nameOf(line.labelId)}
                     value={`${shown(line.expense)} · ${share(line.share)}`}
                   />
@@ -159,9 +155,7 @@ export function ControllableSpending({
                 lines={[
                   point.missing.length > 0 &&
                     t('reports.trendMissing', {
-                      currencies: point.missing
-                        .map((code) => format.currency(currencyByCode(code)))
-                        .join(t('totals.separator')),
+                      currencies: currencyList(point.missing),
                     }),
                 ]}
               >

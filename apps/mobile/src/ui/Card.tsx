@@ -40,31 +40,32 @@ export function Heading({ children, small = false }: { children: string; small?:
 
 /**
  * A figure with what it is, read out as one: `label` above `value`, or
- * beside it in a list of `inline` ones.
+ * beside it as one `row` of a list.
  */
 export function Figure({
   label,
   value,
   note,
   large = false,
-  inline = false,
+  row = false,
 }: {
   label: string;
   value: string;
   note?: string | undefined;
   large?: boolean;
-  inline?: boolean;
+  /** One of a list of figures: `label` and `value` on one line. */
+  row?: boolean;
 }) {
   return (
     <View
       accessible
       accessibilityLabel={[label, value, note].filter(Boolean).join('، ')}
-      style={inline ? styles.inline : styles.figure}
+      style={row ? styles.row : styles.figure}
     >
-      <Text size="sm" tone="foregroundMuted" style={inline && styles.grow}>
+      <Text size="sm" tone="foregroundMuted" style={row && styles.grow}>
         {label}
       </Text>
-      <Text bold={large || inline} size={large ? '2xl' : 'base'} style={styles.number}>
+      <Text bold={large || row} size={large ? '2xl' : 'base'} style={styles.number}>
         {value}
       </Text>
       {note && (
@@ -86,7 +87,7 @@ const styles = StyleSheet.create({
   rows: { borderRadius: nativeTheme.radius.lg, borderWidth: StyleSheet.hairlineWidth },
   separator: { height: StyleSheet.hairlineWidth, marginHorizontal: nativeTheme.space(4) },
   figure: { gap: nativeTheme.space(0.5) },
-  inline: {
+  row: {
     flexDirection: 'row',
     flexWrap: 'wrap',
     alignItems: 'baseline',

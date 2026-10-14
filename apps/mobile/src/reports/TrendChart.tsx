@@ -1,4 +1,4 @@
-import { currencyByCode, money } from '@daric/core';
+import { currencyByCode, money, periodParam } from '@daric/core';
 import type { Report } from '@daric/core';
 import { nativeTheme } from '@daric/design-tokens';
 import { isolate } from '@daric/i18n';
@@ -8,7 +8,7 @@ import { Rect } from 'react-native-svg';
 import { Chart } from '../charts/Chart';
 import { barPlot, extremes, nearest } from '../charts/geometry';
 import type { PlotBox } from '../charts/geometry';
-import { useFormatters } from '../display/formatters';
+import { useFormatters, useShownInBase } from '../display/formatters';
 import { useI18n } from '../i18n/locale';
 import { Text } from '../ui/Text';
 import { useTheme } from '../ui/theme';
@@ -32,9 +32,10 @@ export function TrendChart({
   const { t } = useI18n();
   const { colors } = useTheme();
   const format = useFormatters();
-  const [picked, setPicked] = useState<number>();
+  // By month, so another Period never highlights a month it does not hold.
+  const [picked, setPicked] = useState<string>();
   const base = currencyByCode(baseCurrency);
-  const shown = (amount: bigint) => format.money(money(amount, base));
+  const shown = useShownInBase(baseCurrency);
   const income = extremes(trend, (p) => p.income);
   const expense = extremes(trend, (p) => p.expense);
   if (!income || !expense) return null;
@@ -44,17 +45,25 @@ export function TrendChart({
       trend.map((p) => [Number(p.income), Number(p.expense)]),
       box,
     );
-  const index = picked ?? trend.length - 1;
+  const found = trend.findIndex((p) => periodParam(p.month) === picked);
+  const index = found === -1 ? trend.length - 1 : found;
   const current = trend[index] ?? income.last;
-  const summary = t('reports.trendSummary', {
+  const span = {
     from: isolate(format.period(income.first.month)),
     to: isolate(format.period(income.last.month)),
     base: format.currency(base),
-    income: isolate(shown(income.highest.income)),
-    incomeMonth: isolate(format.period(income.highest.month)),
-    expense: isolate(shown(expense.highest.expense)),
-    expenseMonth: isolate(format.period(expense.highest.month)),
-  });
+  };
+  // With nothing recorded there is no highest month to name.
+  const nothing = income.highest.income === 0n && expense.highest.expense === 0n;
+  const summary = nothing
+    ? t('reports.trendChart', span)
+    : t('reports.trendSummary', {
+        ...span,
+        income: isolate(shown(income.highest.income)),
+        incomeMonth: isolate(format.period(income.highest.month)),
+        expense: isolate(shown(expense.highest.expense)),
+        expenseMonth: isolate(format.period(expense.highest.month)),
+      });
 
   return (
     <>
@@ -74,6 +83,9 @@ export function TrendChart({
             </Text>
           </View>
         ))}
+        <Text size="sm">
+          {t('reports.figure', { name: t('reports.net'), amount: shown(current.net) })}
+        </Text>
       </View>
       <Chart
         height={220}
@@ -81,14 +93,17 @@ export function TrendChart({
         tickLabel={(value) =>
           format.money(money(BigInt(Math.round(value)), base), { label: false })
         }
-        onTouch={(x, box) =>
-          setPicked(
-            nearest(
-              plot(box).bands.map((b) => (b.start + b.end) / 2),
-              x,
-            ),
-          )
-        }
+        span={{ from: format.period(income.first.month), to: format.period(income.last.month) }}
+        onTouch={(x, box) => {
+          const point =
+            trend[
+              nearest(
+                plot(box).bands.map((b) => (b.start + b.end) / 2),
+                x,
+              )
+            ];
+          setPicked(point && periodParam(point.month));
+        }}
         draw={(box) => {
           const { bars, bands, ticks } = plot(box);
           const band = bands[index];

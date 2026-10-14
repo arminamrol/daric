@@ -5,7 +5,7 @@ import { useState } from 'react';
 import { Circle, Path } from 'react-native-svg';
 import { Chart } from '../charts/Chart';
 import { extremes, linePlot, nearest } from '../charts/geometry';
-import { useFormatters } from '../display/formatters';
+import { useFormatters, useShownInBase } from '../display/formatters';
 import { useI18n } from '../i18n/locale';
 import { Text } from '../ui/Text';
 import { useTheme } from '../ui/theme';
@@ -25,9 +25,11 @@ export function HistoryChart({
   const { t } = useI18n();
   const { colors } = useTheme();
   const format = useFormatters();
-  const [picked, setPicked] = useState<number>();
+  // By id, so a new list never highlights a snapshot it does not hold.
+  const [picked, setPicked] = useState<string>();
   const base = currencyByCode(baseCurrency);
-  const shown = (amount: bigint) => isolate(format.money(money(amount, base)));
+  const inBase = useShownInBase(baseCurrency);
+  const shown = (amount: bigint) => isolate(inBase(amount));
   const ends = extremes(snapshots, (s) => s.total);
   if (!ends) return null;
 
@@ -37,7 +39,8 @@ export function HistoryChart({
       snapshots.map((s) => Number(s.total)),
       box,
     );
-  const index = picked ?? snapshots.length - 1;
+  const found = snapshots.findIndex((s) => s.id === picked);
+  const index = found === -1 ? snapshots.length - 1 : found;
   const current = snapshots[index] ?? ends.last;
   const summary = t('netWorth.chartSummary', {
     from: isolate(format.day(ends.first.day)),
@@ -59,7 +62,7 @@ export function HistoryChart({
         importantForAccessibility="no"
         accessibilityElementsHidden
       >
-        {`${format.day(current.day)} · ${t(`netWorth.kind.${current.kind}`)}: ${format.money(money(current.total, base))}`}
+        {`${format.day(current.day)} · ${t(`netWorth.kind.${current.kind}`)}: ${inBase(current.total)}`}
       </Text>
       <Chart
         height={200}
@@ -67,12 +70,15 @@ export function HistoryChart({
         tickLabel={(value) =>
           format.money(money(BigInt(Math.round(value)), base), { label: false })
         }
+        span={{ from: format.day(ends.first.day), to: format.day(ends.last.day) }}
         onTouch={(x, box) =>
           setPicked(
-            nearest(
-              plot(box).points.map((p) => p.x),
-              x,
-            ),
+            snapshots[
+              nearest(
+                plot(box).points.map((p) => p.x),
+                x,
+              )
+            ]?.id,
           )
         }
         draw={(box) => {

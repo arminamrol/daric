@@ -3,7 +3,7 @@ import { nativeTheme } from '@daric/design-tokens';
 import { useState } from 'react';
 import { StyleSheet, View } from 'react-native';
 import { useSignedIn } from '../auth/session';
-import { useFormatters } from '../display/formatters';
+import { useCurrencyList, useFormatters } from '../display/formatters';
 import { useI18n } from '../i18n/locale';
 import { Button } from '../ui/Button';
 import { Card, Heading, Rows } from '../ui/Card';
@@ -21,6 +21,7 @@ import { useNetWorthHistory, useTakeSnapshot } from './net-worth';
 export function NetWorthHistory() {
   const { t } = useI18n();
   const format = useFormatters();
+  const currencyList = useCurrencyList();
   const { workspace } = useSignedIn();
   const history = useNetWorthHistory();
   const take = useTakeSnapshot();
@@ -88,9 +89,7 @@ export function NetWorthHistory() {
                       }),
                       s.missing.length > 0 &&
                         t('netWorth.incomplete', {
-                          currencies: s.missing
-                            .map((code) => format.currency(currencyByCode(code)))
-                            .join(t('totals.separator')),
+                          currencies: currencyList(s.missing),
                         }),
                     ]}
                   />

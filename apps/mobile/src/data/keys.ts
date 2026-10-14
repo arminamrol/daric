@@ -9,10 +9,9 @@ export const labelsKey = (workspaceId: string) => ['labels', workspaceId] as con
 export const budgetsKey = (workspaceId: string) => ['budgets', workspaceId] as const;
 /** Recurring Rules and Due Occurrences. */
 export const recurringKey = (workspaceId: string) => ['recurring', workspaceId] as const;
-/**
- * Worked out by the API from everything else, so read afresh whenever their
- * screen opens rather than after each write; changed only online.
- */
+// Net Worth, the Projection and reports are worked out by the API from
+// everything else, so they are read afresh whenever their screen opens rather
+// than after each write; their own changes are sent online only.
 export const netWorthKey = (workspaceId: string) => ['net-worth', workspaceId] as const;
 export const snapshotsKey = (workspaceId: string) => ['net-worth-snapshots', workspaceId] as const;
 export const valuationsKey = (workspaceId: string, accountId: string) =>

@@ -1,11 +1,11 @@
-import { currencyByCode, hasRole, MAX_TRAILING_MONTHS, money } from '@daric/core';
+import { hasRole, MAX_TRAILING_MONTHS } from '@daric/core';
 import type { ProjectionReport } from '@daric/core';
 import { nativeTheme } from '@daric/design-tokens';
 import { isolate } from '@daric/i18n';
 import { useState } from 'react';
 import { StyleSheet, View } from 'react-native';
 import { useSignedIn } from '../auth/session';
-import { useFormatters } from '../display/formatters';
+import { useFormatters, useShownInBase } from '../display/formatters';
 import { useI18n } from '../i18n/locale';
 import { Button } from '../ui/Button';
 import { Card, Figure, Heading } from '../ui/Card';
@@ -63,7 +63,7 @@ function Lines({
           {empty}
         </Text>
       ) : (
-        lines.map((line) => <Figure key={line.key} inline label={line.label} value={line.value} />)
+        lines.map((line) => <Figure key={line.key} row label={line.label} value={line.value} />)
       )}
     </View>
   );
@@ -81,8 +81,7 @@ export function Assumptions({
   const format = useFormatters();
   const { workspace } = useSignedIn();
   const settings = useProjectionSettings();
-  const base = currencyByCode(projection.baseCurrency);
-  const shown = (amount: bigint) => format.money(money(amount, base));
+  const shown = useShownInBase(projection.baseCurrency);
   const { mode, remaining, window, monthsUsed } = projection;
   const averaging = mode !== 'MANUAL';
   const used = window.slice(window.length - monthsUsed);
@@ -123,6 +122,7 @@ export function Assumptions({
         ratesUsed={projection.ratesUsed}
         missing={projection.missing}
         day={projection.today}
+        baseCurrency={projection.baseCurrency}
       />
       {averaging &&
         settings.data &&

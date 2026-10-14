@@ -6,11 +6,11 @@ import { useState } from 'react';
 import { StyleSheet, View } from 'react-native';
 import { useSignedIn } from '../../auth/session';
 import { useCategories } from '../../categories/categories';
-import { useFormatters } from '../../display/formatters';
+import { useCurrencyList, useFormatters, useShownInBase } from '../../display/formatters';
 import { useI18n } from '../../i18n/locale';
 import { useLabels } from '../../labels/labels';
 import { ControllableSpending } from '../../reports/ControllableSpending';
-import { useReport, useShare, useShownInBase } from '../../reports/reports';
+import { useReport, useShare } from '../../reports/reports';
 import { ShareBar } from '../../reports/ShareBar';
 import { TrendChart } from '../../reports/TrendChart';
 import { Button } from '../../ui/Button';
@@ -78,7 +78,12 @@ function Summary({ report }: { report: Report }) {
       {(['income', 'expense', 'net'] as const).map((key) => (
         <Figure key={key} large label={t(`reports.${key}`)} value={shown(report[key])} />
       ))}
-      <RateNotes ratesUsed={report.ratesUsed} missing={report.missing} day={report.rateDay} />
+      <RateNotes
+        ratesUsed={report.ratesUsed}
+        missing={report.missing}
+        day={report.rateDay}
+        baseCurrency={report.baseCurrency}
+      />
     </Card>
   );
 }
@@ -86,6 +91,7 @@ function Summary({ report }: { report: Report }) {
 function Trend({ report }: { report: Report }) {
   const { t } = useI18n();
   const format = useFormatters();
+  const currencyList = useCurrencyList();
   const shown = useShownInBase(report.baseCurrency);
   const [listed, setListed] = useState(false);
   return (
@@ -110,9 +116,7 @@ function Trend({ report }: { report: Report }) {
                   ),
                   point.missing.length > 0 &&
                     t('reports.trendMissing', {
-                      currencies: point.missing
-                        .map((code) => format.currency(currencyByCode(code)))
-                        .join(t('totals.separator')),
+                      currencies: currencyList(point.missing),
                     }),
                 ]}
               />

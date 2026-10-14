@@ -5,7 +5,7 @@ import { isolate } from '@daric/i18n';
 import { useRouter } from 'expo-router';
 import { StyleSheet, View } from 'react-native';
 import { useSignedIn } from '../../../auth/session';
-import { useFormatters } from '../../../display/formatters';
+import { useFormatters, useShownInBase } from '../../../display/formatters';
 import { useI18n } from '../../../i18n/locale';
 import { NetWorthHistory } from '../../../net-worth/NetWorthHistory';
 import { useNetWorth, useNetWorthHistory } from '../../../net-worth/net-worth';
@@ -21,7 +21,7 @@ function Breakdown({ netWorth }: { netWorth: NetWorthReport }) {
   const format = useFormatters();
   const router = useRouter();
   const base = currencyByCode(netWorth.baseCurrency);
-  const inBase = (amount: bigint) => format.money(money(amount, base));
+  const inBase = useShownInBase(netWorth.baseCurrency);
   // An archived Account with nothing in it adds nothing worth showing.
   const shown = netWorth.accounts.filter((a) => !a.archived || a.value !== 0n);
 
@@ -29,9 +29,14 @@ function Breakdown({ netWorth }: { netWorth: NetWorthReport }) {
     <>
       <Card>
         <Figure large label={t('netWorth.total')} value={inBase(netWorth.total)} />
-        <Figure inline label={t('netWorth.assets')} value={inBase(netWorth.assets)} />
-        <Figure inline label={t('netWorth.liabilities')} value={inBase(netWorth.liabilities)} />
-        <RateNotes ratesUsed={netWorth.ratesUsed} missing={netWorth.missing} day={netWorth.day} />
+        <Figure row label={t('netWorth.assets')} value={inBase(netWorth.assets)} />
+        <Figure row label={t('netWorth.liabilities')} value={inBase(netWorth.liabilities)} />
+        <RateNotes
+          ratesUsed={netWorth.ratesUsed}
+          missing={netWorth.missing}
+          day={netWorth.day}
+          baseCurrency={netWorth.baseCurrency}
+        />
       </Card>
       {netWorth.byCurrency.length > 1 && (
         <View style={styles.section}>

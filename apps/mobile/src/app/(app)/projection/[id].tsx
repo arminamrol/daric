@@ -24,7 +24,10 @@ export default function EditPlannedItemScreen() {
       ) : item ? (
         <PlannedItemForm key={item.id} item={item} />
       ) : (
-        <Status alert message={t('plannedItems.notFound')} />
+        <Status
+          alert
+          message={items.data ? t('plannedItems.notFound') : t('plannedItems.loadFailed')}
+        />
       )}
     </>
   );
