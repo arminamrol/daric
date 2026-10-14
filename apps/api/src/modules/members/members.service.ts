@@ -43,6 +43,7 @@ export class MembersService {
     userId: string,
     memberId: string,
     { role }: UpdateMemberInput,
+    client: ClientInfo,
   ): Promise<Member> {
     const tx = scopedTx();
     const target = await this.find(memberId);
@@ -60,6 +61,7 @@ export class MembersService {
       action: 'member.role_change',
       actorUserId: userId,
       workspaceId: membership.workspaceId,
+      client,
       metadata: { memberUserId: target.userId, from: target.role, to: role },
     });
     return one(await this.withEmails([updated]));
@@ -101,13 +103,13 @@ export class MembersService {
   }
 
   private async withEmails(rows: Row[]): Promise<Member[]> {
-    const emails = await emailsOf(
+    const emailOf = await emailsOf(
       this.db,
       rows.map((r) => r.userId),
     );
     return rows.map(({ createdAt, ...row }) => ({
       ...row,
-      email: emails.get(row.userId) ?? '',
+      email: emailOf(row.userId) ?? '',
       joinedAt: createdAt.toISOString(),
     }));
   }

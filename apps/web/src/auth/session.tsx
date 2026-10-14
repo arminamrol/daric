@@ -6,6 +6,7 @@ import { Navigate, Outlet } from 'react-router';
 import { useApi } from '../api/api';
 import { useI18n } from '../i18n/locale';
 import { storedFlag } from '../lib/storedFlag';
+import { pendingInvitation } from '../members/pendingInvitation';
 
 export const ME_QUERY_KEY = ['me'] as const;
 
@@ -113,10 +114,13 @@ export function RequireSession() {
   return <Outlet />;
 }
 
-/** Layout route for login and sign-up; a signed-in User goes home instead. */
+/** Where a User goes once signed in: back to an Invitation opened while signed out, else home. */
+export const afterSignIn = () => (pendingInvitation.get() ? '/invitation' : '/');
+
+/** Layout route for login and sign-up; a signed-in User goes on (`afterSignIn`) instead. */
 export function GuestOnly() {
   const me = useMe();
   if (me.isPending) return <Loading />;
-  if (me.data) return <Navigate to="/" replace />;
+  if (me.data) return <Navigate to={afterSignIn()} replace />;
   return <Outlet />;
 }

@@ -121,7 +121,7 @@ export class InvitationsService {
     const tx = scopedTx();
     if (!(await this.sharingAllowed(tx, workspaceId))) throw sharingNotEntitled();
     const now = new Date();
-    if (input.email) await this.assertInvitable(tx, input.email, now);
+    if (input.email) await this.assertInvitable(tx, workspaceId, input.email, now);
 
     const token = randomBytes(32).toString('base64url');
     const row = one(
@@ -203,13 +203,13 @@ export class InvitationsService {
   }
 
   async preview(token: string): Promise<InvitationPreview> {
-    const found = await this.pending(this.db, token);
+    const found = await this.findPending(this.db, token);
     if (!found) throw invalidInvitation();
-    const emails = await emailsOf(this.db, [found.invitedByUserId]);
+    const emailOf = await emailsOf(this.db, [found.invitedByUserId]);
     return {
       workspaceName: found.workspaceName,
       role: found.role,
-      invitedByEmail: found.invitedByUserId ? (emails.get(found.invitedByUserId) ?? null) : null,
+      invitedByEmail: emailOf(found.invitedByUserId),
       email: found.email,
       expiresAt: found.expiresAt.toISOString(),
     };
@@ -222,7 +222,7 @@ export class InvitationsService {
    */
   async accept(userId: string, token: string, client: ClientInfo): Promise<AcceptedInvitation> {
     return this.db.transaction(async (tx) => {
-      const found = await this.pending(tx, token, { lock: true });
+      const found = await this.findPending(tx, token, { lock: true });
       if (!found) throw invalidInvitation();
       const user = one(
         await tx
@@ -295,12 +295,18 @@ export class InvitationsService {
   }
 
   /** Refuses an email that is already a Member, or already has a pending Invitation. */
-  private async assertInvitable(db: Executor, email: string, now: Date): Promise<void> {
+  private async assertInvitable(
+    db: Executor,
+    workspaceId: string,
+    email: string,
+    now: Date,
+  ): Promise<void> {
     const [pending] = await db
       .select({ id: invitations.id })
       .from(invitations)
       .where(
         and(
+          eq(invitations.workspaceId, workspaceId),
           eq(invitations.email, email),
           isNull(invitations.acceptedAt),
           isNull(invitations.revokedAt),
@@ -316,12 +322,14 @@ export class InvitationsService {
     const [member] = await db
       .select({ id: workspaceMembers.id })
       .from(workspaceMembers)
-      .where(eq(workspaceMembers.userId, user.id));
+      .where(
+        and(eq(workspaceMembers.workspaceId, workspaceId), eq(workspaceMembers.userId, user.id)),
+      );
     if (member) throw new ConflictException('This email is already a Member');
   }
 
   /** The pending Invitation a token belongs to, with its Workspace's name; null otherwise. */
-  private async pending(db: Executor, token: string, { lock = false } = {}) {
+  private async findPending(db: Executor, token: string, { lock = false } = {}) {
     const query = db
       .select({
         ...columns,
@@ -338,7 +346,7 @@ export class InvitationsService {
 
   private async view(rows: Row[]): Promise<Invitation[]> {
     const now = new Date();
-    const emails = await emailsOf(
+    const emailOf = await emailsOf(
       this.db,
       rows.map((r) => r.invitedByUserId),
     );
@@ -347,7 +355,7 @@ export class InvitationsService {
       email: row.email,
       role: row.role,
       status: statusOf(row, now),
-      invitedByEmail: row.invitedByUserId ? (emails.get(row.invitedByUserId) ?? null) : null,
+      invitedByEmail: emailOf(row.invitedByUserId),
       createdAt: row.createdAt.toISOString(),
       expiresAt: row.expiresAt.toISOString(),
     }));

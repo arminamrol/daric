@@ -57,15 +57,20 @@ export class ConsentsService {
         .where(and(eq(userConsents.id, consentId), eq(userConsents.userId, userId)))
         .for('update');
       if (!consent) throw new NotFoundException();
-      if (consent.revokedAt || !consent.workspaceId) return;
+      if (consent.revokedAt) return;
       const { workspaceId } = consent;
-      const [member] = await tx
-        .select({ role: workspaceMembers.role })
-        .from(workspaceMembers)
-        .where(
-          and(eq(workspaceMembers.workspaceId, workspaceId), eq(workspaceMembers.userId, userId)),
-        );
-      if (member && member.role !== 'OWNER') {
+      const [member] = workspaceId
+        ? await tx
+            .select({ role: workspaceMembers.role })
+            .from(workspaceMembers)
+            .where(
+              and(
+                eq(workspaceMembers.workspaceId, workspaceId),
+                eq(workspaceMembers.userId, userId),
+              ),
+            )
+        : [];
+      if (workspaceId && member && member.role !== 'OWNER') {
         await endSharing(tx, this.audit, {
           workspaceId,
           member: { userId, role: member.role },
@@ -74,10 +79,18 @@ export class ConsentsService {
           client,
         });
       } else {
+        // Its Workspace is gone, or the User is no longer a Member of it.
         await tx
           .update(userConsents)
           .set({ revokedAt: new Date() })
           .where(eq(userConsents.id, consent.id));
+        await this.audit.record(tx, {
+          action: 'consent.revoke',
+          actorUserId: userId,
+          workspaceId,
+          client,
+          metadata: { consentId: consent.id, purpose: consent.purpose },
+        });
       }
     });
   }

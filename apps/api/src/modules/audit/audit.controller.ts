@@ -7,7 +7,7 @@ import {
   ApiTags,
 } from '@nestjs/swagger';
 import { auditPageSchema, auditQuerySchema, type AuditPage } from '@daric/core';
-import { and, desc, eq, lt, or, sql } from 'drizzle-orm';
+import { and, desc, eq, lt, or } from 'drizzle-orm';
 import { createZodDto, ZodValidationPipe } from 'nestjs-zod';
 import { DATABASE } from '../../common/di-tokens';
 import { MinRole } from '../../common/workspace.guard';
@@ -49,7 +49,7 @@ export class AuditController {
       if (!cursor) return { entries: [], next: null };
       older = or(
         lt(auditLogs.createdAt, cursor.createdAt),
-        and(eq(auditLogs.createdAt, cursor.createdAt), sql`${auditLogs.id} < ${before}`),
+        and(eq(auditLogs.createdAt, cursor.createdAt), lt(auditLogs.id, before)),
       );
     }
     const rows = await tx
@@ -65,14 +65,14 @@ export class AuditController {
       .orderBy(desc(auditLogs.createdAt), desc(auditLogs.id))
       .limit(limit + 1);
     const page = rows.slice(0, limit);
-    const emails = await emailsOf(
+    const emailOf = await emailsOf(
       this.db,
       page.map((r) => r.actorUserId),
     );
     return {
       entries: page.map(({ actorUserId, createdAt, metadata, ...row }) => ({
         ...row,
-        actorEmail: actorUserId ? (emails.get(actorUserId) ?? null) : null,
+        actorEmail: emailOf(actorUserId),
         metadata: metadata as AuditPage['entries'][number]['metadata'],
         createdAt: createdAt.toISOString(),
       })),

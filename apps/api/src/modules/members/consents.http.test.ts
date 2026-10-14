@@ -1,6 +1,6 @@
 import { and, eq } from 'drizzle-orm';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
-import { auditLogs } from '../../db/schema';
+import { auditLogs, workspaces } from '../../db/schema';
 import { call, registerUser, startTestApp, type TestApp } from '../../test/app';
 import { testDatabase } from '../../test/db';
 import { joined } from '../../test/sharing';
@@ -91,6 +91,16 @@ describe('Consents', () => {
     expect(list).toHaveLength(2);
     expect(list[0].revokedAt).toBeNull();
     expect(list[1]).toMatchObject({ id: first.id, revokedAt: expect.any(String) });
+  });
+
+  it('can still be revoked once its Workspace is gone', async () => {
+    const owner = await registerUser(t.url);
+    const member = await joined(t, owner, 'MEMBER');
+    const [consent] = (await consents(member)).body;
+    await db.delete(workspaces).where(eq(workspaces.id, owner.workspaceId));
+    expect((await consents(member)).body[0].workspace).toBeNull();
+    expect((await revoke(member, consent.id)).status).toBe(204);
+    expect((await consents(member)).body[0].revokedAt).toEqual(expect.any(String));
   });
 
   it("answer 404 for another User's Consent", async () => {

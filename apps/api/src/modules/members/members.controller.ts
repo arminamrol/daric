@@ -46,8 +46,9 @@ export class MembersController {
     @CurrentUserId() userId: string,
     @Param('memberId') memberId: string,
     @ZodBody(UpdateMemberDto) body: UpdateMemberInput,
+    @Client() client: ClientInfo,
   ) {
-    return this.members.changeRole(membership, userId, memberId, body);
+    return this.members.changeRole(membership, userId, memberId, body, client);
   }
 
   /** Removes a Member, or, on one's own membership, leaves the Workspace. */
