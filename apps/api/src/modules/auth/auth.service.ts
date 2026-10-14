@@ -7,6 +7,7 @@ import { DATABASE } from '../../common/di-tokens';
 import { type Database, one } from '../../db/client';
 import { authIdentities, users, workspaceMembers, workspaces } from '../../db/schema';
 import { AuditService } from '../audit/audit.service';
+import { EntitlementsService } from '../billing/entitlements.service';
 import { EmailLinksService } from './email-links.service';
 import { seedDefaultCategories } from '../categories/defaults';
 import { hashPassword, verifyAgainstDummy, verifyPassword } from './passwords';
@@ -34,6 +35,7 @@ export class AuthService {
     @Inject(TokenService) private readonly tokens: TokenService,
     @Inject(AuditService) private readonly audit: AuditService,
     @Inject(EmailLinksService) private readonly emailLinks: EmailLinksService,
+    @Inject(EntitlementsService) private readonly entitlements: EntitlementsService,
   ) {}
 
   /** Rotates a refresh token (see TokenService.rotate); a replayed token is audited and refused. */
@@ -71,8 +73,8 @@ export class AuthService {
 
   /**
    * Creates the User, their Personal Workspace with its default Categories (in
-   * the User's language) and Owner membership in one transaction, then mails
-   * them a verification link.
+   * the User's language), Owner membership and Trial in one transaction, then
+   * mails them a verification link.
    */
   async register(input: RegisterInput, client: ClientInfo): Promise<SignedIn> {
     const secretHash = await hashPassword(input.password);
@@ -102,6 +104,7 @@ export class AuthService {
           .insert(workspaceMembers)
           .values({ workspaceId: workspace.id, userId: user.id, role: 'OWNER' });
         await seedDefaultCategories(tx, workspace.id, user.locale);
+        await this.entitlements.startTrial(tx, user.id);
         await this.audit.record(tx, {
           action: 'auth.register',
           actorUserId: user.id,

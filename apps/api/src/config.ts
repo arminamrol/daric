@@ -1,3 +1,4 @@
+import { IRR, type Money, type Plan } from '@daric/core';
 import { z } from 'zod';
 
 const positiveInt = z.coerce.number().int().positive();
@@ -45,10 +46,57 @@ const envSchema = z.object({
     .url()
     .default('http://localhost:5173')
     .transform((u) => u.replace(/\/+$/, '')),
+  /** Whether Plans limit anything; off (every Entitlement unlimited) on a self-hosted server. */
+  BILLING_ENABLED: flag.default(false),
+  /** Days of Plus every new User gets at sign-up. */
+  TRIAL_DAYS: positiveInt.default(14),
+  /** Signed-in Devices a User may have on each Plan. */
+  FREE_DEVICE_LIMIT: positiveInt.default(1),
+  PLUS_DEVICE_LIMIT: positiveInt.default(3),
+  /** AI analyses a User may run per month on each Plan. */
+  FREE_AI_ANALYSES_PER_MONTH: z.coerce.number().int().min(0).default(1),
+  PLUS_AI_ANALYSES_PER_MONTH: z.coerce.number().int().min(0).default(30),
+  /** Price of one month of Plus, an Amount in IRR (rials). */
+  PLUS_MONTHLY_PRICE_IRR: positiveInt.default(2_000_000),
   LOG_LEVEL: z.enum(['fatal', 'error', 'warn', 'info', 'debug', 'trace', 'silent']).default('info'),
 });
 
 export type Config = z.output<typeof envSchema>;
+
+/** One Plan's limits; `null` is unlimited. */
+export interface PlanLimits {
+  signedInDevices: number | null;
+  shareWorkspace: boolean;
+  aiAnalysesPerMonth: number | null;
+}
+
+/** Plans, their limits and prices, as the Entitlement service reads them. */
+export interface BillingConfig {
+  enabled: boolean;
+  trialDays: number;
+  limits: Record<Plan, PlanLimits>;
+  plusMonthlyPrice: Money;
+}
+
+export function billingConfig(config: Config): BillingConfig {
+  return {
+    enabled: config.BILLING_ENABLED,
+    trialDays: config.TRIAL_DAYS,
+    limits: {
+      FREE: {
+        signedInDevices: config.FREE_DEVICE_LIMIT,
+        shareWorkspace: false,
+        aiAnalysesPerMonth: config.FREE_AI_ANALYSES_PER_MONTH,
+      },
+      PLUS: {
+        signedInDevices: config.PLUS_DEVICE_LIMIT,
+        shareWorkspace: true,
+        aiAnalysesPerMonth: config.PLUS_AI_ANALYSES_PER_MONTH,
+      },
+    },
+    plusMonthlyPrice: { amount: BigInt(config.PLUS_MONTHLY_PRICE_IRR), currency: IRR },
+  };
+}
 
 export function loadConfig(env: Record<string, string | undefined> = process.env): Config {
   const result = envSchema.safeParse(env);

@@ -12,6 +12,7 @@ import type { Config } from './config';
 import { DatabaseModule } from './db/database.module';
 import { AccountsModule } from './modules/accounts/accounts.module';
 import { AuditModule } from './modules/audit/audit.module';
+import { BillingModule } from './modules/billing/billing.module';
 import { AuthController } from './modules/auth/auth.controller';
 import { AuthModule } from './modules/auth/auth.module';
 import { BudgetsModule } from './modules/budgets/budgets.module';
@@ -79,6 +80,7 @@ export class AppModule {
           ],
         }),
         AuditModule,
+        BillingModule,
         MailerModule,
         AuthModule,
         WorkspacesModule,

@@ -12,6 +12,7 @@ export * from './projection';
 export * from './planned-item';
 export * from './report';
 export * from './export';
+export * from './subscription';
 export {
   currencyCodes,
   monthParamSchema,

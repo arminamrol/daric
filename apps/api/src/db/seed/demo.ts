@@ -14,6 +14,7 @@ import {
 import { and, eq, inArray, sql } from 'drizzle-orm';
 import { v7 as uuidv7 } from 'uuid';
 import { hashPassword } from '../../modules/auth/passwords';
+import { trialFor } from '../../modules/billing/entitlements';
 import { seedDefaultCategories } from '../../modules/categories/defaults';
 import { type Database, type Transaction, one } from '../client';
 import {
@@ -27,6 +28,7 @@ import {
   plannedItems,
   recurringOccurrences,
   recurringRules,
+  subscriptions,
   transactionLabels,
   transactions,
   users,
@@ -36,6 +38,8 @@ import {
 
 export const DEMO_EMAIL = 'demo@example.com';
 export const DEMO_PASSWORD = 'daric-demo';
+/** The demo User starts a fresh Trial on every seed, as a new User would. */
+const DEMO_TRIAL_DAYS = 14;
 
 /** Full Jalali months before the current one that get activity. */
 const MONTHS_BACK = 6;
@@ -579,6 +583,9 @@ export async function seedDemo(
     const workspaceId = workspace.id;
     await tx.insert(workspaceMembers).values({ workspaceId, userId: user.id, role: 'OWNER' });
     await seedDefaultCategories(tx, workspaceId);
+    await tx
+      .insert(subscriptions)
+      .values({ userId: user.id, ...trialFor(new Date(), DEMO_TRIAL_DAYS) });
 
     const accountIds = idsFor(demoAccounts);
     await tx.insert(accounts).values(

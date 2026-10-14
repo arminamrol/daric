@@ -230,6 +230,26 @@ describe('api-client', () => {
     expect(sent[0]?.headers.get('x-csrf-token')).toBe('csrf-1');
   });
 
+  it("reads the User's Subscription", async () => {
+    const subscription = {
+      billingEnabled: true,
+      plan: 'PLUS',
+      onTrial: true,
+      trialEndsAt: '2026-10-28T08:00:00.000Z',
+      expiresAt: '2026-10-28T08:00:00.000Z',
+      entitlements: {
+        signedInDevices: 3,
+        shareWorkspace: true,
+        aiAnalysesPerMonth: 30,
+        aiAnalysesLeftThisMonth: 30,
+      },
+    };
+    const { client } = fakeServer({
+      'GET /v1/me/subscription': () => ({ status: 200, body: subscription }),
+    });
+    expect(await client.getSubscription()).toEqual(subscription);
+  });
+
   describe('Accounts', () => {
     const account = {
       id: '01900000-0000-7000-8000-0000000000a1',
