@@ -1,4 +1,4 @@
-import { locales } from '@daric/core';
+import { parseLocale } from '@daric/core';
 import type { Locale } from '@daric/core';
 import { createTranslator, direction } from '@daric/i18n';
 import type { Direction, Translate } from '@daric/i18n';
@@ -15,14 +15,15 @@ interface I18n {
   readonly dir: Direction;
   readonly t: Translate;
   readonly setLocale: (locale: Locale) => void;
+  /** Whether the User's last choice failed to save; the language stays as it was. */
+  readonly saveFailed: boolean;
 }
 
 const I18nContext = createContext<I18n | null>(null);
 
 function readLocale(): Locale {
   try {
-    const stored = localStorage.getItem(LOCALE_STORAGE_KEY);
-    return locales.find((locale) => locale === stored) ?? 'fa';
+    return parseLocale(localStorage.getItem(LOCALE_STORAGE_KEY));
   } catch {
     return 'fa';
   }
@@ -46,24 +47,30 @@ function saveLocale(locale: Locale): void {
  */
 export function LocaleProvider({ children }: { children: ReactNode }) {
   const me = useMe().data;
-  const { mutate: updatePreferences } = useUpdatePreferences();
-  const [local, setLocal] = useState(readLocale);
+  const { mutate: updatePreferences, isError: saveFailed } = useUpdatePreferences();
+  const [deviceLocale, setDeviceLocale] = useState(readLocale);
   const signedIn = Boolean(me);
-  const locale = me ? me.preferences.locale : local;
+  const locale = me ? me.preferences.locale : deviceLocale;
   // Keep the User's language as this device's own, so it stays after they sign out.
-  if (me && local !== locale) setLocal(locale);
+  if (me && deviceLocale !== locale) setDeviceLocale(locale);
 
   const setLocale = useCallback(
     (next: Locale) => {
-      setLocal(next);
+      setDeviceLocale(next);
       if (signedIn) updatePreferences({ locale: next });
     },
     [signedIn, updatePreferences],
   );
 
   const value = useMemo(
-    () => ({ locale, dir: direction(locale), t: createTranslator(locale), setLocale }),
-    [locale, setLocale],
+    () => ({
+      locale,
+      dir: direction(locale),
+      t: createTranslator(locale),
+      setLocale,
+      saveFailed,
+    }),
+    [locale, setLocale, saveFailed],
   );
 
   useEffect(() => {

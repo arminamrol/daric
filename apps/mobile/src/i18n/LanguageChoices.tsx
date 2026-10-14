@@ -1,4 +1,4 @@
-import { locales } from '@daric/core';
+import { locales, parseLocale } from '@daric/core';
 import { useState } from 'react';
 import { Choices } from '../ui/Choices';
 import { useI18n } from './locale';
@@ -16,8 +16,8 @@ export function LanguageChoices() {
       choices={locales.map((id) => ({ id, label: t(`language.${id}`) }))}
       selected={locale}
       onSelect={(id) => {
-        const next = locales.find((l) => l === id);
-        if (!next || next === locale) return;
+        const next = parseLocale(id);
+        if (next === locale) return;
         setFailed(false);
         setLocale(next).catch(() => setFailed(true));
       }}

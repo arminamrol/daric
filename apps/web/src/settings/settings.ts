@@ -37,13 +37,29 @@ export function useUpdatePreferences() {
     mutationFn: (input: UpdateUserPreferencesInput) => api.updatePreferences(input),
     onMutate: async (input) => {
       await queryClient.cancelQueries({ queryKey: ME_QUERY_KEY });
+      const before = queryClient.getQueryData<Me | null>(ME_QUERY_KEY)?.preferences;
       queryClient.setQueryData<Me | null>(
         ME_QUERY_KEY,
         (me) => me && { ...me, preferences: { ...me.preferences, ...input } },
       );
+      return { before };
     },
-    // Another change may be showing optimistically too; ask the server what was saved.
-    onError: () => queryClient.invalidateQueries({ queryKey: ME_QUERY_KEY }),
+    onError: (_, input, context) => {
+      // Undo this change where it still shows, so it is gone even if the server cannot be
+      // asked; another change may be showing optimistically too, so ask what was saved.
+      const before = context?.before;
+      if (before) {
+        queryClient.setQueryData<Me | null>(ME_QUERY_KEY, (me) => {
+          if (!me) return me;
+          const preferences = { ...me.preferences };
+          for (const key of Object.keys(input) as (keyof UpdateUserPreferencesInput)[]) {
+            if (preferences[key] === input[key]) Object.assign(preferences, { [key]: before[key] });
+          }
+          return { ...me, preferences };
+        });
+      }
+      return queryClient.invalidateQueries({ queryKey: ME_QUERY_KEY });
+    },
     onSuccess: (preferences) => {
       // A later change still in flight already shows its own value; let it land first.
       if (queryClient.isMutating({ mutationKey: PREFERENCES_MUTATION_KEY }) > 1) return;

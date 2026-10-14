@@ -37,6 +37,22 @@ describe('language', () => {
     expect((await option('English')).checked).toBe(true);
   });
 
+  it('says so, and stays in Persian, when the choice cannot be saved', async () => {
+    const fake = fakeApi({ signedInAs: 'sara@example.com' });
+    renderApp({ path: '/settings', api: fake.api });
+    await screen.findByRole('heading', { name: 'تنظیمات' });
+    // The browser thinks it is online, but the request fails.
+    fake.setOffline(true);
+    await userEvent.click(await option('English'));
+
+    expect(await screen.findByRole('alert')).toHaveProperty(
+      'textContent',
+      'ذخیره نشد. دوباره امتحان کنید.',
+    );
+    expect(root().lang).toBe('fa');
+    expect((await option('فارسی')).checked).toBe(true);
+  });
+
   it("lets the User's saved language win over this device's", async () => {
     localStorage.setItem(LOCALE_STORAGE_KEY, 'fa');
     const { api } = fakeApi({ signedInAs: 'sara@example.com', locale: 'en' });
