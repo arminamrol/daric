@@ -53,6 +53,7 @@ import type {
   RecurringRule,
   Me,
   Session,
+  Subscription,
   Transaction,
   UserPreferences,
   Workspace,
@@ -118,6 +119,21 @@ export function fakeApi({
   let nextValuationId = 1;
   /** In the order taken; listed oldest first by day. */
   const snapshots: NetWorthSnapshot[] = [];
+  // Every User has this one Subscription: on the Trial, with billing enabled.
+  const trialEnd = new Date(Date.now() + 14 * 24 * 60 * 60 * 1000).toISOString();
+  let subscription: Subscription = {
+    billingEnabled: true,
+    plan: 'PLUS',
+    onTrial: true,
+    trialEndsAt: trialEnd,
+    expiresAt: trialEnd,
+    entitlements: {
+      signedInDevices: 3,
+      shareWorkspace: true,
+      aiAnalysesPerMonth: 30,
+      aiAnalysesLeftThisMonth: 30,
+    },
+  };
   /** Formats of the exports asked for, oldest first. */
   const exports: ExportFormat[] = [];
   /** Occurrences confirmed (with their Transaction) or skipped, by `ruleId|dueOn`. */
@@ -1305,6 +1321,10 @@ export function fakeApi({
       user.preferences = { ...user.preferences, ...input };
       return { ...user.preferences };
     },
+    async getSubscription() {
+      signedIn();
+      return structuredClone(subscription);
+    },
   };
 
   // Every call fails while offline, as fetch does, before reaching the fake server.
@@ -1363,6 +1383,8 @@ export function fakeApi({
     emailVerified: (email: string) => users.get(email)?.emailVerified,
     workspace: () => workspace,
     preferences: () => signedIn().preferences,
+    /** Sets what the server answers about the User's Plan. */
+    setSubscription: (value: Subscription) => void (subscription = value),
   };
 }
 export type FakeApi = ReturnType<typeof fakeApi>;

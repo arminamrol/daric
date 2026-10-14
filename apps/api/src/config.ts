@@ -45,6 +45,18 @@ const envSchema = z.object({
     .url()
     .default('http://localhost:5173')
     .transform((u) => u.replace(/\/+$/, '')),
+  /** Whether Plans limit anything; off (every Entitlement unlimited) on a self-hosted server. */
+  BILLING_ENABLED: flag.default(false),
+  /** Days of Plus every new User gets at sign-up. */
+  TRIAL_DAYS: positiveInt.default(14),
+  /** Signed-in Devices a User may have on each Plan. */
+  FREE_DEVICE_LIMIT: positiveInt.default(1),
+  PLUS_DEVICE_LIMIT: positiveInt.default(3),
+  /** AI analyses a User may run per month on each Plan. */
+  FREE_AI_ANALYSES_PER_MONTH: z.coerce.number().int().min(0).default(1),
+  PLUS_AI_ANALYSES_PER_MONTH: z.coerce.number().int().min(0).default(30),
+  /** Price of one month of Plus, an Amount in IRR (rials). */
+  PLUS_MONTHLY_PRICE_IRR: positiveInt.default(2_000_000),
   LOG_LEVEL: z.enum(['fatal', 'error', 'warn', 'info', 'debug', 'trace', 'silent']).default('info'),
 });
 

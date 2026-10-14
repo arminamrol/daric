@@ -44,6 +44,8 @@ import {
   periodParam,
   type Session,
   sessionSchema,
+  type Subscription,
+  subscriptionSchema,
   type Transaction,
   transactionListSchema,
   transactionSchema,
@@ -157,6 +159,8 @@ export interface ApiClient {
   /** Owner or Admin only. */
   updateWorkspace(workspaceId: string, input: UpdateWorkspaceInput): Promise<Workspace>;
   updatePreferences(input: UpdateUserPreferencesInput): Promise<UserPreferences>;
+  /** The User's Plan, its expiry and their Entitlements, as the server decides them. */
+  getSubscription(): Promise<Subscription>;
   /** Archived Accounts are left out unless `includeArchived`. */
   listAccounts(workspaceId: string, options?: { includeArchived?: boolean }): Promise<Account[]>;
   /** Owner or Admin only. */
@@ -497,6 +501,7 @@ export function createApiClient(options: ApiClientOptions = {}): ApiClient {
       request('PATCH', `/v1/workspaces/${encodeURIComponent(workspaceId)}`, workspaceSchema, input),
     updatePreferences: (input) =>
       request('PATCH', '/v1/me/preferences', userPreferencesSchema, input),
+    getSubscription: () => request('GET', '/v1/me/subscription', subscriptionSchema),
     listAccounts: (workspaceId, { includeArchived = false } = {}) =>
       request(
         'GET',

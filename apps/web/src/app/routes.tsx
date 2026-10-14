@@ -23,6 +23,7 @@ import { ReportsPage } from '../pages/ReportsPage';
 import { ResetPasswordPage } from '../pages/ResetPasswordPage';
 import { SettingsPage } from '../pages/SettingsPage';
 import { SignupPage } from '../pages/SignupPage';
+import { SubscriptionPage } from '../pages/SubscriptionPage';
 import { TransactionEditPage } from '../pages/TransactionEditPage';
 import { TransactionsPage } from '../pages/TransactionsPage';
 import { ValuationsPage } from '../pages/ValuationsPage';
@@ -64,6 +65,7 @@ export const routes: RouteObject[] = [
           { path: 'rates/new', element: <RateFormPage /> },
           { path: 'rates/:rateId', element: <RateFormPage /> },
           { path: 'settings', element: <SettingsPage /> },
+          { path: 'settings/subscription', element: <SubscriptionPage /> },
         ],
       },
       {
