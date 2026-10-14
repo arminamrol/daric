@@ -1,10 +1,10 @@
 import { eq } from 'drizzle-orm';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
+import { DAY } from '../../common/time';
 import { subscriptions } from '../../db/schema';
 import { call, registerUser, startTestApp, testPassword, type TestApp } from '../../test/app';
 import { testDatabase, uniqueEmail } from '../../test/db';
 
-const DAY = 24 * 60 * 60 * 1000;
 const { db, pool } = testDatabase();
 afterAll(() => pool.end());
 

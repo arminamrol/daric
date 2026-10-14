@@ -5,7 +5,7 @@ import { useI18n } from '../i18n/locale';
 import { useFormatters } from '../settings/settings';
 import { useSubscription } from '../settings/subscription';
 
-/** The Plan and how long it lasts; nothing to show when billing is disabled. */
+/** The Plan and how long it lasts; shown only when billing is enabled. */
 function PlanCard({ subscription }: { subscription: Subscription }) {
   const { t } = useI18n();
   const format = useFormatters();
@@ -35,7 +35,7 @@ function PlanCard({ subscription }: { subscription: Subscription }) {
   );
 }
 
-function Entitlements({ subscription }: { subscription: Subscription }) {
+function EntitlementList({ subscription }: { subscription: Subscription }) {
   const { t } = useI18n();
   const format = useFormatters();
   const titleId = useId();
@@ -99,7 +99,7 @@ export function SubscriptionPage() {
               {t('subscription.billingDisabled')}
             </p>
           )}
-          <Entitlements subscription={subscription.data} />
+          <EntitlementList subscription={subscription.data} />
         </>
       )}
     </div>

@@ -1,7 +1,6 @@
 import type { Entitlements, Plan, Subscription } from '@daric/core';
-import type { BillingConfig } from '../../config';
-
-const DAY = 24 * 60 * 60 * 1000;
+import { DAY } from '../../common/time';
+import type { BillingConfig } from './billing-config';
 
 /** A `subscriptions` row as the Entitlement service needs it. */
 export interface StoredSubscription {
@@ -26,7 +25,8 @@ const UNLIMITED: Entitlements = {
 /**
  * The one place that decides what a User may do (ADR-0008): the Plan in effect
  * at `now` and its limits from config, or everything unlimited when billing is
- * disabled. A User without a Subscription is on Free.
+ * disabled. A User without a Subscription is on Free. Plus ends at the expiry
+ * itself for now; the 7-day Grace Period (ADR-0008) arrives with ticket 43.
  */
 export function subscriptionView(
   subscription: StoredSubscription | undefined,

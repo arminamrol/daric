@@ -70,6 +70,9 @@ describe('runInWorkspace', () => {
     await expect(
       runInWorkspace(db, a, (tx) => tx.execute(sql`SELECT * FROM users`)),
     ).rejects.toMatchObject(pgError(/permission denied/));
+    await expect(
+      runInWorkspace(db, a, (tx) => tx.execute(sql`SELECT * FROM subscriptions`)),
+    ).rejects.toMatchObject(pgError(/permission denied/));
   });
 
   it('keeps audit logs append-only', async () => {

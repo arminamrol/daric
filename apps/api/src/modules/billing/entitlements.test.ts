@@ -1,10 +1,11 @@
 import { describe, expect, it } from 'vitest';
-import { billingConfig, loadConfig } from '../../config';
+import { DAY } from '../../common/time';
+import { loadConfig } from '../../config';
+import { billingConfig } from './billing-config';
 import { subscriptionView, trialFor } from './entitlements';
 
 const now = new Date('2026-10-14T08:00:00Z');
-const day = 24 * 60 * 60 * 1000;
-const daysFromNow = (n: number) => new Date(now.getTime() + n * day);
+const daysFromNow = (n: number) => new Date(now.getTime() + n * DAY);
 
 const env = { DATABASE_URL: 'postgres://localhost/daric', JWT_SECRET: 'x'.repeat(32) };
 const billing = billingConfig(
