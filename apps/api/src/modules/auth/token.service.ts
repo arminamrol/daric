@@ -1,7 +1,7 @@
 import { createHash, randomBytes } from 'node:crypto';
 import { Inject, Injectable } from '@nestjs/common';
 import { type SignedOutReason, signedOutReasons } from '@daric/core';
-import { and, eq, inArray, isNull } from 'drizzle-orm';
+import { and, eq, inArray, isNull, type SQL } from 'drizzle-orm';
 import { errors, jwtVerify, SignJWT } from 'jose';
 import { v7 as uuidv7 } from 'uuid';
 import type { Config } from '../../config';
@@ -35,6 +35,12 @@ export type DeviceEndReason = NonNullable<(typeof signedInDevices.$inferSelect)[
 const isExplained = (reason: DeviceEndReason | null | undefined): reason is SignedOutReason =>
   (signedOutReasons as readonly string[]).includes(reason ?? '');
 
+/** What a login tells of the Signed-in Device it starts. */
+export interface NewDevice {
+  /** Browser and OS, or phone model; null when the client did not say. */
+  name: string | null;
+}
+
 /** Who an access token was issued to. */
 export interface AccessTokenSubject {
   userId: string;
@@ -60,7 +66,7 @@ export class TokenService {
   async issue(
     db: Executor,
     userId: string,
-    device: { name: string | null },
+    device: NewDevice,
     now = new Date(),
   ): Promise<IssuedTokens> {
     const familyId = uuidv7();
@@ -74,19 +80,19 @@ export class TokenService {
    * Trades a refresh token for new tokens in the same family. Each refresh
    * token works once; presenting a used one revokes the whole family, since
    * either the holder or a thief now has a token that should not exist.
-   * Takes a transaction because the token row is locked until it commits,
-   * so two concurrent refreshes with one token cannot both succeed.
+   * Takes a transaction because the device and token rows are locked until
+   * it commits, so two concurrent refreshes with one token cannot both
+   * succeed, and a device ended meanwhile (another login past the limit)
+   * gets no new token.
    */
   async rotate(tx: Transaction, refreshToken: string, now = new Date()): Promise<Rotation> {
-    const row = await this.lockByToken(tx, refreshToken);
-    if (!row) return { outcome: 'invalid' };
-    if (row.revokedAt) {
-      const [device] = await tx
-        .select({ endReason: signedInDevices.endReason })
-        .from(signedInDevices)
-        .where(eq(signedInDevices.id, row.familyId));
-      const reason = device?.endReason;
-      return isExplained(reason) ? { outcome: 'invalid', reason } : { outcome: 'invalid' };
+    const locked = await this.lockByToken(tx, refreshToken);
+    if (!locked) return { outcome: 'invalid' };
+    const { row, device } = locked;
+    if (row.revokedAt || device.endedAt) {
+      return isExplained(device.endReason)
+        ? { outcome: 'invalid', reason: device.endReason }
+        : { outcome: 'invalid' };
     }
     // Reuse is checked before expiry: a replayed token's descendants may still be alive.
     if (row.usedAt) {
@@ -105,34 +111,50 @@ export class TokenService {
 
   /**
    * Revokes the family `refreshToken` belongs to; returns its User, or null for
-   * an unknown token. The row lock makes a concurrent rotation of the same token
+   * an unknown token. The device lock makes a concurrent rotation in the family
    * finish first, so the token it issues is revoked too.
    */
   async revoke(tx: Transaction, refreshToken: string, now = new Date()): Promise<string | null> {
-    const row = await this.lockByToken(tx, refreshToken);
-    if (!row) return null;
-    await this.endDevices(tx, [row.familyId], 'LOGOUT', now);
-    return row.userId;
+    const locked = await this.lockByToken(tx, refreshToken);
+    if (!locked) return null;
+    await this.endDevices(tx, [locked.row.familyId], 'LOGOUT', now);
+    return locked.row.userId;
   }
 
   /** Ends every Signed-in Device of the User, e.g. after their password changed. */
   async revokeAllForUser(
-    db: Executor,
+    tx: Transaction,
     userId: string,
     reason: DeviceEndReason,
     now = new Date(),
   ): Promise<void> {
-    await db
-      .update(refreshTokens)
-      .set({ revokedAt: now })
-      .where(and(eq(refreshTokens.userId, userId), isNull(refreshTokens.revokedAt)));
-    await db
-      .update(signedInDevices)
-      .set({ endedAt: now, endReason: reason })
-      .where(and(eq(signedInDevices.userId, userId), isNull(signedInDevices.endedAt)));
+    const open = await this.lockDevices(
+      tx,
+      and(eq(signedInDevices.userId, userId), isNull(signedInDevices.endedAt)),
+    );
+    await this.endDevices(tx, open, reason, now);
   }
 
-  /** Revokes every refresh token of the Signed-in Devices and records why they ended. */
+  /**
+   * Locks Signed-in Device rows (and so their families) and returns their ids.
+   * Every path that ends a device or rotates a token locks the device before
+   * its tokens: a rotation waits for an ending to commit and then sees it, and
+   * an ending sees every token a rotation issued before it.
+   */
+  async lockDevices(tx: Transaction, where: SQL | undefined): Promise<string[]> {
+    const rows = await tx
+      .select({ id: signedInDevices.id })
+      .from(signedInDevices)
+      .where(where)
+      .orderBy(signedInDevices.id)
+      .for('update');
+    return rows.map((r) => r.id);
+  }
+
+  /**
+   * Revokes every refresh token of the Signed-in Devices and records why they
+   * ended. The caller has locked the device rows (`lockDevices`).
+   */
   async endDevices(
     db: Executor,
     deviceIds: string[],
@@ -150,13 +172,25 @@ export class TokenService {
       .where(and(inArray(signedInDevices.id, deviceIds), isNull(signedInDevices.endedAt)));
   }
 
+  /** Locks the token's device, then the token row itself (see `lockDevices` for the order). */
   private async lockByToken(tx: Transaction, refreshToken: string) {
+    const tokenHash = hashToken(refreshToken);
+    const [found] = await tx
+      .select({ familyId: refreshTokens.familyId })
+      .from(refreshTokens)
+      .where(eq(refreshTokens.tokenHash, tokenHash));
+    if (!found) return undefined;
+    const [device] = await tx
+      .select({ endedAt: signedInDevices.endedAt, endReason: signedInDevices.endReason })
+      .from(signedInDevices)
+      .where(eq(signedInDevices.id, found.familyId))
+      .for('update');
     const [row] = await tx
       .select()
       .from(refreshTokens)
-      .where(eq(refreshTokens.tokenHash, hashToken(refreshToken)))
+      .where(eq(refreshTokens.tokenHash, tokenHash))
       .for('update');
-    return row;
+    return row && device ? { row, device } : undefined;
   }
 
   private async issueInFamily(

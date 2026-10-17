@@ -4,7 +4,7 @@
 
 **Blocked by:** 07, 40
 
-**Status:** in-progress
+**Status:** done
 
 - [x] Each refresh-token family is a Signed-in Device with a last-used time and a readable name (browser/OS or phone model)
 - [x] Login beyond the device Entitlement revokes the least recently used family(ies); no login is ever blocked
@@ -19,6 +19,8 @@
 Notes for later tickets:
 
 - `signed_in_devices` (migration 0019) is the Signed-in Device: its `id` is the refresh-token family id (`refresh_tokens.family_id` now references it, cascade), with `name`, `last_used_at` (login, then each refresh), `ended_at` and `end_reason` (`LOGOUT`, `REFRESH_REUSE`, `PASSWORD_RESET`, `DEVICE_LIMIT`, `SIGNED_OUT_REMOTELY`). Existing families were backfilled unnamed. It cascades from `users`, so the account-deletion scan stays clean. No RLS/grants, like the other identity tables.
+- Lock order is device row, then its tokens, on every path (`TokenService.lockDevices`, `lockByToken`): rotation, logout, password reset, remote sign-out and the limit. A rotation waits for an ending to commit and then refuses (`rotate` also refuses a device with `ended_at` set even if a token was left unrevoked), and an ending revokes every token a rotation committed before it. `revokeAllForUser` now takes a `Transaction`.
+- Replaying an old used token of a device already ended (e.g. by the limit) answers as that end reason, not as reuse, and is not audited as `auth.refresh_reuse` (unchanged from 07 for revoked families).
 - A device is *live* (counted and listed) while not ended and it still holds an unused, unrevoked, unexpired refresh token; a lapsed family needs no clean-up.
 - `TokenService.issue(db, userId, { name })` creates the device; `endDevices(db, ids, reason)` and `revokeAllForUser(db, userId, reason)` revoke tokens and record why. Access tokens now carry `sid` (the device id); `AuthGuard` puts it on `req.user.deviceId` and `@CurrentDeviceId()` reads it (null for tokens minted before this ticket).
 - `SignedInDevicesService.enforceLimit` runs in the login transaction after the new family is issued, with the User row locked (`FOR UPDATE`) so concurrent logins count each other. It keeps the newest `limit - 1` others by `last_used_at` and ends the rest as `DEVICE_LIMIT` (audited `auth.device_limit` with `{ deviceIds }`). Registration does not enforce (a new User has one device). `EntitlementsService.subscriptionOf/entitlementsOf` take an optional `Executor` as third argument. 43 ("only the most recently active Signed-in Device stays logged in" after Grace) can reuse `live`/`endDevices`, e.g. with a new end reason.

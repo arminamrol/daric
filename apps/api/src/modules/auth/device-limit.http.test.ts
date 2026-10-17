@@ -164,6 +164,42 @@ describe('device limit with billing enabled', () => {
     expect((await listDevices(t, other)).body).toHaveLength(1);
   });
 
+  it('refuses a device ended while its refresh was under way, even with a token left unrevoked', async () => {
+    // A login past the limit ended the device as a refresh of it issued a new token.
+    const { userId, device } = await signUp(t);
+    await db
+      .update(signedInDevices)
+      .set({ endedAt: new Date(), endReason: 'DEVICE_LIMIT' })
+      .where(eq(signedInDevices.userId, userId));
+    const res = await refresh(t, device);
+    expect(res.status).toBe(401);
+    expect(res.body.reason).toBe('DEVICE_LIMIT');
+  });
+
+  it('ends every device and its tokens on a password reset', async () => {
+    const { email, userId, device } = await signUp(t);
+    const other = await logIn(t, email);
+    await call(t.url, 'POST', '/v1/auth/password/forgot', { body: { email } });
+    const token = t.mail.lastToken(email);
+    expect(
+      (
+        await call(t.url, 'POST', '/v1/auth/password/reset', {
+          body: { token, password: 'a new password!' },
+        })
+      ).status,
+    ).toBe(204);
+    for (const d of [device, other]) {
+      const res = await refresh(t, d);
+      expect(res.status).toBe(401);
+      expect(res.body.reason).toBeUndefined();
+    }
+    const rows = await db
+      .select({ endReason: signedInDevices.endReason })
+      .from(signedInDevices)
+      .where(eq(signedInDevices.userId, userId));
+    expect(rows.map((r) => r.endReason)).toEqual(['PASSWORD_RESET', 'PASSWORD_RESET']);
+  });
+
   it('gives no reason after a plain logout', async () => {
     const { device } = await signUp(t);
     await call(t.url, 'POST', '/v1/auth/logout', { body: { refreshToken: device.refreshToken } });

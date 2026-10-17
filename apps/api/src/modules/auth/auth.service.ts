@@ -12,7 +12,7 @@ import { EmailLinksService } from './email-links.service';
 import { seedDefaultCategories } from '../categories/defaults';
 import { hashPassword, verifyAgainstDummy, verifyPassword } from './passwords';
 import { SignedInDevicesService } from './signed-in-devices.service';
-import { type IssuedTokens, TokenService } from './token.service';
+import { type IssuedTokens, type NewDevice, TokenService } from './token.service';
 
 /** A signed-in User and their new tokens; the controller decides how the tokens travel. */
 export interface SignedIn {
@@ -89,11 +89,7 @@ export class AuthService {
    * the User's language), Owner membership and Trial in one transaction, then
    * mails them a verification link.
    */
-  async register(
-    input: RegisterInput,
-    client: ClientInfo,
-    device: { name: string | null },
-  ): Promise<SignedIn> {
+  async register(input: RegisterInput, client: ClientInfo, device: NewDevice): Promise<SignedIn> {
     const secretHash = await hashPassword(input.password);
     const { locale = 'fa' } = input;
     const { displayCalendar, digits, workspaceCalendar } = SIGN_UP_DEFAULTS[locale];
@@ -145,11 +141,7 @@ export class AuthService {
    * Signs the User in on a new Signed-in Device. One beyond their device
    * Entitlement ends the least recently used others; a login is never refused for it.
    */
-  async login(
-    input: LoginInput,
-    client: ClientInfo,
-    device: { name: string | null },
-  ): Promise<SignedIn> {
+  async login(input: LoginInput, client: ClientInfo, device: NewDevice): Promise<SignedIn> {
     const [found] = await this.db
       .select({ id: users.id, email: users.email, secretHash: authIdentities.secretHash })
       .from(authIdentities)

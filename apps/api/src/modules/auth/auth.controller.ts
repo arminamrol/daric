@@ -48,6 +48,7 @@ import { ZodBody } from '../../common/zod';
 import { SendsMail } from '../mailer/sends-mail';
 import { AuthService, type SignedIn } from './auth.service';
 import { deviceName } from './device-name';
+import type { NewDevice } from './token.service';
 import { EmailLinksService } from './email-links.service';
 import {
   clearSessionCookies,
@@ -247,7 +248,7 @@ function usesCookies(req: Request): boolean {
 }
 
 /** The new Signed-in Device's name: from the native app's header, else the user agent. */
-function signingInDevice(req: Request): { name: string | null } {
+function signingInDevice(req: Request): NewDevice {
   return {
     name: deviceName({
       given: req.get(DEVICE_NAME_HEADER),

@@ -1,9 +1,9 @@
 import { Inject, Injectable } from '@nestjs/common';
 import type { SignedInDevice } from '@daric/core';
-import { and, desc, eq, exists, gt, isNull, ne } from 'drizzle-orm';
+import { and, desc, eq, exists, gt, inArray, isNull, ne } from 'drizzle-orm';
 import { DATABASE } from '../../common/di-tokens';
 import type { ClientInfo } from '../../common/request';
-import type { Database, Executor } from '../../db/client';
+import type { Database, Executor, Transaction } from '../../db/client';
 import { refreshTokens, signedInDevices } from '../../db/schema';
 import { AuditService } from '../audit/audit.service';
 import { EntitlementsService } from '../billing/entitlements.service';
@@ -49,19 +49,16 @@ export class SignedInDevicesService {
     now = new Date(),
   ): Promise<boolean> {
     return this.db.transaction(async (tx) => {
-      const [device] = await tx
-        .select({ id: signedInDevices.id })
-        .from(signedInDevices)
-        .where(
-          and(
-            eq(signedInDevices.id, deviceId),
-            eq(signedInDevices.userId, userId),
-            isNull(signedInDevices.endedAt),
-          ),
-        )
-        .for('update');
-      if (!device) return false;
-      await this.tokens.endDevices(tx, [device.id], 'SIGNED_OUT_REMOTELY', now);
+      const locked = await this.tokens.lockDevices(
+        tx,
+        and(
+          eq(signedInDevices.id, deviceId),
+          eq(signedInDevices.userId, userId),
+          isNull(signedInDevices.endedAt),
+        ),
+      );
+      if (locked.length === 0) return false;
+      await this.tokens.endDevices(tx, locked, 'SIGNED_OUT_REMOTELY', now);
       await this.audit.record(tx, {
         action: 'auth.device_sign_out',
         actorUserId: userId,
@@ -79,7 +76,7 @@ export class SignedInDevicesService {
    * locked, so concurrent logins count each other.
    */
   async enforceLimit(
-    tx: Executor,
+    tx: Transaction,
     userId: string,
     keepDeviceId: string,
     client: ClientInfo,
@@ -88,7 +85,13 @@ export class SignedInDevicesService {
     const limit = (await this.entitlements.entitlementsOf(userId, now, tx)).signedInDevices;
     if (limit === null) return;
     const others = await this.live(tx, userId, now, keepDeviceId);
-    const ended = others.slice(Math.max(0, limit - 1)).map((d) => d.id);
+    const beyond = others.slice(Math.max(0, limit - 1)).map((d) => d.id);
+    if (beyond.length === 0) return;
+    // Locked before ending, so a refresh of one of them under way is ended with it.
+    const ended = await this.tokens.lockDevices(
+      tx,
+      and(inArray(signedInDevices.id, beyond), isNull(signedInDevices.endedAt)),
+    );
     if (ended.length === 0) return;
     await this.tokens.endDevices(tx, ended, 'DEVICE_LIMIT', now);
     await this.audit.record(tx, {
