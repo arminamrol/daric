@@ -30,6 +30,7 @@ import {
   authResultSchema,
   CLIENT_HEADER,
   CSRF_COOKIE,
+  DEVICE_NAME_HEADER,
   forgotPasswordInputSchema,
   loginInputSchema,
   refreshInputSchema,
@@ -46,6 +47,7 @@ import { Client, type ClientInfo, CurrentUserId } from '../../common/request';
 import { ZodBody } from '../../common/zod';
 import { SendsMail } from '../mailer/sends-mail';
 import { AuthService, type SignedIn } from './auth.service';
+import { deviceName } from './device-name';
 import { EmailLinksService } from './email-links.service';
 import {
   clearSessionCookies,
@@ -77,6 +79,11 @@ const signedInResponse = {
 @ApiTags('auth')
 @ApiExtraModels(SessionDto, AuthResultDto)
 @ApiHeader({ name: CLIENT_HEADER, required: false, enum: ['mobile'] })
+@ApiHeader({
+  name: DEVICE_NAME_HEADER,
+  required: false,
+  description: 'A native app names its Signed-in Device (e.g. the phone model)',
+})
 @Public()
 @Controller('v1/auth')
 export class AuthController {
@@ -94,7 +101,7 @@ export class AuthController {
     @Req() req: Request,
     @Res({ passthrough: true }) res: Response,
   ) {
-    return deliverSignIn(req, res, await this.auth.register(body, client));
+    return deliverSignIn(req, res, await this.auth.register(body, client, signingInDevice(req)));
   }
 
   @Post('login')
@@ -107,7 +114,7 @@ export class AuthController {
     @Req() req: Request,
     @Res({ passthrough: true }) res: Response,
   ) {
-    return deliverSignIn(req, res, await this.auth.login(body, client));
+    return deliverSignIn(req, res, await this.auth.login(body, client, signingInDevice(req)));
   }
 
   @Post('email/verify')
@@ -191,7 +198,10 @@ export class SignedInDeviceController {
   @ApiBody(refreshBody)
   @ApiOkResponse(signedInResponse)
   @ApiUnauthorizedResponse({
-    description: 'The refresh token is unknown, used, revoked or expired',
+    description:
+      'The refresh token is unknown, used, revoked or expired; web cookies are cleared. ' +
+      '`reason` DEVICE_LIMIT: a login elsewhere went past the device Entitlement; ' +
+      'SIGNED_OUT_REMOTELY: the User signed this device out from another.',
   })
   async refresh(
     @Body() body: unknown,
@@ -199,9 +209,16 @@ export class SignedInDeviceController {
     @Req() req: Request,
     @Res({ passthrough: true }) res: Response,
   ) {
-    const token = presentedRefreshToken(req, body);
-    if (!token) throw new UnauthorizedException();
-    return deliverSignIn(req, res, await this.auth.refresh(token, client), { rotateCsrf: false });
+    try {
+      const token = presentedRefreshToken(req, body);
+      if (!token) throw new UnauthorizedException();
+      const signedIn = await this.auth.refresh(token, client);
+      return deliverSignIn(req, res, signedIn, { rotateCsrf: false });
+    } catch (error) {
+      // The cookies are no good any more; the browser need not keep sending them.
+      if (error instanceof UnauthorizedException && usesCookies(req)) clearSessionCookies(res);
+      throw error;
+    }
   }
 
   @Post('logout')
@@ -227,6 +244,16 @@ export class SignedInDeviceController {
  */
 function usesCookies(req: Request): boolean {
   return !isMobileClient(req) && req.get('authorization') === undefined;
+}
+
+/** The new Signed-in Device's name: from the native app's header, else the user agent. */
+function signingInDevice(req: Request): { name: string | null } {
+  return {
+    name: deviceName({
+      given: req.get(DEVICE_NAME_HEADER),
+      userAgent: req.get('user-agent') ?? null,
+    }),
+  };
 }
 
 /** The refresh token from the cookie for the web app, from the body for the mobile app. */

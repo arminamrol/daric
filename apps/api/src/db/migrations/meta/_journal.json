@@ -134,6 +134,13 @@
       "when": 1791986132376,
       "tag": "0018_invitations_consents",
       "breakpoints": true
+    },
+    {
+      "idx": 19,
+      "version": "7",
+      "when": 1792232005553,
+      "tag": "0019_signed_in_devices",
+      "breakpoints": true
     }
   ]
 }

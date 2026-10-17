@@ -10,7 +10,8 @@ export interface Membership {
 
 /** What the guards attach to a request. */
 export interface AppRequest extends Request {
-  user?: { id: string };
+  /** `deviceId`: the Signed-in Device the access token was issued to, if it says. */
+  user?: { id: string; deviceId: string | null };
   membership?: Membership;
 }
 
@@ -30,6 +31,15 @@ export const CurrentUserId = createParamDecorator((_: unknown, ctx: ExecutionCon
   if (!user) throw new Error('CurrentUserId used on a public route');
   return user.id;
 });
+
+/** The Signed-in Device the request comes from; null for access tokens that do not say. */
+export const CurrentDeviceId = createParamDecorator(
+  (_: unknown, ctx: ExecutionContext): string | null => {
+    const user = ctx.switchToHttp().getRequest<AppRequest>().user;
+    if (!user) throw new Error('CurrentDeviceId used on a public route');
+    return user.deviceId;
+  },
+);
 
 /** The caller's membership in `:wsId`, resolved by WorkspaceGuard. */
 export const CurrentMembership = createParamDecorator(

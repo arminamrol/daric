@@ -39,9 +39,9 @@ export class AuthGuard implements CanActivate {
     const token =
       bearerToken(req) ?? (isMobileClient(req) ? undefined : readCookie(req, ACCESS_COOKIE));
     if (!token) throw new UnauthorizedException();
-    const userId = await this.tokens.verifyAccessToken(token);
-    if (!userId) throw new UnauthorizedException();
-    req.user = { id: userId };
+    const subject = await this.tokens.verifyAccessToken(token);
+    if (!subject) throw new UnauthorizedException();
+    req.user = { id: subject.userId, deviceId: subject.deviceId };
     return true;
   }
 }

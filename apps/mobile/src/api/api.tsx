@@ -3,7 +3,9 @@ import type { ApiClient } from '@daric/api-client';
 import Constants from 'expo-constants';
 import * as SecureStore from 'expo-secure-store';
 import { createContext, use } from 'react';
+import { Platform } from 'react-native';
 import { secureStoreTokens } from '../auth/tokens';
+import { phoneName } from './device-name';
 
 /**
  * Where the API is: `EXPO_PUBLIC_API_URL` when set, else port 3000 on the
@@ -18,9 +20,25 @@ const LOGOUT_PENDING = 'daric.logoutPending';
 
 const tokens = secureStoreTokens(SecureStore);
 
+const signedOutListeners = new Set<() => void>();
+
+/** Runs `listener` whenever the API refuses to refresh: this phone is signed out. */
+export function onSignedOut(listener: () => void): () => void {
+  signedOutListeners.add(listener);
+  return () => void signedOutListeners.delete(listener);
+}
+
 /** The API client of the mobile app: bearer tokens kept in SecureStore (ADR-0006). */
 export function createMobileApi(): ApiClient {
-  return createApiClient({ baseUrl: API_URL, tokens });
+  const deviceName = phoneName(Platform);
+  return createApiClient({
+    baseUrl: API_URL,
+    tokens,
+    ...(deviceName && { deviceName }),
+    onSignedOut: () => {
+      for (const listener of signedOutListeners) listener();
+    },
+  });
 }
 
 /**

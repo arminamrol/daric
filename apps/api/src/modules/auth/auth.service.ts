@@ -11,6 +11,7 @@ import { EntitlementsService } from '../billing/entitlements.service';
 import { EmailLinksService } from './email-links.service';
 import { seedDefaultCategories } from '../categories/defaults';
 import { hashPassword, verifyAgainstDummy, verifyPassword } from './passwords';
+import { SignedInDevicesService } from './signed-in-devices.service';
 import { type IssuedTokens, TokenService } from './token.service';
 
 /** A signed-in User and their new tokens; the controller decides how the tokens travel. */
@@ -36,9 +37,14 @@ export class AuthService {
     @Inject(AuditService) private readonly audit: AuditService,
     @Inject(EmailLinksService) private readonly emailLinks: EmailLinksService,
     @Inject(EntitlementsService) private readonly entitlements: EntitlementsService,
+    @Inject(SignedInDevicesService) private readonly devices: SignedInDevicesService,
   ) {}
 
-  /** Rotates a refresh token (see TokenService.rotate); a replayed token is audited and refused. */
+  /**
+   * Rotates a refresh token (see TokenService.rotate); a replayed token is
+   * audited and refused. A refusal says why when the User should be told:
+   * `reason` DEVICE_LIMIT or SIGNED_OUT_REMOTELY.
+   */
   async refresh(refreshToken: string, client: ClientInfo): Promise<SignedIn> {
     const rotation = await this.db.transaction(async (tx) => {
       const result = await this.tokens.rotate(tx, refreshToken);
@@ -52,6 +58,13 @@ export class AuthService {
       return result;
     });
     // Outside the transaction, so a reuse still commits its revocation.
+    if (rotation.outcome === 'invalid' && rotation.reason) {
+      throw new UnauthorizedException({
+        statusCode: 401,
+        message: 'This Signed-in Device was signed out',
+        reason: rotation.reason,
+      });
+    }
     if (rotation.outcome !== 'rotated') throw new UnauthorizedException();
     const user = one(
       await this.db
@@ -76,7 +89,11 @@ export class AuthService {
    * the User's language), Owner membership and Trial in one transaction, then
    * mails them a verification link.
    */
-  async register(input: RegisterInput, client: ClientInfo): Promise<SignedIn> {
+  async register(
+    input: RegisterInput,
+    client: ClientInfo,
+    device: { name: string | null },
+  ): Promise<SignedIn> {
     const secretHash = await hashPassword(input.password);
     const { locale = 'fa' } = input;
     const { displayCalendar, digits, workspaceCalendar } = SIGN_UP_DEFAULTS[locale];
@@ -112,7 +129,7 @@ export class AuthService {
           client,
         });
         return {
-          result: signedIn(user, await this.tokens.issue(tx, user.id)),
+          result: signedIn(user, await this.tokens.issue(tx, user.id, device)),
           mail: await this.emailLinks.verificationMail(tx, user),
         };
       });
@@ -124,7 +141,15 @@ export class AuthService {
     }
   }
 
-  async login(input: LoginInput, client: ClientInfo): Promise<SignedIn> {
+  /**
+   * Signs the User in on a new Signed-in Device. One beyond their device
+   * Entitlement ends the least recently used others; a login is never refused for it.
+   */
+  async login(
+    input: LoginInput,
+    client: ClientInfo,
+    device: { name: string | null },
+  ): Promise<SignedIn> {
     const [found] = await this.db
       .select({ id: users.id, email: users.email, secretHash: authIdentities.secretHash })
       .from(authIdentities)
@@ -146,8 +171,12 @@ export class AuthService {
     }
 
     return this.db.transaction(async (tx) => {
+      // Concurrent logins wait here, so each counts the devices the other made.
+      await tx.select({ id: users.id }).from(users).where(eq(users.id, found.id)).for('update');
       await this.audit.record(tx, { action: 'auth.login', actorUserId: found.id, client });
-      return signedIn(found, await this.tokens.issue(tx, found.id));
+      const tokens = await this.tokens.issue(tx, found.id, device);
+      await this.devices.enforceLimit(tx, found.id, tokens.deviceId, client);
+      return signedIn(found, tokens);
     });
   }
 }

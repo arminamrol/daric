@@ -1,5 +1,6 @@
 import { ApiError, type ApiClient } from '@daric/api-client';
 import {
+  type SignedInDevice,
   accountValue,
   amountToWire,
   controllableSpending,
@@ -173,6 +174,16 @@ export function fakeApi({
   let nextConsentId = 1;
   /** Newest first. */
   let auditEntries: AuditEntry[] = [];
+  /** The User's Signed-in Devices, most recently used first: this browser alone to start. */
+  let devices: SignedInDevice[] = [
+    {
+      id: '01900000-0000-7000-8f00-000000000001',
+      name: 'Chrome · Windows',
+      signedInAt: '2026-10-01T08:00:00.000Z',
+      lastUsedAt: '2026-10-09T06:00:00.000Z',
+      current: true,
+    },
+  ];
 
   function signedIn(): FakeUser {
     if (!current) throw new ApiError(401, { message: 'Unauthorized' });
@@ -1390,6 +1401,16 @@ export function fakeApi({
       signedIn();
       return structuredClone(subscription);
     },
+    async listDevices() {
+      signedIn();
+      return structuredClone(devices);
+    },
+    async signOutDevice(deviceId) {
+      signedIn();
+      if (!devices.some((d) => d.id === deviceId))
+        throw new ApiError(404, { message: 'Not Found' });
+      devices = devices.filter((d) => d.id !== deviceId);
+    },
     async listMembers(workspaceId) {
       inWorkspace(workspaceId);
       return structuredClone(members);
@@ -1604,6 +1625,11 @@ export function fakeApi({
     preferences: () => signedIn().preferences,
     /** Sets what the server answers about the User's Plan. */
     setSubscription: (value: Subscription) => void (subscription = value),
+    /** Sets the User's Signed-in Devices, most recently used first. */
+    setDevices: (value: SignedInDevice[]) => void (devices = structuredClone(value)),
+    devices: () => devices,
+    /** Ends the session on the server, as a login elsewhere past the device limit does. */
+    endSession: () => void (current = undefined),
     /** Puts someone else into the Workspace, as if they had joined earlier. */
     addMember: (email: string, memberRole: WorkspaceRole) => addMember(email, memberRole),
     members: () => members,

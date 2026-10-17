@@ -9,7 +9,8 @@ import { Link, useNavigate } from 'react-router';
 import { useApi } from '../api/api';
 import { useI18n } from '../i18n/locale';
 import { useOfflineDevice } from '../offline/offline';
-import { afterSignIn, logoutPending, ME_QUERY_KEY } from './session';
+import { logoutPending, ME_QUERY_KEY, useAfterSignIn } from './session';
+import { signedOutNotice } from './signedOut';
 
 type Mode = 'login' | 'signup';
 type Field = 'email' | 'password';
@@ -79,7 +80,10 @@ export function AuthForm({ mode }: { mode: Mode }) {
   const api = useApi();
   const queryClient = useQueryClient();
   const navigate = useNavigate();
+  const afterSignIn = useAfterSignIn();
   const device = useOfflineDevice();
+  // Read once: it stays on screen until this form signs someone in.
+  const [signedOut] = useState(() => (mode === 'login' ? signedOutNotice.get() : null));
   const copy = COPY[mode];
   const id = useId();
   const ids = {
@@ -104,6 +108,7 @@ export function AuthForm({ mode }: { mode: Mode }) {
       mode === 'signup' ? api.register({ ...input, locale }) : api.login(input),
     onSuccess: async (_, { keepData }) => {
       logoutPending.set(false);
+      signedOutNotice.set(null);
       await device.setKeep(keepData);
       // The cookies changed; ask the API who is signed in now. Reset, not removed:
       // the header keeps watching the same query and shows the signed-in nav.
@@ -134,6 +139,19 @@ export function AuthForm({ mode }: { mode: Mode }) {
       <h1 id={ids.title} className="text-2xl font-bold">
         {t(copy.title)}
       </h1>
+      {signedOut && (
+        <div
+          role="status"
+          className="flex flex-col gap-2 rounded-md bg-surface-muted px-3 py-2 text-sm"
+        >
+          <p>{t(`auth.signedOut.${signedOut}`)}</p>
+          {signedOut === 'DEVICE_LIMIT' && (
+            <Link to="/settings/subscription" className={linkClass}>
+              {t('auth.signedOut.upgrade')}
+            </Link>
+          )}
+        </div>
+      )}
       <form
         aria-labelledby={ids.title}
         noValidate

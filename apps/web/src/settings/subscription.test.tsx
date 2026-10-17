@@ -120,4 +120,70 @@ describe('Subscription page', () => {
     expect(entitlement('دستگاه‌های واردشده')).toBe('نامحدود');
     expect(entitlement('تحلیل هوش مصنوعی در این ماه')).toBe('نامحدود');
   });
+
+  it('lists the Signed-in Devices and signs another one out', async () => {
+    const fake = signedIn();
+    fake.setDevices([
+      {
+        id: '01900000-0000-7000-8f00-000000000001',
+        name: 'Chrome · Windows',
+        signedInAt: '2026-10-01T08:00:00.000Z',
+        // 17 Mehr 1405.
+        lastUsedAt: '2026-10-09T06:00:00.000Z',
+        current: true,
+      },
+      {
+        id: '01900000-0000-7000-8f00-000000000002',
+        name: null,
+        signedInAt: '2026-09-20T08:00:00.000Z',
+        // 10 Mehr 1405.
+        lastUsedAt: '2026-10-02T06:00:00.000Z',
+        current: false,
+      },
+    ]);
+    renderApp({ path: '/settings/subscription', api: fake.api });
+
+    const section = within(await screen.findByRole('region', { name: 'دستگاه‌های واردشده' }));
+    expect(section.getByText(`تا ${isolate('۳')} دستگاه هم‌زمان`, { exact: false })).toBeTruthy();
+    const items = await section.findAllByRole('listitem');
+    const [mine, other] = items;
+    if (!mine || !other) throw new Error('expected two devices');
+    expect(items.map((item) => item.querySelector('p')?.textContent)).toEqual([
+      'Chrome · Windowsهمین دستگاه',
+      'دستگاه ناشناخته',
+    ]);
+    expect(within(mine).getByText(`آخرین استفاده ${isolate('۱۷ مهر ۱۴۰۵')}`)).toBeTruthy();
+    expect(within(mine).queryByRole('button')).toBeNull();
+
+    await userEvent.click(
+      within(other).getByRole('button', {
+        name: `خارج کردن ${isolate('دستگاه ناشناخته')}`,
+      }),
+    );
+    await userEvent.click(within(other).getByRole('button', { name: 'بله، خارج کن' }));
+    await vi.waitFor(() => expect(section.getAllByRole('listitem')).toHaveLength(1));
+    expect(fake.devices().map((d) => d.id)).toEqual(['01900000-0000-7000-8f00-000000000001']);
+  });
+
+  it('gives no device limit when billing is disabled', async () => {
+    renderApp({
+      path: '/settings/subscription',
+      api: signedIn({
+        billingEnabled: false,
+        plan: 'FREE',
+        onTrial: false,
+        trialEndsAt: null,
+        expiresAt: null,
+        entitlements: {
+          signedInDevices: null,
+          shareWorkspace: true,
+          aiAnalysesPerMonth: null,
+          aiAnalysesLeftThisMonth: null,
+        },
+      }).api,
+    });
+    const section = within(await screen.findByRole('region', { name: 'دستگاه‌های واردشده' }));
+    expect(await section.findByText('Chrome · Windows')).toBeTruthy();
+    expect(section.queryByText(/هم‌زمان/)).toBeNull();
+  });
 });

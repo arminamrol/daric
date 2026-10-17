@@ -3,6 +3,8 @@ import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { useState } from 'react';
 import type { ReactNode } from 'react';
 import { ApiProvider } from '../api/api';
+import { useForgetWhenSignedOut } from '../auth/logout';
+import { reportSignedOut } from '../auth/signedOut';
 import { LocaleProvider } from '../i18n/locale';
 import { OfflineProvider } from '../offline/offline';
 
@@ -21,16 +23,24 @@ export function AppProviders({
     () => new QueryClient({ defaultOptions: { queries: { gcTime: KEPT_FOR } } }),
   );
   // The API is served from the web app's origin (Vite proxies `/v1` in development).
-  const [client] = useState(() => api ?? createApiClient());
+  const [client] = useState(() => api ?? createApiClient({ onSignedOut: reportSignedOut }));
 
   return (
     <ApiProvider value={client}>
       <QueryClientProvider client={queryClient}>
         {/* Inside the query cache: a signed-in User's language comes with them. */}
         <LocaleProvider>
-          <OfflineProvider>{children}</OfflineProvider>
+          <OfflineProvider>
+            <ForgetWhenSignedOut />
+            {children}
+          </OfflineProvider>
         </LocaleProvider>
       </QueryClientProvider>
     </ApiProvider>
   );
+}
+
+function ForgetWhenSignedOut() {
+  useForgetWhenSignedOut();
+  return null;
 }

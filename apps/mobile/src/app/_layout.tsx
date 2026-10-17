@@ -7,6 +7,7 @@ import { useCallback, useEffect, useState } from 'react';
 import { I18nManager } from 'react-native';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 import { ApiProvider, createMobileApi } from '../api/api';
+import { useForgetWhenSignedOut } from '../auth/session';
 import { deviceLocale, rememberLocale } from '../i18n/device-locale';
 import { LocaleProvider } from '../i18n/locale';
 import { applyDirection } from '../i18n/rtl';
@@ -62,6 +63,7 @@ export default function RootLayout() {
           <LocaleProvider locale={locale} onChange={changeLocale}>
             <ThemeProvider>
               <OfflineProvider>
+                <ForgetWhenSignedOut />
                 <Stack screenOptions={{ headerShown: false }} />
               </OfflineProvider>
             </ThemeProvider>
@@ -70,4 +72,9 @@ export default function RootLayout() {
       </ApiProvider>
     </SafeAreaProvider>
   );
+}
+
+function ForgetWhenSignedOut() {
+  useForgetWhenSignedOut();
+  return null;
 }
