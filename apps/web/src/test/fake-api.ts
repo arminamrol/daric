@@ -39,6 +39,7 @@ import {
   todayIn,
 } from '@daric/core';
 import type {
+  AccountDeletionPreview,
   AuditEntry,
   Consent,
   Invitation,
@@ -259,6 +260,19 @@ export function fakeApi({
   }
 
   const sharingAllowed = () => subscription.entitlements.shareWorkspace;
+
+  /** The one Workspace is shared while anyone but the User belongs to it. */
+  function deletionPreview(): AccountDeletionPreview {
+    const ref = { id: workspace.id, name: workspace.name };
+    const owner = workspace.role === 'OWNER';
+    const shared = owner && members.length > 1;
+    const bought = subscription.plan === 'PLUS' && !subscription.onTrial;
+    return {
+      sharedWorkspaces: shared ? [{ ...ref, otherMembers: members.length - 1 }] : [],
+      deletedWorkspaces: owner && !shared ? [ref] : [],
+      plusForfeitedUntil: subscription.billingEnabled && bought ? subscription.expiresAt : null,
+    };
+  }
 
   /** Puts an Account straight into the Workspace, as if created earlier. */
   function addAccount(fields: Partial<Account> & Pick<Account, 'name'>): Account {
@@ -1400,6 +1414,38 @@ export function fakeApi({
       members = members.filter((m) => m.id !== memberId);
       if (leaving) joined = joined.filter((w) => w.id !== workspaceId);
     },
+    async transferOwnership(workspaceId, memberId) {
+      const { role: actor } = inWorkspace(workspaceId, 'OWNER');
+      const member = findMember(memberId);
+      const user = signedIn();
+      if (actor !== 'OWNER' || member.userId === user.id) {
+        throw new ApiError(403, { message: 'Forbidden' });
+      }
+      members = members.map((m) =>
+        m.id === memberId
+          ? { ...m, role: 'OWNER' }
+          : m.userId === user.id
+            ? { ...m, role: 'ADMIN' }
+            : m,
+      );
+      workspace = { ...workspace, role: 'ADMIN' };
+    },
+    async accountDeletion() {
+      signedIn();
+      return deletionPreview();
+    },
+    async deleteAccount(password) {
+      const user = signedIn();
+      if (password !== user.password) {
+        throw new ApiError(403, { message: 'Forbidden', reason: 'WRONG_PASSWORD' });
+      }
+      const { sharedWorkspaces } = deletionPreview();
+      if (sharedWorkspaces.length > 0) {
+        throw new ApiError(409, { reason: 'OWNS_SHARED_WORKSPACE', sharedWorkspaces });
+      }
+      users.delete(user.email);
+      current = undefined;
+    },
     async listInvitations(workspaceId) {
       inWorkspace(workspaceId, 'ADMIN');
       return {
@@ -1547,6 +1593,8 @@ export function fakeApi({
     /** In the API's list order, archived ones included. */
     categories: () => inTreeOrder(categories),
     signedInUser: () => current?.email,
+    /** Whether a User with this email exists. */
+    hasUser: (email: string) => users.has(email),
     /** The token in the newest unused link mailed to `email`, if any. */
     verificationToken: (email: string) => lastMailedToken(email, 'verify'),
     resetToken: (email: string) => lastMailedToken(email, 'reset'),

@@ -21,6 +21,7 @@ import {
   useMembers,
   useRemoveMember,
   useRevokeInvitation,
+  useTransferOwnership,
   useUpdateMember,
 } from '../members/members';
 import { useFormatters } from '../settings/settings';
@@ -37,6 +38,7 @@ function MemberRow({ member }: { member: Member }) {
   const queryClient = useQueryClient();
   const update = useUpdateMember();
   const remove = useRemoveMember();
+  const transfer = useTransferOwnership();
   const roleId = useId();
   const self = member.userId === me.user.id;
   const manageable = !self && mayManageMember(workspace.role, member.role);
@@ -84,6 +86,17 @@ function MemberRow({ member }: { member: Member }) {
               pending={remove.isPending}
               onConfirm={() => remove.mutate(member.id)}
             />
+            {workspace.role === 'OWNER' && (
+              <ConfirmButton
+                label={t('members.makeOwner')}
+                ariaLabel={t('members.makeOwnerLabel', { email: member.email })}
+                question={t('members.makeOwnerConfirm', { email: isolate(member.email) })}
+                confirm={t('members.makeOwnerYes')}
+                cancel={t('members.cancel')}
+                pending={transfer.isPending}
+                onConfirm={() => transfer.mutate(member.id)}
+              />
+            )}
           </>
         ) : (
           <span className="text-sm text-foreground-muted">{t(`roles.${member.role}`)}</span>
@@ -99,7 +112,7 @@ function MemberRow({ member }: { member: Member }) {
           />
         )}
       </div>
-      {(update.isError || remove.isError) && (
+      {(update.isError || remove.isError || transfer.isError) && (
         <p role="alert" className={alertClass}>
           {t('members.changeFailed')}
         </p>

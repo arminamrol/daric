@@ -100,6 +100,8 @@ import {
   invitationListSchema,
   type InvitationPreview,
   invitationPreviewSchema,
+  type AccountDeletionPreview,
+  accountDeletionPreviewSchema,
   type Member,
   memberListSchema,
   memberSchema,
@@ -184,6 +186,16 @@ export interface ApiClient {
   updateMember(workspaceId: string, memberId: string, input: UpdateMemberInput): Promise<Member>;
   /** Removes a Member by the role matrix, or, on one's own membership, leaves the Workspace. */
   removeMember(workspaceId: string, memberId: string): Promise<void>;
+  /** Owner only: makes the Member the Owner; the caller stays on as an Admin. */
+  transferOwnership(workspaceId: string, memberId: string): Promise<void>;
+  /** What deleting the signed-in User's account would delete, and what blocks it. */
+  accountDeletion(): Promise<AccountDeletionPreview>;
+  /**
+   * Deletes the signed-in User and their data for good; the session ends with
+   * it. 403 with `reason` WRONG_PASSWORD; 409 with `reason`
+   * OWNS_SHARED_WORKSPACE while they own a Workspace others belong to.
+   */
+  deleteAccount(password: string): Promise<void>;
   /** Owner or Admin: the Invitations, newest first, and whether the Owner's Plan allows more. */
   listInvitations(workspaceId: string): Promise<InvitationList>;
   /**
@@ -556,6 +568,18 @@ export function createApiClient(options: ApiClientOptions = {}): ApiClient {
       ),
     removeMember: (workspaceId, memberId) =>
       request('DELETE', `${membersPath(workspaceId)}/${encodeURIComponent(memberId)}`, noContent),
+    transferOwnership: (workspaceId, memberId) =>
+      request(
+        'POST',
+        `${membersPath(workspaceId)}/${encodeURIComponent(memberId)}/transfer-ownership`,
+        noContent,
+      ),
+    accountDeletion: () => request('GET', '/v1/me/deletion', accountDeletionPreviewSchema),
+    deleteAccount: async (password) => {
+      await request('POST', '/v1/me/deletion', noContent, { password });
+      // The User is gone, and with them every token this device held.
+      await tokens?.write(undefined);
+    },
     listInvitations: (workspaceId) =>
       request('GET', invitationsPath(workspaceId), invitationListSchema),
     createInvitation: (workspaceId, input) =>

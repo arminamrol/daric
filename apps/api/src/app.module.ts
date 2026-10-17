@@ -15,6 +15,7 @@ import { AuditModule } from './modules/audit/audit.module';
 import { BillingModule } from './modules/billing/billing.module';
 import { AuthController } from './modules/auth/auth.controller';
 import { AuthModule } from './modules/auth/auth.module';
+import { checksPassword } from './modules/auth/checks-password';
 import { BudgetsModule } from './modules/budgets/budgets.module';
 import { ExportModule } from './modules/export/export.module';
 import { ExchangeRatesModule } from './modules/exchange-rates/exchange-rates.module';
@@ -65,11 +66,13 @@ export class AppModule {
           throttlers: [
             { name: 'default', ttl: MINUTE, limit: config.RATE_LIMIT_PER_MINUTE },
             {
-              // Login, registration and the mailed-link routes get a tighter budget against guessing.
+              // Login, registration, the mailed-link routes and other password checks get a
+              // tighter budget against guessing.
               name: 'auth',
               ttl: MINUTE,
               limit: config.AUTH_RATE_LIMIT_PER_MINUTE,
-              skipIf: (context) => context.getClass() !== AuthController,
+              skipIf: (context) =>
+                context.getClass() !== AuthController && !checksPassword(context),
             },
             {
               // Against using us to flood someone's inbox; each User also has a cap of their own.

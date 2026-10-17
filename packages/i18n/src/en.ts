@@ -732,6 +732,10 @@ export const en = {
   'members.leaveConfirm':
     "You will no longer have access to this workspace's data, and your sharing consent is taken back.",
   'members.leaveYes': 'Yes, leave',
+  'members.makeOwner': 'Make owner',
+  'members.makeOwnerLabel': 'Make {email} the owner',
+  'members.makeOwnerConfirm': '{email} will own this workspace, and you will stay on as an admin.',
+  'members.makeOwnerYes': 'Yes, make owner',
   'members.changeFailed': 'The change was not made. Please try again.',
   'invitations.title': 'Invitations',
   'invitations.new': 'New invitation',
@@ -855,4 +859,23 @@ export const en = {
   'audit.action.member.leave': 'Left the workspace',
   'audit.action.consent.grant': 'Gave consent',
   'audit.action.consent.revoke': 'Took back consent',
+  'audit.action.workspace.transfer_ownership': 'Transferred ownership',
+  'audit.action.user.delete': 'A member deleted their account',
+  'deleteAccount.link': 'Delete account',
+  'deleteAccount.title': 'Delete account',
+  'deleteAccount.intro':
+    'Your account is deleted for good, with your consents and subscription. This cannot be undone. Export your data first if you want to keep it.',
+  'deleteAccount.deleted': 'These workspaces are deleted with everything in them:',
+  'deleteAccount.kept': 'In workspaces of others, what you recorded stays, without your name.',
+  'deleteAccount.shared':
+    'You own workspaces that others belong to. Make one of them the owner first:',
+  'deleteAccount.sharedItem': '{name} (others: {count})',
+  'deleteAccount.chooseOwner': 'Choose a new owner',
+  'deleteAccount.plusForfeited':
+    'Your Daric Plus time until {date} is lost with your account and is not refunded.',
+  'deleteAccount.password': 'Your password',
+  'deleteAccount.submit': 'Delete my account for good',
+  'deleteAccount.wrongPassword': 'The password is incorrect.',
+  'deleteAccount.failed': 'The account could not be deleted. Try again.',
+  'deleteAccount.loadFailed': 'Could not load what would be deleted.',
 } as const satisfies Messages;

@@ -9,6 +9,7 @@ import { CategoryFormPage } from '../pages/CategoryFormPage';
 import { ForgotPasswordPage } from '../pages/ForgotPasswordPage';
 import { AuditPage } from '../pages/AuditPage';
 import { ConsentsPage } from '../pages/ConsentsPage';
+import { DeleteAccountPage } from '../pages/DeleteAccountPage';
 import { HomePage } from '../pages/HomePage';
 import { InvitationPage } from '../pages/InvitationPage';
 import { LabelFormPage } from '../pages/LabelFormPage';
@@ -73,6 +74,7 @@ export const routes: RouteObject[] = [
           { path: 'settings/members', element: <MembersPage /> },
           { path: 'settings/consents', element: <ConsentsPage /> },
           { path: 'settings/audit', element: <AuditPage /> },
+          { path: 'settings/delete-account', element: <DeleteAccountPage /> },
         ],
       },
       {

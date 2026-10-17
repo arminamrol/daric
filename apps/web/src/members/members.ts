@@ -80,6 +80,21 @@ export function useRemoveMember() {
   });
 }
 
+/** Owner only: hands the Workspace to a Member; the User's own Role is read again. */
+export function useTransferOwnership() {
+  const api = useApi();
+  const queryClient = useQueryClient();
+  const { workspace } = useSignedIn();
+  return useMutation({
+    mutationFn: (memberId: string) => api.transferOwnership(workspace.id, memberId),
+    onSettled: () =>
+      Promise.all([
+        queryClient.invalidateQueries({ queryKey: membersKey(workspace.id) }),
+        queryClient.invalidateQueries({ queryKey: ME_QUERY_KEY }),
+      ]),
+  });
+}
+
 export function useConsents() {
   const api = useApi();
   return useQuery({ queryKey: CONSENTS_QUERY_KEY, queryFn: () => api.listConsents() });

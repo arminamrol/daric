@@ -6,7 +6,7 @@ import {
   type Member,
   type UpdateMemberInput,
 } from '@daric/core';
-import { eq, sql } from 'drizzle-orm';
+import { and, eq, sql } from 'drizzle-orm';
 import { DATABASE } from '../../common/di-tokens';
 import { type ClientInfo, isUuid, type Membership } from '../../common/request';
 import { type Database, one } from '../../db/client';
@@ -94,12 +94,55 @@ export class MembersService {
     });
   }
 
-  private async find(memberId: string) {
+  /**
+   * The Owner hands the Workspace to another Member and stays on as an Admin.
+   * Both memberships are locked first, so two transfers at once cannot leave
+   * two Owners, and a target who leaves meanwhile cannot leave none.
+   */
+  async transferOwnership(
+    membership: Membership,
+    userId: string,
+    memberId: string,
+    client: ClientInfo,
+  ): Promise<void> {
+    const tx = scopedTx();
+    const own = and(
+      eq(workspaceMembers.workspaceId, membership.workspaceId),
+      eq(workspaceMembers.userId, userId),
+    );
+    const [self] = await tx
+      .select({ role: workspaceMembers.role })
+      .from(workspaceMembers)
+      .where(own)
+      .for('update');
+    const target = await this.find(memberId, { lock: true });
+    if (self?.role !== 'OWNER' || target.userId === userId) throw new ForbiddenException();
+    const bump = { version: sql`${workspaceMembers.version} + 1` };
+    await tx
+      .update(workspaceMembers)
+      .set({ role: 'ADMIN', ...bump })
+      .where(own);
+    await tx
+      .update(workspaceMembers)
+      .set({ role: 'OWNER', ...bump })
+      .where(eq(workspaceMembers.id, target.id));
+    await this.audit.record(tx, {
+      action: 'workspace.transfer_ownership',
+      actorUserId: userId,
+      workspaceId: membership.workspaceId,
+      client,
+      metadata: { memberUserId: target.userId, from: target.role, to: 'OWNER' },
+    });
+  }
+
+  /** The membership, locked against changes until the request commits when `lock`. */
+  private async find(memberId: string, { lock = false } = {}) {
     if (!isUuid(memberId)) throw new NotFoundException();
-    const [row] = await scopedTx()
+    const query = scopedTx()
       .select(columns)
       .from(workspaceMembers)
       .where(eq(workspaceMembers.id, memberId));
+    const [row] = await (lock ? query.for('update') : query);
     if (!row) throw new NotFoundException();
     return row;
   }

@@ -1,4 +1,4 @@
-import { Delete, Get, HttpCode, HttpStatus, Inject, Param, Patch } from '@nestjs/common';
+import { Delete, Get, HttpCode, HttpStatus, Inject, Param, Patch, Post } from '@nestjs/common';
 import {
   ApiForbiddenResponse,
   ApiNoContentResponse,
@@ -66,5 +66,20 @@ export class MembersController {
     @Client() client: ClientInfo,
   ) {
     return this.members.remove(membership, userId, memberId, client);
+  }
+
+  /** The Owner hands the Workspace to another Member and becomes an Admin. */
+  @Post(':memberId/transfer-ownership')
+  @MinRole('OWNER')
+  @HttpCode(HttpStatus.NO_CONTENT)
+  @ApiNoContentResponse({ description: 'The Member is the Owner; the former Owner an Admin' })
+  @ApiForbiddenResponse({ description: 'Only the Owner, and only to someone else' })
+  transferOwnership(
+    @CurrentMembership() membership: Membership,
+    @CurrentUserId() userId: string,
+    @Param('memberId') memberId: string,
+    @Client() client: ClientInfo,
+  ) {
+    return this.members.transferOwnership(membership, userId, memberId, client);
   }
 }

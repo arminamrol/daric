@@ -4,14 +4,31 @@ import { useOfflineDevice } from '../offline/offline';
 import { currentWorkspace, logoutPending, ME_QUERY_KEY } from './session';
 
 /**
- * Ends this Signed-in Device and wipes what it kept: the waiting changes (after
- * one last try to send them), the cached data and the "keep data" answer.
- * Offline the API cannot be told yet, but the device is wiped all the same.
+ * Wipes what this device kept of the signed-in User: the waiting changes, the
+ * cached data, the "keep data" answer and the chosen Workspace. Signed out,
+ * the session gate sends the visitor to login.
+ */
+export function useForgetSession(): () => Promise<void> {
+  const queryClient = useQueryClient();
+  const device = useOfflineDevice();
+  return async () => {
+    await device.wipe();
+    currentWorkspace.set(null);
+    // The query the header watches stays; everything else held in memory goes.
+    queryClient.setQueryData(ME_QUERY_KEY, null);
+    queryClient.removeQueries({ predicate: (q) => q.queryKey[0] !== ME_QUERY_KEY[0] });
+  };
+}
+
+/**
+ * Ends this Signed-in Device and wipes what it kept, after one last try to
+ * send the waiting changes. Offline the API cannot be told yet, but the device
+ * is wiped all the same.
  */
 export function useLogout() {
   const api = useApi();
-  const queryClient = useQueryClient();
   const device = useOfflineDevice();
+  const forget = useForgetSession();
   return useMutation({
     networkMode: 'always',
     mutationFn: async () => {
@@ -23,12 +40,7 @@ export function useLogout() {
         logoutPending.set(true);
         throw error;
       } finally {
-        await device.wipe();
-        currentWorkspace.set(null);
-        // Signed out: the session gate sends the visitor to login. The query
-        // the header watches stays; everything else held in memory goes.
-        queryClient.setQueryData(ME_QUERY_KEY, null);
-        queryClient.removeQueries({ predicate: (q) => q.queryKey[0] !== ME_QUERY_KEY[0] });
+        await forget();
       }
     },
   });

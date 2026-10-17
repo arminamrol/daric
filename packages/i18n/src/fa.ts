@@ -718,6 +718,10 @@ export const fa = {
   'members.leaveConfirm':
     'دیگر به داده‌های این فضای کاری دسترسی نخواهید داشت و رضایت اشتراک‌گذاری شما پس گرفته می‌شود.',
   'members.leaveYes': 'بله، ترک می‌کنم',
+  'members.makeOwner': 'مالک کردن',
+  'members.makeOwnerLabel': 'مالک کردن {email}',
+  'members.makeOwnerConfirm': '{email} مالک این فضای کاری می‌شود و شما مدیر آن می‌مانید.',
+  'members.makeOwnerYes': 'بله، مالک شود',
   'members.changeFailed': 'تغییر انجام نشد. دوباره امتحان کنید.',
   'invitations.title': 'دعوت‌ها',
   'invitations.new': 'دعوت تازه',
@@ -843,4 +847,23 @@ export const fa = {
   'audit.action.member.leave': 'ترک فضای کاری',
   'audit.action.consent.grant': 'دادن رضایت',
   'audit.action.consent.revoke': 'پس گرفتن رضایت',
+  'audit.action.workspace.transfer_ownership': 'واگذاری مالکیت',
+  'audit.action.user.delete': 'عضوی حساب کاربری‌اش را حذف کرد',
+  'deleteAccount.link': 'حذف حساب کاربری',
+  'deleteAccount.title': 'حذف حساب کاربری',
+  'deleteAccount.intro':
+    'حساب کاربری شما با رضایت‌ها و اشتراکتان برای همیشه حذف می‌شود و برگشت‌پذیر نیست. اگر داده‌هایتان را می‌خواهید، پیش از آن خروجی بگیرید.',
+  'deleteAccount.deleted': 'این فضاهای کاری با همهٔ محتوایشان حذف می‌شوند:',
+  'deleteAccount.kept': 'در فضاهای کاری دیگران، آنچه ثبت کرده‌اید بدون نام شما می‌ماند.',
+  'deleteAccount.shared':
+    'شما مالک فضاهای کاری‌ای هستید که دیگران هم عضوشان هستند. اول یکی از آن‌ها را مالک کنید:',
+  'deleteAccount.sharedItem': '{name} (دیگران: {count})',
+  'deleteAccount.chooseOwner': 'انتخاب مالک تازه',
+  'deleteAccount.plusForfeited':
+    'زمان باقی‌ماندهٔ دریک پلاس شما تا {date} با حساب از دست می‌رود و بازپرداخت نمی‌شود.',
+  'deleteAccount.password': 'رمز عبور شما',
+  'deleteAccount.submit': 'حساب کاربری‌ام برای همیشه حذف شود',
+  'deleteAccount.wrongPassword': 'رمز عبور درست نیست.',
+  'deleteAccount.failed': 'حساب کاربری حذف نشد. دوباره تلاش کنید.',
+  'deleteAccount.loadFailed': 'بارگذاری آنچه حذف می‌شود ممکن نشد.',
 } as const;
