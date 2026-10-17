@@ -1,7 +1,8 @@
 import { ApiError } from '@daric/api-client';
 import type { LoginInput, Me, Workspace } from '@daric/core';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { finishPendingLogout, logOut, useApi } from '../api/api';
+import { useEffect, useEffectEvent } from 'react';
+import { finishPendingLogout, logOut, onSignedOut, useApi } from '../api/api';
 import { useOfflineDevice } from '../offline/offline';
 
 export const ME_QUERY_KEY = ['me'] as const;
@@ -52,14 +53,28 @@ export function useLogin() {
 }
 
 /**
- * Ends this Signed-in Device and wipes what it kept: the waiting changes (after
- * one last try to send them), the cached data and the "keep data" answer. The
- * tokens are forgotten even when the API cannot be told; it is told later.
+ * Wipes what this phone kept of the signed-in User: the waiting changes, the
+ * cached data and the "keep data" answer. Signed out, the app shows login.
+ */
+function useForgetSession(): () => Promise<void> {
+  const queryClient = useQueryClient();
+  const device = useOfflineDevice();
+  return async () => {
+    await device.wipe();
+    queryClient.setQueryData(ME_QUERY_KEY, null);
+    queryClient.removeQueries({ predicate: (q) => q.queryKey[0] !== ME_QUERY_KEY[0] });
+  };
+}
+
+/**
+ * Ends this Signed-in Device and wipes what it kept, after one last try to
+ * send the waiting changes. The tokens are forgotten even when the API cannot
+ * be told; it is told later.
  */
 export function useLogout() {
   const api = useApi();
-  const queryClient = useQueryClient();
   const device = useOfflineDevice();
+  const forget = useForgetSession();
   return useMutation({
     networkMode: 'always',
     mutationFn: async () => {
@@ -67,10 +82,19 @@ export function useLogout() {
       try {
         await logOut(api);
       } finally {
-        await device.wipe();
-        queryClient.setQueryData(ME_QUERY_KEY, null);
-        queryClient.removeQueries({ predicate: (q) => q.queryKey[0] !== ME_QUERY_KEY[0] });
+        await forget();
       }
     },
   });
+}
+
+/**
+ * Wipes the phone, as on logout, whenever the API signs it out: a login
+ * elsewhere went past the device Entitlement, the User signed it out from
+ * another device, or its refresh token expired.
+ */
+export function useForgetWhenSignedOut(): void {
+  const forget = useForgetSession();
+  const signedOut = useEffectEvent(() => void forget());
+  useEffect(() => onSignedOut(signedOut), []);
 }

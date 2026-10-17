@@ -25,3 +25,4 @@ export * from './member';
 export * from './consent';
 export * from './audit';
 export * from './account-deletion';
+export * from './device';

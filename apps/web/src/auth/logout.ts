@@ -1,7 +1,9 @@
 import { useMutation, useQueryClient } from '@tanstack/react-query';
+import { useEffect, useEffectEvent } from 'react';
 import { useApi } from '../api/api';
 import { useOfflineDevice } from '../offline/offline';
 import { currentWorkspace, logoutPending, ME_QUERY_KEY } from './session';
+import { hasSignedIn, onSignedOut } from './signedOut';
 
 /**
  * Wipes what this device kept of the signed-in User: the waiting changes, the
@@ -13,6 +15,7 @@ export function useForgetSession(): () => Promise<void> {
   const device = useOfflineDevice();
   return async () => {
     await device.wipe();
+    hasSignedIn.set(false);
     currentWorkspace.set(null);
     // The query the header watches stays; everything else held in memory goes.
     queryClient.setQueryData(ME_QUERY_KEY, null);
@@ -44,4 +47,16 @@ export function useLogout() {
       }
     },
   });
+}
+
+/**
+ * Wipes the device, as on logout, whenever the API signs it out: another login
+ * went past the device Entitlement, the User signed it out elsewhere, or its
+ * refresh token expired. Changes still waiting are lost, as the server no longer
+ * takes them from this device.
+ */
+export function useForgetWhenSignedOut(): void {
+  const forget = useForgetSession();
+  const signedOut = useEffectEvent(() => void forget());
+  useEffect(() => onSignedOut(signedOut), []);
 }

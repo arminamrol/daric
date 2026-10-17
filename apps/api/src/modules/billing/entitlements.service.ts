@@ -30,8 +30,13 @@ export class EntitlementsService {
     await tx.insert(subscriptions).values({ userId, ...trialFor(now, this.billing.trialDays) });
   }
 
-  async subscriptionOf(userId: string, now = new Date()): Promise<Subscription> {
-    const [stored] = await this.db
+  /** `db` lets a check read inside the caller's transaction. */
+  async subscriptionOf(
+    userId: string,
+    now = new Date(),
+    db: Executor = this.db,
+  ): Promise<Subscription> {
+    const [stored] = await db
       .select({
         plan: subscriptions.plan,
         trialEndsAt: subscriptions.trialEndsAt,
@@ -43,7 +48,11 @@ export class EntitlementsService {
     return subscriptionView(stored, { now, billing: this.billing, aiAnalysesUsedThisMonth: 0 });
   }
 
-  async entitlementsOf(userId: string, now = new Date()): Promise<Entitlements> {
-    return (await this.subscriptionOf(userId, now)).entitlements;
+  async entitlementsOf(
+    userId: string,
+    now = new Date(),
+    db: Executor = this.db,
+  ): Promise<Entitlements> {
+    return (await this.subscriptionOf(userId, now, db)).entitlements;
   }
 }

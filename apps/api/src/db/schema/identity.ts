@@ -47,6 +47,38 @@ export const authIdentities = pgTable(
   ],
 );
 
+export const deviceEndReason = pgEnum('device_end_reason', [
+  'LOGOUT',
+  'REFRESH_REUSE',
+  'PASSWORD_RESET',
+  'DEVICE_LIMIT',
+  'SIGNED_OUT_REMOTELY',
+]);
+
+/**
+ * A Signed-in Device: one login and the refresh tokens rotated from it (its
+ * family, whose id is this row's). Counted against the User's device
+ * Entitlement while it has a live refresh token.
+ */
+export const signedInDevices = pgTable(
+  'signed_in_devices',
+  {
+    id: id(),
+    userId: uuid('user_id')
+      .notNull()
+      .references(() => users.id, { onDelete: 'cascade' }),
+    /** Browser and OS, or phone model; null when the client did not say. */
+    name: text('name'),
+    /** The login, then each refresh. */
+    lastUsedAt: timestamp('last_used_at', { withTimezone: true }).notNull().defaultNow(),
+    /** When its tokens were revoked, and why; null while it may still refresh. */
+    endedAt: timestamp('ended_at', { withTimezone: true }),
+    endReason: deviceEndReason('end_reason'),
+    createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => [index('signed_in_devices_user_id_idx').on(t.userId)],
+);
+
 /** A refresh token; tokens rotated from one login share a family (one Signed-in Device). */
 export const refreshTokens = pgTable(
   'refresh_tokens',
@@ -55,7 +87,9 @@ export const refreshTokens = pgTable(
     userId: uuid('user_id')
       .notNull()
       .references(() => users.id, { onDelete: 'cascade' }),
-    familyId: uuid('family_id').notNull(),
+    familyId: uuid('family_id')
+      .notNull()
+      .references(() => signedInDevices.id, { onDelete: 'cascade' }),
     /** SHA-256 of the token; the token itself is never stored. */
     tokenHash: text('token_hash').notNull(),
     expiresAt: timestamp('expires_at', { withTimezone: true }).notNull(),

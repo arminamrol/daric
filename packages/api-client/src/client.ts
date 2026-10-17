@@ -31,6 +31,11 @@ import {
   CLIENT_HEADER,
   CSRF_COOKIE,
   CSRF_HEADER,
+  DEVICE_NAME_HEADER,
+  type SignedInDevice,
+  signedInDeviceListSchema,
+  type SignedOutReason,
+  signedOutReasonSchema,
   type Label,
   labelListSchema,
   labelSchema,
@@ -156,6 +161,20 @@ export interface ApiClientOptions {
    * with a bearer header instead of cookies and refreshes the tokens itself.
    */
   tokens?: TokenStore;
+  /**
+   * Called when the API refused to refresh the session: this Signed-in Device
+   * is signed out, with `reason` when the User should be told why. The app
+   * wipes what the device kept, as on logout (ADR-0005).
+   */
+  onSignedOut?: (reason: SignedOutReason | undefined) => void;
+  /** A native app's name for its Signed-in Device (the phone model), sent on sign-in. */
+  deviceName?: string;
+  /**
+   * Whether this browser signed in, so a 401 is worth a refresh. The web app
+   * cannot see its httpOnly cookies, so it remembers; without this, every 401
+   * is. Unused with a token store, which knows whether it holds tokens.
+   */
+  mayRefresh?: () => boolean;
 }
 
 export interface ApiClient {
@@ -180,6 +199,10 @@ export interface ApiClient {
   updatePreferences(input: UpdateUserPreferencesInput): Promise<UserPreferences>;
   /** The User's Plan, its expiry and their Entitlements, as the server decides them. */
   getSubscription(): Promise<Subscription>;
+  /** The User's Signed-in Devices, most recently used first; `current` is this one. */
+  listDevices(): Promise<SignedInDevice[]>;
+  /** Signs one of the User's devices out; 404 when it is not signed in any more. */
+  signOutDevice(deviceId: string): Promise<void>;
   /** Everyone in the Workspace, in the order they joined; any Member may see them. */
   listMembers(workspaceId: string): Promise<Member[]>;
   /** Owner or Admin, by the role matrix: an Admin changes only Members and Viewers, to those. */
@@ -403,12 +426,28 @@ function documentCookie(name: string): string | undefined {
 }
 
 /**
+ * Runs `refresh` while no other tab of this browser refreshes: every tab
+ * shares the refresh cookie, and using it twice ends the Signed-in Device.
+ */
+function inOneTab<T>(refresh: () => Promise<T>): Promise<T> {
+  const locks = typeof navigator === 'undefined' ? undefined : navigator.locks;
+  return locks ? locks.request('daric.refresh', refresh) : refresh();
+}
+
+/** Why a refused refresh signed the device out, if the API said and this client knows it. */
+async function signedOutReason(res: Response): Promise<SignedOutReason | undefined> {
+  const body = (await readBody(res).catch(() => undefined)) as { reason?: unknown } | undefined;
+  const parsed = signedOutReasonSchema.safeParse(body?.reason);
+  return parsed.success ? parsed.data : undefined;
+}
+
+/**
  * The API client (ADR-0006). On the web the browser attaches the httpOnly
  * session cookies and this code never sees a token; the only cookie it reads
  * is the CSRF token, which it echoes in a header on every mutating request.
  * Given a token store (the mobile app), it sends the access token as a bearer
- * header instead and, when the API answers 401, refreshes the tokens once and
- * repeats the request.
+ * header instead. Either way, when the API answers 401 it refreshes the
+ * tokens once and repeats the request.
  */
 export function createApiClient(options: ApiClientOptions = {}): ApiClient {
   const baseUrl = options.baseUrl ?? '';
@@ -448,44 +487,73 @@ export function createApiClient(options: ApiClientOptions = {}): ApiClient {
   // twice ends the Signed-in Device.
   let refreshing: Promise<boolean> | undefined;
 
-  /** Gets new tokens after `stale` was refused; whether there are new ones to try. */
-  function refreshed(store: TokenStore, stale: string): Promise<boolean> {
-    return (refreshing ??= (async () => {
-      const held = await store.read();
-      if (!held) return false;
-      // Another request refreshed meanwhile.
-      if (held.accessToken !== stale) return true;
-      const res = await doFetch(`${baseUrl}/v1/auth/refresh`, {
-        method: 'POST',
-        headers: { [CLIENT_HEADER]: 'mobile', 'Content-Type': 'application/json' },
-        credentials: 'omit',
-        body: toJson({ refreshToken: held.refreshToken }),
-      });
-      if (res.status === 401) {
-        // Used, revoked or expired: this device is signed out.
-        await store.write(undefined);
-        return false;
-      }
-      if (!res.ok) return false;
-      const { accessToken, refreshToken } = authResultSchema.parse(await readBody(res));
-      await store.write({ accessToken, refreshToken });
-      return true;
-    })().finally(() => {
+  /** Gets new tokens after a 401; whether the request is worth repeating. */
+  function refreshed(stale: string | undefined): Promise<boolean> {
+    return (refreshing ??= (
+      tokens ? refreshTokens(tokens, stale) : inOneTab(refreshCookies)
+    ).finally(() => {
       refreshing = undefined;
     }));
   }
 
+  /** Used, revoked or expired: this device is signed out. */
+  async function signedOut(res: Response): Promise<false> {
+    options.onSignedOut?.(await signedOutReason(res));
+    return false;
+  }
+
+  /** The web app: the browser sends the refresh cookie and keeps the new ones. */
+  async function refreshCookies(): Promise<boolean> {
+    const headers: Record<string, string> = {};
+    const csrf = await csrfToken();
+    if (csrf) headers[CSRF_HEADER] = csrf;
+    const res = await doFetch(`${baseUrl}/v1/auth/refresh`, {
+      method: 'POST',
+      headers,
+      credentials: 'include',
+    });
+    if (res.status === 401) return signedOut(res);
+    return res.ok;
+  }
+
+  /** The mobile app: trades the stored refresh token for new tokens, after `stale` was refused. */
+  async function refreshTokens(store: TokenStore, stale: string | undefined): Promise<boolean> {
+    const held = await store.read();
+    if (!held) return false;
+    // Another request refreshed meanwhile.
+    if (held.accessToken !== stale) return true;
+    const res = await doFetch(`${baseUrl}/v1/auth/refresh`, {
+      method: 'POST',
+      headers: { [CLIENT_HEADER]: 'mobile', 'Content-Type': 'application/json' },
+      credentials: 'omit',
+      body: toJson({ refreshToken: held.refreshToken }),
+    });
+    if (res.status === 401) {
+      await store.write(undefined);
+      return signedOut(res);
+    }
+    if (!res.ok) return false;
+    const { accessToken, refreshToken } = authResultSchema.parse(await readBody(res));
+    await store.write({ accessToken, refreshToken });
+    return true;
+  }
+
   /**
    * Sends a request, refreshing the tokens once when the access token was
-   * refused. An `anonymous` one (signing in or out) carries no access token.
+   * refused. An `anonymous` one (signing in or out) carries no access token
+   * and is never repeated.
    */
   async function send(
     method: string,
     path: string,
     body?: unknown,
-    { anonymous = false, retry = true } = {},
+    {
+      anonymous = false,
+      retry = true,
+      extraHeaders = {},
+    }: { anonymous?: boolean; retry?: boolean; extraHeaders?: Record<string, string> } = {},
   ): Promise<Response> {
-    const headers: Record<string, string> = {};
+    const headers: Record<string, string> = { ...extraHeaders };
     const { credentials, accessToken } = await authenticate(method, headers, anonymous);
     const init: RequestInit = { method, headers, credentials };
     if (body !== undefined) {
@@ -496,11 +564,12 @@ export function createApiClient(options: ApiClientOptions = {}): ApiClient {
     if (
       res.status === 401 &&
       retry &&
-      tokens &&
-      accessToken &&
-      (await refreshed(tokens, accessToken))
+      !anonymous &&
+      // Signed out: there is nothing to refresh.
+      (tokens ? accessToken !== undefined : (options.mayRefresh?.() ?? true)) &&
+      (await refreshed(accessToken))
     ) {
-      return send(method, path, body, { retry: false });
+      return send(method, path, body, { retry: false, extraHeaders });
     }
     return res;
   }
@@ -510,9 +579,12 @@ export function createApiClient(options: ApiClientOptions = {}): ApiClient {
     path: string,
     schema: { parse(value: unknown): T },
     body?: unknown,
-    { anonymous = false } = {},
+    {
+      anonymous = false,
+      extraHeaders = {},
+    }: { anonymous?: boolean; extraHeaders?: Record<string, string> } = {},
   ): Promise<T> {
-    const res = await send(method, path, body, { anonymous });
+    const res = await send(method, path, body, { anonymous, extraHeaders });
     const parsed = await readBody(res);
     if (!res.ok) throw new ApiError(res.status, parsed);
     return schema.parse(parsed);
@@ -520,20 +592,26 @@ export function createApiClient(options: ApiClientOptions = {}): ApiClient {
 
   /** Signs in or up; the mobile app keeps the tokens it is handed. */
   async function signIn(path: string, input: unknown): Promise<Session> {
-    if (!tokens) return request('POST', path, sessionSchema, input);
+    const extraHeaders: Record<string, string> = options.deviceName
+      ? { [DEVICE_NAME_HEADER]: options.deviceName }
+      : {};
+    if (!tokens) {
+      return request('POST', path, sessionSchema, input, { anonymous: true, extraHeaders });
+    }
     const { accessToken, refreshToken, ...session } = await request(
       'POST',
       path,
       authResultSchema,
       input,
-      { anonymous: true },
+      { anonymous: true, extraHeaders },
     );
     await tokens.write({ accessToken, refreshToken });
     return session;
   }
 
   async function logout(): Promise<void> {
-    if (!tokens) return request('POST', '/v1/auth/logout', noContent);
+    if (!tokens)
+      return request('POST', '/v1/auth/logout', noContent, undefined, { anonymous: true });
     const refreshToken = (await tokens.read())?.refreshToken;
     try {
       await request('POST', '/v1/auth/logout', noContent, refreshToken && { refreshToken }, {
@@ -558,6 +636,9 @@ export function createApiClient(options: ApiClientOptions = {}): ApiClient {
     updatePreferences: (input) =>
       request('PATCH', '/v1/me/preferences', userPreferencesSchema, input),
     getSubscription: () => request('GET', '/v1/me/subscription', subscriptionSchema),
+    listDevices: () => request('GET', '/v1/me/devices', signedInDeviceListSchema),
+    signOutDevice: (deviceId) =>
+      request('DELETE', `/v1/me/devices/${encodeURIComponent(deviceId)}`, noContent),
     listMembers: (workspaceId) => request('GET', membersPath(workspaceId), memberListSchema),
     updateMember: (workspaceId, memberId, input) =>
       request(

@@ -325,7 +325,10 @@ describe('Keeping data on this device', () => {
     goOffline(fake);
     await userEvent.type(amountField(form), '۱۲{Enter}');
     await row('−۱۲ ریال');
-    expect(localStorage.getItem('daric.lastPicks.' + fake.workspace().id)).not.toBeNull();
+    // Written once the change is queued, which can come just after the row shows.
+    await vi.waitFor(() =>
+      expect(localStorage.getItem('daric.lastPicks.' + fake.workspace().id)).not.toBeNull(),
+    );
 
     await userEvent.click(screen.getByRole('button', { name: 'خروج' }));
     expect(await screen.findByRole('heading', { name: 'ورود به دریک' })).toBeTruthy();

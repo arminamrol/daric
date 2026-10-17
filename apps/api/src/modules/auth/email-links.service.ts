@@ -141,7 +141,7 @@ export class EmailLinksService {
         .where(and(eq(authIdentities.userId, userId), eq(authIdentities.provider, 'PASSWORD')));
       // Following a link mailed to the address proves the User reads it.
       const user = await markVerified(tx, userId);
-      await this.tokens.revokeAllForUser(tx, userId);
+      await this.tokens.revokeAllForUser(tx, userId, 'PASSWORD_RESET');
       await this.emailTokens.voidOutstanding(tx, userId, 'RESET_PASSWORD');
       await this.audit.record(tx, { action: 'auth.password_reset', actorUserId: userId, client });
       return {

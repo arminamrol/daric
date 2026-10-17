@@ -2,11 +2,12 @@ import { ApiError } from '@daric/api-client';
 import type { Me, Workspace } from '@daric/core';
 import { useQuery } from '@tanstack/react-query';
 import { useSyncExternalStore } from 'react';
-import { Navigate, Outlet } from 'react-router';
+import { Navigate, Outlet, useLocation } from 'react-router';
 import { useApi } from '../api/api';
 import { useI18n } from '../i18n/locale';
 import { storedFlag } from '../lib/storedFlag';
 import { pendingInvitation } from '../members/pendingInvitation';
+import { hasSignedIn } from './signedOut';
 
 export const ME_QUERY_KEY = ['me'] as const;
 
@@ -33,7 +34,10 @@ export function useMe() {
         return null;
       }
       try {
-        return await api.me();
+        const me = await api.me();
+        // Signed in before this browser remembered it; from now on a 401 is worth a refresh.
+        hasSignedIn.set(true);
+        return me;
       } catch (error) {
         if (error instanceof ApiError && error.status === 401) return null;
         throw error;
@@ -101,6 +105,7 @@ function Loading() {
 export function RequireSession() {
   const { t } = useI18n();
   const me = useMe();
+  const location = useLocation();
   if (me.isPending) return <Loading />;
   // Who was signed in last time is enough offline: a failed refetch keeps it.
   if (me.isError && me.data === undefined) {
@@ -110,16 +115,29 @@ export function RequireSession() {
       </p>
     );
   }
-  if (!me.data) return <Navigate to="/login" replace />;
+  if (!me.data) return <Navigate to="/login" replace state={{ from: location.pathname }} />;
   return <Outlet />;
 }
 
-/** Where a User goes once signed in: back to an Invitation opened while signed out, else home. */
-export const afterSignIn = () => (pendingInvitation.get() ? '/invitation' : '/');
+/**
+ * Where a User goes once signed in: back to an Invitation opened while signed
+ * out, else to the page that sent them to log in, else home.
+ */
+export function useAfterSignIn(): () => string {
+  const { state } = useLocation();
+  const from = (state as { from?: unknown } | null)?.from;
+  return () =>
+    pendingInvitation.get()
+      ? '/invitation'
+      : typeof from === 'string' && from.startsWith('/')
+        ? from
+        : '/';
+}
 
-/** Layout route for login and sign-up; a signed-in User goes on (`afterSignIn`) instead. */
+/** Layout route for login and sign-up; a signed-in User goes on (`useAfterSignIn`) instead. */
 export function GuestOnly() {
   const me = useMe();
+  const afterSignIn = useAfterSignIn();
   if (me.isPending) return <Loading />;
   if (me.data) return <Navigate to={afterSignIn()} replace />;
   return <Outlet />;

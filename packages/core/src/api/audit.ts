@@ -54,6 +54,8 @@ export const auditActions = [
   'consent.revoke',
   'workspace.transfer_ownership',
   'user.delete',
+  'auth.device_limit',
+  'auth.device_sign_out',
 ] as const;
 export type AuditAction = (typeof auditActions)[number];
 

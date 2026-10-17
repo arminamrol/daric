@@ -1,6 +1,12 @@
 import { describe, expect, it } from 'vitest';
-import { ApiError, createApiClient, memoryTokenStore, transactionConflict } from './index';
-import type { TokenStore } from './index';
+import {
+  ApiError,
+  createApiClient,
+  memoryTokenStore,
+  signedOutChannel,
+  transactionConflict,
+} from './index';
+import type { ApiClientOptions, TokenStore } from './index';
 
 const user = { id: '01900000-0000-7000-8000-000000000000', email: 'sara@example.com' };
 const preferences = {
@@ -44,6 +50,7 @@ function fakeServer(
   >,
   initialCookies: Record<string, string> = {},
   tokens?: TokenStore,
+  options: Pick<ApiClientOptions, 'onSignedOut' | 'deviceName' | 'mayRefresh'> = {},
 ) {
   const cookies = new Map(Object.entries(initialCookies));
   const sent: Sent[] = [];
@@ -70,6 +77,7 @@ function fakeServer(
     fetch,
     readCookie: (name) => cookies.get(name),
     ...(tokens && { tokens }),
+    ...options,
   });
   return { client, sent };
 }
@@ -132,6 +140,125 @@ describe('api-client', () => {
     );
     await client.me();
     expect(sent[0]?.headers.has('x-csrf-token')).toBe(false);
+  });
+
+  describe('refreshing a lapsed web session', () => {
+    const me = { user: { ...user, emailVerified: true }, preferences, workspaces: [] };
+
+    /** `/v1/me` answers 401 until a refresh succeeded. */
+    function lapsed(
+      refresh: () => { status: number; body?: unknown },
+      onSignedOut?: ApiClientOptions['onSignedOut'],
+    ) {
+      let refreshed = false;
+      return fakeServer(
+        {
+          'GET /v1/me': () => (refreshed ? { status: 200, body: me } : { status: 401 }),
+          'POST /v1/auth/refresh': () => {
+            const res = refresh();
+            refreshed = res.status === 200;
+            return res;
+          },
+        },
+        { '__Host-daric_csrf': 'csrf-1' },
+        undefined,
+        onSignedOut && { onSignedOut },
+      );
+    }
+
+    it('refreshes with the refresh cookie and repeats the request', async () => {
+      const { client, sent } = lapsed(() => ({ status: 200, body: session }));
+      expect(await client.me()).toEqual(me);
+      expect(sent.map((r) => `${r.method} ${r.url}`)).toEqual([
+        'GET /v1/me',
+        'POST /v1/auth/refresh',
+        'GET /v1/me',
+      ]);
+      expect(sent[1]?.headers.get('x-csrf-token')).toBe('csrf-1');
+      expect(sent[1]?.credentials).toBe('include');
+      expect(sent[1]?.body).toBeUndefined();
+    });
+
+    it('refreshes once for requests that fail together', async () => {
+      const { client, sent } = lapsed(() => ({ status: 200, body: session }));
+      await Promise.all([client.me(), client.me(), client.me()]);
+      expect(sent.filter((r) => r.url === '/v1/auth/refresh')).toHaveLength(1);
+    });
+
+    it('tells why the device was signed out, and fails with the first 401', async () => {
+      const reasons: unknown[] = [];
+      const { client } = lapsed(
+        () => ({ status: 401, body: { statusCode: 401, reason: 'DEVICE_LIMIT' } }),
+        (reason?: unknown) => void reasons.push(reason),
+      );
+      await expect(client.me()).rejects.toMatchObject({ status: 401 });
+      expect(reasons).toEqual(['DEVICE_LIMIT']);
+    });
+
+    it('says it was signed out without a reason when the refresh is refused for another', async () => {
+      const reasons: unknown[] = [];
+      const { client } = lapsed(
+        () => ({ status: 401, body: { statusCode: 401, reason: 'SOMETHING_NEW' } }),
+        (reason?: unknown) => void reasons.push(reason),
+      );
+      await expect(client.me()).rejects.toMatchObject({ status: 401 });
+      expect(reasons).toEqual([undefined]);
+    });
+
+    it('is not signed out when the refresh fails for another reason', async () => {
+      const reasons: unknown[] = [];
+      const { client } = lapsed(
+        () => ({ status: 503 }),
+        (reason?: unknown) => void reasons.push(reason),
+      );
+      await expect(client.me()).rejects.toMatchObject({ status: 401 });
+      expect(reasons).toEqual([]);
+    });
+
+    it('does not refresh for a browser that never signed in', async () => {
+      const reasons: unknown[] = [];
+      const { client, sent } = fakeServer(
+        { 'GET /v1/me': () => ({ status: 401 }) },
+        { '__Host-daric_csrf': 'csrf-1' },
+        undefined,
+        { mayRefresh: () => false, onSignedOut: (reason) => void reasons.push(reason) },
+      );
+      await expect(client.me()).rejects.toMatchObject({ status: 401 });
+      expect(sent.map((r) => r.url)).toEqual(['/v1/me']);
+      expect(reasons).toEqual([]);
+    });
+
+    it('does not refresh after a failed login', async () => {
+      const { client, sent } = fakeServer(
+        { 'POST /v1/auth/login': () => ({ status: 401 }) },
+        { '__Host-daric_csrf': 'csrf-1' },
+      );
+      await expect(
+        client.login({ email: user.email, password: 'wrong password' }),
+      ).rejects.toMatchObject({ status: 401 });
+      expect(sent.map((r) => r.url)).toEqual(['/v1/auth/login']);
+    });
+  });
+
+  it('lists the Signed-in Devices and signs one out', async () => {
+    const device = {
+      id: '01900000-0000-7000-8000-0000000000d1',
+      name: 'Chrome · Windows',
+      signedInAt: '2026-10-10T10:00:00.000Z',
+      lastUsedAt: '2026-10-11T10:00:00.000Z',
+      current: true,
+    };
+    const { client, sent } = fakeServer(
+      {
+        'GET /v1/me/devices': () => ({ status: 200, body: [device] }),
+        [`DELETE /v1/me/devices/${device.id}`]: () => ({ status: 204 }),
+      },
+      { '__Host-daric_csrf': 'csrf-1' },
+    );
+    expect(await client.listDevices()).toEqual([device]);
+    await client.signOutDevice(device.id);
+    expect(sent[1]?.method).toBe('DELETE');
+    expect(sent[1]?.headers.get('x-csrf-token')).toBe('csrf-1');
   });
 
   it('logs out with the CSRF header and no body: the browser sends the refresh cookie', async () => {
@@ -1340,6 +1467,48 @@ describe('api-client', () => {
       expect(await tokens.read()).toEqual({ accessToken: 'access-1', refreshToken: 'refresh-1' });
     });
 
+    it('tells why the device was signed out when the refresh is refused', async () => {
+      const reasons: unknown[] = [];
+      const tokens = memoryTokenStore({ accessToken: 'access-1', refreshToken: 'refresh-1' });
+      const { client } = fakeServer(
+        {
+          'GET /v1/me': () => ({ status: 401 }),
+          'POST /v1/auth/refresh': () => ({
+            status: 401,
+            body: { statusCode: 401, reason: 'SIGNED_OUT_REMOTELY' },
+          }),
+        },
+        {},
+        tokens,
+        { onSignedOut: (reason) => void reasons.push(reason) },
+      );
+      await expect(client.me()).rejects.toMatchObject({ status: 401 });
+      expect(reasons).toEqual(['SIGNED_OUT_REMOTELY']);
+      expect(await tokens.read()).toBeUndefined();
+    });
+
+    it('names the device when signing in, and only then', async () => {
+      const tokens = memoryTokenStore();
+      const { client, sent } = fakeServer(
+        {
+          'POST /v1/auth/register': () => ({ status: 201, body: signedIn }),
+          'POST /v1/auth/login': () => ({ status: 200, body: signedIn }),
+          'GET /v1/me': () => ({ status: 200, body: me }),
+        },
+        {},
+        tokens,
+        { deviceName: 'Pixel 9' },
+      );
+      await client.register({ email: user.email, password: 'secret password' });
+      await client.login({ email: user.email, password: 'secret password' });
+      await client.me();
+      expect(sent.map((r) => r.headers.get('x-daric-device'))).toEqual([
+        'Pixel 9',
+        'Pixel 9',
+        null,
+      ]);
+    });
+
     it('does not refresh after a failed login', async () => {
       const { client, sent } = mobile(
         { 'POST /v1/auth/login': () => ({ status: 401 }) },
@@ -1389,5 +1558,17 @@ describe('api-client', () => {
       expect(sent[0]?.headers.get('authorization')).toBe('Bearer access-1');
       expect(sent[0]?.headers.get('x-daric-client')).toBe('mobile');
     });
+  });
+});
+
+describe('signedOutChannel', () => {
+  it('tells every subscriber why, until they unsubscribe', () => {
+    const channel = signedOutChannel();
+    const heard: unknown[] = [];
+    const stop = channel.subscribe((reason) => void heard.push(reason));
+    channel.report('DEVICE_LIMIT');
+    stop();
+    channel.report(undefined);
+    expect(heard).toEqual(['DEVICE_LIMIT']);
   });
 });
