@@ -169,6 +169,12 @@ export interface ApiClientOptions {
   onSignedOut?: (reason: SignedOutReason | undefined) => void;
   /** A native app's name for its Signed-in Device (the phone model), sent on sign-in. */
   deviceName?: string;
+  /**
+   * Whether this browser signed in, so a 401 is worth a refresh. The web app
+   * cannot see its httpOnly cookies, so it remembers; without this, every 401
+   * is. Unused with a token store, which knows whether it holds tokens.
+   */
+  mayRefresh?: () => boolean;
 }
 
 export interface ApiClient {
@@ -441,7 +447,7 @@ async function signedOutReason(res: Response): Promise<SignedOutReason | undefin
  * is the CSRF token, which it echoes in a header on every mutating request.
  * Given a token store (the mobile app), it sends the access token as a bearer
  * header instead. Either way, when the API answers 401 it refreshes the
- * session once and repeats the request.
+ * tokens once and repeats the request.
  */
 export function createApiClient(options: ApiClientOptions = {}): ApiClient {
   const baseUrl = options.baseUrl ?? '';
@@ -481,7 +487,7 @@ export function createApiClient(options: ApiClientOptions = {}): ApiClient {
   // twice ends the Signed-in Device.
   let refreshing: Promise<boolean> | undefined;
 
-  /** Gets a new session after a 401; whether the request is worth repeating. */
+  /** Gets new tokens after a 401; whether the request is worth repeating. */
   function refreshed(stale: string | undefined): Promise<boolean> {
     return (refreshing ??= (
       tokens ? refreshTokens(tokens, stale) : inOneTab(refreshCookies)
@@ -533,7 +539,7 @@ export function createApiClient(options: ApiClientOptions = {}): ApiClient {
   }
 
   /**
-   * Sends a request, refreshing the session once when the access token was
+   * Sends a request, refreshing the tokens once when the access token was
    * refused. An `anonymous` one (signing in or out) carries no access token
    * and is never repeated.
    */
@@ -559,8 +565,8 @@ export function createApiClient(options: ApiClientOptions = {}): ApiClient {
       res.status === 401 &&
       retry &&
       !anonymous &&
-      // Signed out on the phone: there is nothing to refresh.
-      (!tokens || accessToken) &&
+      // Signed out: there is nothing to refresh.
+      (tokens ? accessToken !== undefined : (options.mayRefresh?.() ?? true)) &&
       (await refreshed(accessToken))
     ) {
       return send(method, path, body, { retry: false, extraHeaders });

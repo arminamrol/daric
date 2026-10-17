@@ -91,7 +91,7 @@ export function useLogout() {
 /**
  * Wipes the phone, as on logout, whenever the API signs it out: a login
  * elsewhere went past the device Entitlement, the User signed it out from
- * another device, or the session lapsed.
+ * another device, or its refresh token expired.
  */
 export function useForgetWhenSignedOut(): void {
   const forget = useForgetSession();

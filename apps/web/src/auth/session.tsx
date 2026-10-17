@@ -7,6 +7,7 @@ import { useApi } from '../api/api';
 import { useI18n } from '../i18n/locale';
 import { storedFlag } from '../lib/storedFlag';
 import { pendingInvitation } from '../members/pendingInvitation';
+import { hasSignedIn } from './signedOut';
 
 export const ME_QUERY_KEY = ['me'] as const;
 
@@ -33,7 +34,10 @@ export function useMe() {
         return null;
       }
       try {
-        return await api.me();
+        const me = await api.me();
+        // Signed in before this browser remembered it; from now on a 401 is worth a refresh.
+        hasSignedIn.set(true);
+        return me;
       } catch (error) {
         if (error instanceof ApiError && error.status === 401) return null;
         throw error;

@@ -1,4 +1,4 @@
-import { ApiError, createApiClient, memoryTokenStore } from '@daric/api-client';
+import { ApiError, createApiClient, memoryTokenStore, signedOutChannel } from '@daric/api-client';
 import type { ApiClient } from '@daric/api-client';
 import Constants from 'expo-constants';
 import * as SecureStore from 'expo-secure-store';
@@ -20,13 +20,10 @@ const LOGOUT_PENDING = 'daric.logoutPending';
 
 const tokens = secureStoreTokens(SecureStore);
 
-const signedOutListeners = new Set<() => void>();
+const signedOut = signedOutChannel();
 
 /** Runs `listener` whenever the API refuses to refresh: this phone is signed out. */
-export function onSignedOut(listener: () => void): () => void {
-  signedOutListeners.add(listener);
-  return () => void signedOutListeners.delete(listener);
-}
+export const onSignedOut = signedOut.subscribe;
 
 /** The API client of the mobile app: bearer tokens kept in SecureStore (ADR-0006). */
 export function createMobileApi(): ApiClient {
@@ -35,9 +32,7 @@ export function createMobileApi(): ApiClient {
     baseUrl: API_URL,
     tokens,
     ...(deviceName && { deviceName }),
-    onSignedOut: () => {
-      for (const listener of signedOutListeners) listener();
-    },
+    onSignedOut: signedOut.report,
   });
 }
 

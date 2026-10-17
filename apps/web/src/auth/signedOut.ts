@@ -1,7 +1,16 @@
+import { signedOutChannel } from '@daric/api-client';
 import { type SignedOutReason, signedOutReasonSchema } from '@daric/core';
+import { storedFlag } from '../lib/storedFlag';
 
 const KEY = 'daric.signedOut';
-const listeners = new Set<() => void>();
+const channel = signedOutChannel();
+
+/**
+ * Whether this browser holds a Signed-in Device, as far as it knows: set when
+ * it signs in or the API names the User, cleared when it forgets the session.
+ * Only then is a 401 worth a refresh; a visitor who never signed in skips it.
+ */
+export const hasSignedIn = storedFlag('daric.signedIn');
 
 /**
  * Why the server last signed this browser out, kept until the next sign-in
@@ -27,17 +36,13 @@ export const signedOutNotice = {
 };
 
 /**
- * The API refused to refresh the session: this Signed-in Device is signed
- * out. Remembers why, if told, and has the app forget the session.
+ * The API refused to refresh: this Signed-in Device is signed out. Remembers why, if told, and has the app forget the session.
  * A later refusal without a reason (another tab's) keeps the one given.
  */
 export function reportSignedOut(reason: SignedOutReason | undefined): void {
   if (reason) signedOutNotice.set(reason);
-  for (const listener of listeners) listener();
+  channel.report(reason);
 }
 
-/** Runs `listener` whenever the session is found signed out; returns the unsubscribe. */
-export function onSignedOut(listener: () => void): () => void {
-  listeners.add(listener);
-  return () => void listeners.delete(listener);
-}
+/** Runs `listener` whenever this Signed-in Device is found signed out; returns the unsubscribe. */
+export const onSignedOut = channel.subscribe;

@@ -23,7 +23,7 @@ export interface IssuedTokens {
 /** What presenting a refresh token led to. */
 export type Rotation =
   | { outcome: 'rotated'; userId: string; tokens: IssuedTokens }
-  /** The token was already rotated: someone replayed it, so its family is now revoked. */
+  /** The token was already rotated: someone replayed it, so its family is now revoked (if it was not already). */
   | { outcome: 'reused'; userId: string }
   /** Unknown, revoked or expired; `reason` when the User should be told why it was revoked. */
   | { outcome: 'invalid'; reason?: SignedOutReason };
@@ -31,7 +31,10 @@ export type Rotation =
 /** Why a Signed-in Device ended. */
 export type DeviceEndReason = NonNullable<(typeof signedInDevices.$inferSelect)['endReason']>;
 
-/** Whether a refused refresh explains this end reason to the User. */
+/**
+ * Whether a refused refresh explains this end reason to the User. Core's
+ * `signedOutReasons` is the subset of the database's end reasons a client is told.
+ */
 const isExplained = (reason: DeviceEndReason | null | undefined): reason is SignedOutReason =>
   (signedOutReasons as readonly string[]).includes(reason ?? '');
 
@@ -53,7 +56,12 @@ export function hashToken(token: string): string {
   return createHash('sha256').update(token).digest('hex');
 }
 
-/** Short-lived JWT access tokens and opaque, stored refresh tokens. */
+/**
+ * Short-lived JWT access tokens and opaque, stored refresh tokens. A token
+ * family is a Signed-in Device, so this also starts, rotates and ends the
+ * `signed_in_devices` rows, keeping each change in step with the tokens and
+ * under the same locks; SignedInDevicesService lists them and applies the limit.
+ */
 @Injectable()
 export class TokenService {
   private readonly key: Uint8Array;
@@ -89,15 +97,16 @@ export class TokenService {
     const locked = await this.lockByToken(tx, refreshToken);
     if (!locked) return { outcome: 'invalid' };
     const { row, device } = locked;
+    // Reuse is checked first: a replayed token's descendants may still be alive,
+    // and a replay is audited even once its device has ended or expired.
+    if (row.usedAt) {
+      if (!device.endedAt) await this.endDevices(tx, [row.familyId], 'REFRESH_REUSE', now);
+      return { outcome: 'reused', userId: row.userId };
+    }
     if (row.revokedAt || device.endedAt) {
       return isExplained(device.endReason)
         ? { outcome: 'invalid', reason: device.endReason }
         : { outcome: 'invalid' };
-    }
-    // Reuse is checked before expiry: a replayed token's descendants may still be alive.
-    if (row.usedAt) {
-      await this.endDevices(tx, [row.familyId], 'REFRESH_REUSE', now);
-      return { outcome: 'reused', userId: row.userId };
     }
     if (row.expiresAt <= now) return { outcome: 'invalid' };
     await tx.update(refreshTokens).set({ usedAt: now }).where(eq(refreshTokens.id, row.id));
@@ -205,6 +214,7 @@ export class TokenService {
     const refreshTokenExpiresAt = new Date(
       now.getTime() + this.config.REFRESH_TOKEN_TTL_SECONDS * 1000,
     );
+    // `sid` (session id, RFC 9068 style) names the Signed-in Device, so a request knows which one it is.
     const accessToken = await new SignJWT({ sid: familyId })
       .setProtectedHeader({ alg: 'HS256' })
       .setSubject(userId)

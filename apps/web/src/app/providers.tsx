@@ -4,7 +4,7 @@ import { useState } from 'react';
 import type { ReactNode } from 'react';
 import { ApiProvider } from '../api/api';
 import { useForgetWhenSignedOut } from '../auth/logout';
-import { reportSignedOut } from '../auth/signedOut';
+import { hasSignedIn, reportSignedOut } from '../auth/signedOut';
 import { LocaleProvider } from '../i18n/locale';
 import { OfflineProvider } from '../offline/offline';
 
@@ -23,7 +23,9 @@ export function AppProviders({
     () => new QueryClient({ defaultOptions: { queries: { gcTime: KEPT_FOR } } }),
   );
   // The API is served from the web app's origin (Vite proxies `/v1` in development).
-  const [client] = useState(() => api ?? createApiClient({ onSignedOut: reportSignedOut }));
+  const [client] = useState(
+    () => api ?? createApiClient({ onSignedOut: reportSignedOut, mayRefresh: hasSignedIn.get }),
+  );
 
   return (
     <ApiProvider value={client}>

@@ -1,4 +1,5 @@
 import {
+  ConflictException,
   Controller,
   Delete,
   Get,
@@ -9,6 +10,7 @@ import {
 } from '@nestjs/common';
 import {
   ApiBearerAuth,
+  ApiConflictResponse,
   ApiNoContentResponse,
   ApiNotFoundResponse,
   ApiOkResponse,
@@ -50,11 +52,18 @@ export class SignedInDevicesController {
     description: 'The device is signed out; its next refresh is refused as SIGNED_OUT_REMOTELY',
   })
   @ApiNotFoundResponse({ description: 'Not one of the User’s Signed-in Devices' })
+  @ApiConflictResponse({
+    description: 'It is the device asking: log out instead, which also wipes what it kept',
+  })
   async signOut(
     @CurrentUserId() userId: string,
+    @CurrentDeviceId() currentDeviceId: string | null,
     @Param('deviceId') deviceId: string,
     @Client() client: ClientInfo,
   ): Promise<void> {
+    if (deviceId === currentDeviceId) {
+      throw new ConflictException('This is the current device; log out instead');
+    }
     if (!isUuid(deviceId) || !(await this.devices.signOut(userId, deviceId, client))) {
       throw new NotFoundException();
     }

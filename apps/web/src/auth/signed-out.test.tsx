@@ -25,9 +25,11 @@ describe('signed out by the server', () => {
     await logIn({ keepData: true });
     await screen.findByRole('heading', { name: 'به دریک خوش آمدید' });
     await vi.waitFor(async () => expect(await kept('queryCache')).toBeDefined());
+    // Signed in, a 401 from now on is worth a refresh.
+    expect(localStorage.getItem('daric.signedIn')).toBe('yes');
 
     // Sara logs in on her phone; this browser's next refresh is refused.
-    fake.endSession();
+    fake.signOutThisDevice();
     act(() => reportSignedOut('DEVICE_LIMIT'));
 
     expect(await loginHeading()).toBeTruthy();
@@ -37,6 +39,7 @@ describe('signed out by the server', () => {
     );
     await vi.waitFor(async () => expect(await kept('queryCache')).toBeUndefined());
     expect(localStorage.getItem('daric.keepData')).toBeNull();
+    expect(localStorage.getItem('daric.signedIn')).toBeNull();
 
     // The link leads to Plus once she is signed in again.
     await userEvent.click(
@@ -53,7 +56,7 @@ describe('signed out by the server', () => {
     renderApp({ path: '/settings', api: fake.api });
     await screen.findByRole('heading', { name: 'تنظیمات', level: 1 });
 
-    fake.endSession();
+    fake.signOutThisDevice();
     act(() => reportSignedOut('SIGNED_OUT_REMOTELY'));
 
     expect(await loginHeading()).toBeTruthy();
@@ -68,7 +71,7 @@ describe('signed out by the server', () => {
     renderApp({ path: '/', api: fake.api });
     await screen.findByRole('heading', { name: 'به دریک خوش آمدید' });
 
-    fake.endSession();
+    fake.signOutThisDevice();
     act(() => {
       reportSignedOut('DEVICE_LIMIT');
       reportSignedOut(undefined);

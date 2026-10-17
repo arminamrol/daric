@@ -10,7 +10,7 @@ import { useApi } from '../api/api';
 import { useI18n } from '../i18n/locale';
 import { useOfflineDevice } from '../offline/offline';
 import { logoutPending, ME_QUERY_KEY, useAfterSignIn } from './session';
-import { signedOutNotice } from './signedOut';
+import { hasSignedIn, signedOutNotice } from './signedOut';
 
 type Mode = 'login' | 'signup';
 type Field = 'email' | 'password';
@@ -109,6 +109,7 @@ export function AuthForm({ mode }: { mode: Mode }) {
     onSuccess: async (_, { keepData }) => {
       logoutPending.set(false);
       signedOutNotice.set(null);
+      hasSignedIn.set(true);
       await device.setKeep(keepData);
       // The cookies changed; ask the API who is signed in now. Reset, not removed:
       // the header keeps watching the same query and shows the signed-in nav.

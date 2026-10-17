@@ -1,5 +1,11 @@
 import { describe, expect, it } from 'vitest';
-import { ApiError, createApiClient, memoryTokenStore, transactionConflict } from './index';
+import {
+  ApiError,
+  createApiClient,
+  memoryTokenStore,
+  signedOutChannel,
+  transactionConflict,
+} from './index';
 import type { ApiClientOptions, TokenStore } from './index';
 
 const user = { id: '01900000-0000-7000-8000-000000000000', email: 'sara@example.com' };
@@ -44,7 +50,7 @@ function fakeServer(
   >,
   initialCookies: Record<string, string> = {},
   tokens?: TokenStore,
-  options: Pick<ApiClientOptions, 'onSignedOut' | 'deviceName'> = {},
+  options: Pick<ApiClientOptions, 'onSignedOut' | 'deviceName' | 'mayRefresh'> = {},
 ) {
   const cookies = new Map(Object.entries(initialCookies));
   const sent: Sent[] = [];
@@ -206,6 +212,19 @@ describe('api-client', () => {
         (reason?: unknown) => void reasons.push(reason),
       );
       await expect(client.me()).rejects.toMatchObject({ status: 401 });
+      expect(reasons).toEqual([]);
+    });
+
+    it('does not refresh for a browser that never signed in', async () => {
+      const reasons: unknown[] = [];
+      const { client, sent } = fakeServer(
+        { 'GET /v1/me': () => ({ status: 401 }) },
+        { '__Host-daric_csrf': 'csrf-1' },
+        undefined,
+        { mayRefresh: () => false, onSignedOut: (reason) => void reasons.push(reason) },
+      );
+      await expect(client.me()).rejects.toMatchObject({ status: 401 });
+      expect(sent.map((r) => r.url)).toEqual(['/v1/me']);
       expect(reasons).toEqual([]);
     });
 
@@ -1539,5 +1558,17 @@ describe('api-client', () => {
       expect(sent[0]?.headers.get('authorization')).toBe('Bearer access-1');
       expect(sent[0]?.headers.get('x-daric-client')).toBe('mobile');
     });
+  });
+});
+
+describe('signedOutChannel', () => {
+  it('tells every subscriber why, until they unsubscribe', () => {
+    const channel = signedOutChannel();
+    const heard: unknown[] = [];
+    const stop = channel.subscribe((reason) => void heard.push(reason));
+    channel.report('DEVICE_LIMIT');
+    stop();
+    channel.report(undefined);
+    expect(heard).toEqual(['DEVICE_LIMIT']);
   });
 });

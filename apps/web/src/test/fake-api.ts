@@ -1628,8 +1628,8 @@ export function fakeApi({
     /** Sets the User's Signed-in Devices, most recently used first. */
     setDevices: (value: SignedInDevice[]) => void (devices = structuredClone(value)),
     devices: () => devices,
-    /** Ends the session on the server, as a login elsewhere past the device limit does. */
-    endSession: () => void (current = undefined),
+    /** Ends this Signed-in Device on the server, as a login elsewhere past the device limit does. */
+    signOutThisDevice: () => void (current = undefined),
     /** Puts someone else into the Workspace, as if they had joined earlier. */
     addMember: (email: string, memberRole: WorkspaceRole) => addMember(email, memberRole),
     members: () => members,

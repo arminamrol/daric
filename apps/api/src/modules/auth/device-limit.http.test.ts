@@ -200,6 +200,25 @@ describe('device limit with billing enabled', () => {
     expect(rows.map((r) => r.endReason)).toEqual(['PASSWORD_RESET', 'PASSWORD_RESET']);
   });
 
+  it('still audits a replayed token once its device was signed out by the limit', async () => {
+    const { email, userId, device } = await signUp(t);
+    const stolen = device.refreshToken;
+    await refresh(t, device);
+    await putOnFree(userId);
+    await logIn(t, email);
+    const replay = await call(t.url, 'POST', '/v1/auth/refresh', {
+      body: { refreshToken: stolen },
+    });
+    expect(replay.status).toBe(401);
+    const audited = await db
+      .select({ id: auditLogs.id })
+      .from(auditLogs)
+      .where(and(eq(auditLogs.actorUserId, userId), eq(auditLogs.action, 'auth.refresh_reuse')));
+    expect(audited).toHaveLength(1);
+    // The device's own, newer token still learns why it was signed out.
+    expect((await refresh(t, device)).body.reason).toBe('DEVICE_LIMIT');
+  });
+
   it('gives no reason after a plain logout', async () => {
     const { device } = await signUp(t);
     await call(t.url, 'POST', '/v1/auth/logout', { body: { refreshToken: device.refreshToken } });
@@ -287,6 +306,16 @@ describe('Signed-in Devices list', () => {
       (await call(t.url, 'DELETE', `/v1/me/devices/${phoneId}`, { token: laptop.accessToken }))
         .status,
     ).toBe(404);
+  });
+
+  it('refuses to sign out the device asking: that is a logout', async () => {
+    const { device } = await signUp(t);
+    const [current] = (await listDevices(t, device)).body;
+    const res = await call(t.url, 'DELETE', `/v1/me/devices/${current.id}`, {
+      token: device.accessToken,
+    });
+    expect(res.status).toBe(409);
+    expect((await refresh(t, device)).status).toBe(200);
   });
 
   it("cannot touch another User's devices", async () => {
