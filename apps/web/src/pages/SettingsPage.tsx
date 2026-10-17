@@ -36,6 +36,12 @@ export function SettingsPage() {
       <PreferencesForm preferences={me.preferences} />
       <WorkspaceSettingsForm workspace={workspace} />
       {hasRole(workspace.role, 'ADMIN') && <ExportData workspaceId={workspace.id} />}
+      <Link
+        to="/settings/delete-account"
+        className="w-fit font-medium text-danger underline underline-offset-4"
+      >
+        {t('deleteAccount.link')}
+      </Link>
     </div>
   );
 }

@@ -6,7 +6,7 @@ import {
   type Member,
   type UpdateMemberInput,
 } from '@daric/core';
-import { eq, sql } from 'drizzle-orm';
+import { and, eq, sql } from 'drizzle-orm';
 import { DATABASE } from '../../common/di-tokens';
 import { type ClientInfo, isUuid, type Membership } from '../../common/request';
 import { type Database, one } from '../../db/client';
@@ -91,6 +91,53 @@ export class MembersService {
       actorUserId: userId,
       action: leaving ? 'member.leave' : 'member.remove',
       client,
+    });
+  }
+
+  /**
+   * The Owner hands the Workspace to another Member and stays on as an Admin.
+   * The Owner's membership is locked first, so two transfers at once cannot
+   * both pass and leave two Owners.
+   */
+  async transferOwnership(
+    membership: Membership,
+    userId: string,
+    memberId: string,
+    client: ClientInfo,
+  ): Promise<void> {
+    const tx = scopedTx();
+    const target = await this.find(memberId);
+    const [self] = await tx
+      .select({ role: workspaceMembers.role })
+      .from(workspaceMembers)
+      .where(
+        and(
+          eq(workspaceMembers.workspaceId, membership.workspaceId),
+          eq(workspaceMembers.userId, userId),
+        ),
+      )
+      .for('update');
+    if (self?.role !== 'OWNER' || target.userId === userId) throw new ForbiddenException();
+    const bump = { version: sql`${workspaceMembers.version} + 1` };
+    await tx
+      .update(workspaceMembers)
+      .set({ role: 'ADMIN', ...bump })
+      .where(
+        and(
+          eq(workspaceMembers.workspaceId, membership.workspaceId),
+          eq(workspaceMembers.userId, userId),
+        ),
+      );
+    await tx
+      .update(workspaceMembers)
+      .set({ role: 'OWNER', ...bump })
+      .where(eq(workspaceMembers.id, target.id));
+    await this.audit.record(tx, {
+      action: 'workspace.transfer_ownership',
+      actorUserId: userId,
+      workspaceId: membership.workspaceId,
+      client,
+      metadata: { fromUserId: userId, toUserId: target.userId },
     });
   }
 

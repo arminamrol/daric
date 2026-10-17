@@ -289,6 +289,38 @@ describe('api-client', () => {
       expect(sent[2]?.method).toBe('DELETE');
     });
 
+    it('transfers ownership of the Workspace', async () => {
+      const { client, sent } = fakeServer(
+        {
+          [`POST /v1/workspaces/${ws}/members/${member.id}/transfer-ownership`]: () => ({
+            status: 204,
+          }),
+        },
+        csrf,
+      );
+      await client.transferOwnership(ws, member.id);
+      expect(sent[0]?.headers.get('x-csrf-token')).toBe('csrf-1');
+    });
+
+    it('previews and deletes the account, re-sending the password', async () => {
+      const preview = {
+        sharedWorkspaces: [],
+        deletedWorkspaces: [{ id: ws, name: 'Personal' }],
+        plusForfeitedUntil: null,
+      };
+      const { client, sent } = fakeServer(
+        {
+          'GET /v1/me/deletion': () => ({ status: 200, body: preview }),
+          'POST /v1/me/deletion': () => ({ status: 204 }),
+        },
+        csrf,
+      );
+      expect(await client.accountDeletion()).toEqual(preview);
+      await client.deleteAccount('my password');
+      expect(sent[1]?.body).toEqual({ password: 'my password' });
+      expect(sent[1]?.headers.get('x-csrf-token')).toBe('csrf-1');
+    });
+
     it('creates, lists and revokes Invitations', async () => {
       const link = 'https://daric.example/invitation?token=abc';
       const { client, sent } = fakeServer(
@@ -1334,6 +1366,18 @@ describe('api-client', () => {
         tokens,
       });
       await expect(client.logout()).rejects.toThrow('Network request failed');
+      expect(await tokens.read()).toBeUndefined();
+    });
+
+    it('forgets the tokens once the account is deleted, and keeps them when refused', async () => {
+      const refused = mobile({
+        'POST /v1/me/deletion': () => ({ status: 403, body: { reason: 'WRONG_PASSWORD' } }),
+      });
+      await expect(refused.client.deleteAccount('wrong')).rejects.toMatchObject({ status: 403 });
+      expect(await refused.tokens.read()).toBeDefined();
+
+      const { client, tokens } = mobile({ 'POST /v1/me/deletion': () => ({ status: 204 }) });
+      await client.deleteAccount('right');
       expect(await tokens.read()).toBeUndefined();
     });
 

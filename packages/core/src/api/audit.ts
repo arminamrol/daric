@@ -52,6 +52,8 @@ export const auditActions = [
   'member.leave',
   'consent.grant',
   'consent.revoke',
+  'workspace.transfer_ownership',
+  'account.delete',
 ] as const;
 export type AuditAction = (typeof auditActions)[number];
 

@@ -187,6 +187,54 @@ describe('Members', () => {
     expect(consent?.revokedAt).toBeInstanceOf(Date);
   });
 
+  const transfer = (c: Crew, actor: TestUser, target: keyof Crew['ids']) =>
+    call(t.url, 'POST', `${membersPath(c.workspaceId)}/${c.ids[target]}/transfer-ownership`, {
+      token: actor.token,
+    });
+
+  const rolesOf = async (c: Crew) => {
+    const list = await call(t.url, 'GET', membersPath(c.workspaceId), { token: c.owner.token });
+    return Object.fromEntries(list.body.map((m: { id: string; role: string }) => [m.id, m.role]));
+  };
+
+  it.each(['admin', 'member', 'viewer'] as const)(
+    'let the Owner hand ownership to the %s, staying on as an Admin',
+    async (target) => {
+      const c = await crew();
+      expect((await transfer(c, c.owner, target)).status).toBe(204);
+      const roles = await rolesOf(c);
+      expect(roles[c.ids[target]]).toBe('OWNER');
+      expect(roles[c.ids.owner]).toBe('ADMIN');
+      // The new Owner now holds the Owner's powers, the former one an Admin's.
+      expect((await remove(c, c[target], 'owner')).status).toBe(204);
+      const [row] = await db
+        .select()
+        .from(auditLogs)
+        .where(
+          and(
+            eq(auditLogs.workspaceId, c.workspaceId),
+            eq(auditLogs.action, 'workspace.transfer_ownership'),
+          ),
+        );
+      expect(row).toMatchObject({
+        actorUserId: c.owner.userId,
+        metadata: { fromUserId: c.owner.userId, toUserId: c[target].userId },
+      });
+    },
+  );
+
+  it.each([
+    ['owner', 'owner'],
+    ['admin', 'admin2'],
+    ['admin', 'admin'],
+    ['member', 'viewer'],
+    ['viewer', 'viewer'],
+  ] as const)('refuse the %s handing ownership to the %s', async (actor, target) => {
+    const c = await crew();
+    expect((await transfer(c, c[actor], target)).status).toBe(403);
+    expect((await rolesOf(c))[c.ids.owner]).toBe('OWNER');
+  });
+
   it("answer 404 for a Member of another Workspace or one that doesn't exist", async () => {
     const c = await crew();
     const other = await registerUser(t.url);
@@ -204,6 +252,13 @@ describe('Members', () => {
         token: c.owner.token,
       });
       expect(del.status).toBe(404);
+      const handOver = await call(
+        t.url,
+        'POST',
+        `${membersPath(c.workspaceId)}/${id}/transfer-ownership`,
+        { token: c.owner.token },
+      );
+      expect(handOver.status).toBe(404);
     }
   });
 });
