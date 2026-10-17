@@ -1,5 +1,5 @@
 import { ApiError } from '@daric/api-client';
-import type { AccountDeletionPreview } from '@daric/core';
+import type { AccountDeletionPreview, AccountDeletionRefusal } from '@daric/core';
 import { isolate } from '@daric/i18n';
 import { type FormEvent, useId } from 'react';
 import { useNavigate } from 'react-router';
@@ -67,7 +67,9 @@ function DeleteForm() {
 
   const wrongPassword =
     remove.error instanceof ApiError &&
-    (remove.error.body as { reason?: string } | undefined)?.reason === 'WRONG_PASSWORD';
+    remove.error.status === 403 &&
+    (remove.error.body as { reason?: AccountDeletionRefusal } | undefined)?.reason ===
+      'WRONG_PASSWORD';
 
   return (
     <form noValidate onSubmit={onSubmit} className="flex flex-col gap-4">

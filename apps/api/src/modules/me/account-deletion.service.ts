@@ -10,7 +10,7 @@ import type {
   AccountDeletionRefusal,
   SharedOwnedWorkspace,
 } from '@daric/core';
-import { and, eq, inArray, ne, or, sql } from 'drizzle-orm';
+import { and, eq, gt, inArray, isNull, ne, or, sql } from 'drizzle-orm';
 import { DATABASE } from '../../common/di-tokens';
 import type { Database, Executor } from '../../db/client';
 import {
@@ -86,6 +86,12 @@ export class AccountDeletionService {
         .where(eq(users.id, userId))
         .for('update');
       if (!user) throw new UnauthorizedException();
+      // Their memberships too: a transfer to them waits, or is seen once done.
+      await tx
+        .select({ id: workspaceMembers.id })
+        .from(workspaceMembers)
+        .where(eq(workspaceMembers.userId, userId))
+        .for('update');
       const ownedIds = tx
         .select({ id: workspaceMembers.workspaceId })
         .from(workspaceMembers)
@@ -112,7 +118,7 @@ export class AccountDeletionService {
         .where(and(eq(workspaceMembers.userId, userId), ne(workspaceMembers.role, 'OWNER')));
       for (const { workspaceId, role } of joined) {
         await this.audit.record(tx, {
-          action: 'account.delete',
+          action: 'user.delete',
           actorUserId: null,
           workspaceId,
           metadata: { role },
@@ -128,11 +134,41 @@ export class AccountDeletionService {
         );
       }
       await anonymiseAuditRows(tx, userId);
-      await forgetInvitationsTo(tx, user.email);
+      await this.forgetInvitationsTo(tx, user.email);
       // Cascades to their login, Signed-in Devices, mailed links, memberships,
       // Consents and Subscription; their records elsewhere lose their author.
       await tx.delete(users).where(eq(users.id, userId));
     });
+  }
+
+  /**
+   * Takes the User's email off Invitations sent to it. One still waiting is
+   * revoked and audited first: without an email it would be a link anyone
+   * could accept.
+   */
+  private async forgetInvitationsTo(tx: Executor, email: string): Promise<void> {
+    const sentToThem = sql`lower(${invitations.email}) = lower(${email})`;
+    const revoked = await tx
+      .update(invitations)
+      .set({ revokedAt: new Date() })
+      .where(
+        and(
+          sentToThem,
+          isNull(invitations.acceptedAt),
+          isNull(invitations.revokedAt),
+          gt(invitations.expiresAt, new Date()),
+        ),
+      )
+      .returning({ id: invitations.id, workspaceId: invitations.workspaceId });
+    for (const { id, workspaceId } of revoked) {
+      await this.audit.record(tx, {
+        action: 'invitation.revoke',
+        actorUserId: null,
+        workspaceId,
+        metadata: { invitationId: id },
+      });
+    }
+    await tx.update(invitations).set({ email: null }).where(sentToThem);
   }
 }
 
@@ -173,21 +209,4 @@ async function anonymiseAuditRows(tx: Executor, userId: string): Promise<void> {
       )`,
     })
     .where(or(mine, sql`${auditLogs.metadata}::text LIKE ${`%${userId}%`}`));
-}
-
-/**
- * Takes the User's email off Invitations sent to it. One still waiting is
- * revoked first: without an email it would be a link anyone could accept.
- */
-async function forgetInvitationsTo(tx: Executor, email: string): Promise<void> {
-  await tx
-    .update(invitations)
-    .set({
-      email: null,
-      revokedAt: sql`CASE
-        WHEN ${invitations.acceptedAt} IS NULL AND ${invitations.revokedAt} IS NULL
-          AND ${invitations.expiresAt} > now()
-        THEN now() ELSE ${invitations.revokedAt} END`,
-    })
-    .where(sql`lower(${invitations.email}) = lower(${email})`);
 }

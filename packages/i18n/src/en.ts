@@ -860,7 +860,7 @@ export const en = {
   'audit.action.consent.grant': 'Gave consent',
   'audit.action.consent.revoke': 'Took back consent',
   'audit.action.workspace.transfer_ownership': 'Transferred ownership',
-  'audit.action.account.delete': 'A member deleted their account',
+  'audit.action.user.delete': 'A member deleted their account',
   'deleteAccount.link': 'Delete account',
   'deleteAccount.title': 'Delete account',
   'deleteAccount.intro':

@@ -96,8 +96,8 @@ export class MembersService {
 
   /**
    * The Owner hands the Workspace to another Member and stays on as an Admin.
-   * The Owner's membership is locked first, so two transfers at once cannot
-   * both pass and leave two Owners.
+   * Both memberships are locked first, so two transfers at once cannot leave
+   * two Owners, and a target who leaves meanwhile cannot leave none.
    */
   async transferOwnership(
     membership: Membership,
@@ -106,28 +106,22 @@ export class MembersService {
     client: ClientInfo,
   ): Promise<void> {
     const tx = scopedTx();
-    const target = await this.find(memberId);
+    const own = and(
+      eq(workspaceMembers.workspaceId, membership.workspaceId),
+      eq(workspaceMembers.userId, userId),
+    );
     const [self] = await tx
       .select({ role: workspaceMembers.role })
       .from(workspaceMembers)
-      .where(
-        and(
-          eq(workspaceMembers.workspaceId, membership.workspaceId),
-          eq(workspaceMembers.userId, userId),
-        ),
-      )
+      .where(own)
       .for('update');
+    const target = await this.find(memberId, { lock: true });
     if (self?.role !== 'OWNER' || target.userId === userId) throw new ForbiddenException();
     const bump = { version: sql`${workspaceMembers.version} + 1` };
     await tx
       .update(workspaceMembers)
       .set({ role: 'ADMIN', ...bump })
-      .where(
-        and(
-          eq(workspaceMembers.workspaceId, membership.workspaceId),
-          eq(workspaceMembers.userId, userId),
-        ),
-      );
+      .where(own);
     await tx
       .update(workspaceMembers)
       .set({ role: 'OWNER', ...bump })
@@ -137,16 +131,18 @@ export class MembersService {
       actorUserId: userId,
       workspaceId: membership.workspaceId,
       client,
-      metadata: { fromUserId: userId, toUserId: target.userId },
+      metadata: { memberUserId: target.userId, from: target.role, to: 'OWNER' },
     });
   }
 
-  private async find(memberId: string) {
+  /** The membership, locked against changes until the request commits when `lock`. */
+  private async find(memberId: string, { lock = false } = {}) {
     if (!isUuid(memberId)) throw new NotFoundException();
-    const [row] = await scopedTx()
+    const query = scopedTx()
       .select(columns)
       .from(workspaceMembers)
       .where(eq(workspaceMembers.id, memberId));
+    const [row] = await (lock ? query.for('update') : query);
     if (!row) throw new NotFoundException();
     return row;
   }

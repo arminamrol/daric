@@ -848,7 +848,7 @@ export const fa = {
   'audit.action.consent.grant': 'دادن رضایت',
   'audit.action.consent.revoke': 'پس گرفتن رضایت',
   'audit.action.workspace.transfer_ownership': 'واگذاری مالکیت',
-  'audit.action.account.delete': 'عضوی حساب کاربری‌اش را حذف کرد',
+  'audit.action.user.delete': 'عضوی حساب کاربری‌اش را حذف کرد',
   'deleteAccount.link': 'حذف حساب کاربری',
   'deleteAccount.title': 'حذف حساب کاربری',
   'deleteAccount.intro':

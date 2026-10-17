@@ -205,7 +205,7 @@ describe('Account deletion', () => {
         userAgent: null,
       });
     }
-    expect(anonymous.filter((r) => r.action === 'account.delete')).toEqual([
+    expect(anonymous.filter((r) => r.action === 'user.delete')).toEqual([
       expect.objectContaining({ actorUserId: null, metadata: { role: 'MEMBER' } }),
     ]);
 
@@ -215,6 +215,13 @@ describe('Account deletion', () => {
       .from(invitations)
       .where(eq(invitations.id, pending.body.id));
     expect(invitation).toMatchObject({ email: null, revokedAt: expect.any(Date) });
+    expect(anonymous).toContainEqual(
+      expect.objectContaining({
+        action: 'invitation.revoke',
+        actorUserId: null,
+        metadata: { invitationId: pending.body.id },
+      }),
+    );
 
     // The Owner's own account and data are untouched.
     const members = await call(t.url, 'GET', membersPath(owner.workspaceId), {

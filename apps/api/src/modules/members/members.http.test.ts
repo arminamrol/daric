@@ -218,7 +218,7 @@ describe('Members', () => {
         );
       expect(row).toMatchObject({
         actorUserId: c.owner.userId,
-        metadata: { fromUserId: c.owner.userId, toUserId: c[target].userId },
+        metadata: { memberUserId: c[target].userId, from: expect.any(String), to: 'OWNER' },
       });
     },
   );

@@ -53,7 +53,7 @@ export const auditActions = [
   'consent.grant',
   'consent.revoke',
   'workspace.transfer_ownership',
-  'account.delete',
+  'user.delete',
 ] as const;
 export type AuditAction = (typeof auditActions)[number];
 
