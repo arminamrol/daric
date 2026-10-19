@@ -68,14 +68,12 @@ describe('runInWorkspace', () => {
   it('treats a suspended Member as a non-Member', async () => {
     const a = await seedUserWithWorkspace(db, 'A');
     const b = await seedUserWithWorkspace(db, 'B');
-    await db
-      .insert(workspaceMembers)
-      .values({
-        workspaceId: b.workspaceId,
-        userId: a.userId,
-        role: 'MEMBER',
-        suspendedAt: new Date(),
-      });
+    await db.insert(workspaceMembers).values({
+      workspaceId: b.workspaceId,
+      userId: a.userId,
+      role: 'MEMBER',
+      suspendedAt: new Date(),
+    });
 
     const seen = await runInWorkspace(db, { userId: a.userId, workspaceId: b.workspaceId }, (tx) =>
       tx.select().from(workspaces),
