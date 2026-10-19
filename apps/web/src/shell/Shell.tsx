@@ -6,6 +6,7 @@ import { LanguageToggle } from '../i18n/LanguageToggle';
 import { useI18n } from '../i18n/locale';
 import { SyncStatus } from '../transactions/SyncStatus';
 import { ThemeToggle } from '../theme/ThemeToggle';
+import { GraceBanner } from './GraceBanner';
 import { Logo } from './Logo';
 import { RecurringNavLink } from './RecurringNavLink';
 import { WorkspaceSwitcher } from './WorkspaceSwitcher';
@@ -95,6 +96,7 @@ export function Shell() {
         className="mx-auto w-full max-w-5xl flex-1 px-4 py-12 outline-none"
       >
         {signedIn && <SyncStatus />}
+        {signedIn && <GraceBanner />}
         <Outlet />
       </main>
     </div>

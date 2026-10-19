@@ -1,5 +1,5 @@
 import { Inject, Injectable, NotFoundException } from '@nestjs/common';
-import type { UpdateWorkspaceInput, Workspace } from '@daric/core';
+import type { MyWorkspace, UpdateWorkspaceInput, Workspace } from '@daric/core';
 import { and, eq, sql } from 'drizzle-orm';
 import type { Membership } from '../../common/request';
 import { DATABASE } from '../../common/di-tokens';
@@ -25,10 +25,14 @@ export class WorkspacesService {
     @Inject(AuditService) private readonly audit: AuditService,
   ) {}
 
-  /** Every Workspace the User is a Member of, with their Role. Not Workspace-scoped. */
-  listForUser(userId: string): Promise<Workspace[]> {
+  /** Every Workspace the User is a Member of, with their Role and whether it is suspended. Not Workspace-scoped. */
+  listForUser(userId: string): Promise<MyWorkspace[]> {
     return this.db
-      .select({ ...workspaceColumns, role: workspaceMembers.role })
+      .select({
+        ...workspaceColumns,
+        role: workspaceMembers.role,
+        suspended: sql<boolean>`${workspaceMembers.suspendedAt} IS NOT NULL`,
+      })
       .from(workspaces)
       .innerJoin(
         workspaceMembers,

@@ -4,6 +4,7 @@ import type { Database } from '../db/client';
 import { subscriptions, workspaceMembers } from '../db/schema';
 import { DAY } from '../common/time';
 import { call, registerUser, type TestApp } from './app';
+import { GRACE_DAYS } from '../modules/billing/billing-config';
 
 export type TestUser = Awaited<ReturnType<typeof registerUser>>;
 
@@ -65,9 +66,9 @@ export async function addMember(
   return row.id;
 }
 
-/** Ends the User's Plus time, leaving them on Free (with billing enabled). */
+/** Ends the User's Plus time and its Grace Period, leaving them on Free (with billing enabled). */
 export async function makeFree(db: Database, user: { userId: string }): Promise<void> {
-  const past = new Date(Date.now() - DAY);
+  const past = new Date(Date.now() - (GRACE_DAYS + 1) * DAY);
   await db
     .update(subscriptions)
     .set({ trialEndsAt: past, expiresAt: past })

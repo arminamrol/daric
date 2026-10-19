@@ -12,7 +12,7 @@ import {
 import { isolate } from '@daric/i18n';
 import { useQueryClient } from '@tanstack/react-query';
 import { type FormEvent, useId, useState } from 'react';
-import { useNavigate } from 'react-router';
+import { Link, useNavigate } from 'react-router';
 import { ME_QUERY_KEY, useSignedIn } from '../auth/session';
 import { useI18n } from '../i18n/locale';
 import {
@@ -27,7 +27,7 @@ import {
 import { useFormatters } from '../settings/settings';
 import { ChoiceGroup } from '../ui/ChoiceGroup';
 import { ConfirmButton } from '../ui/ConfirmButton';
-import { Paywall } from '../ui/Paywall';
+import { CHECKOUT_PATH, Paywall } from '../ui/Paywall';
 
 const cardClass = 'flex flex-col gap-4 rounded-xl border border-border bg-surface px-6 py-6';
 const alertClass = 'rounded-md bg-surface-muted px-3 py-2 text-sm text-danger';
@@ -57,6 +57,11 @@ function MemberRow({ member }: { member: Member }) {
         <span className="me-auto font-medium" dir="ltr">
           {member.email}
           {self && <span className="ms-1 text-sm text-foreground-muted">{t('members.you')}</span>}
+          {member.suspended && (
+            <span className="ms-2 rounded-full bg-surface-muted px-2 py-0.5 text-xs text-foreground-muted">
+              {t('members.suspended')}
+            </span>
+          )}
         </span>
         {manageable ? (
           <>
@@ -124,6 +129,7 @@ function MemberRow({ member }: { member: Member }) {
 
 function MemberList() {
   const { t } = useI18n();
+  const { workspace } = useSignedIn();
   const members = useMembers();
   const titleId = useId();
 
@@ -142,11 +148,25 @@ function MemberList() {
           {t('members.loadFailed')}
         </p>
       ) : (
-        <ul aria-labelledby={titleId} className="flex flex-col divide-y divide-border">
-          {members.data.map((member) => (
-            <MemberRow key={member.id} member={member} />
-          ))}
-        </ul>
+        <>
+          {/* Only the Owner's Plus brings them back. */}
+          {workspace.role === 'OWNER' && members.data.some((m) => m.suspended) && (
+            <p className="rounded-md bg-surface-muted px-3 py-2 text-sm">
+              {t('members.suspendedHint')}{' '}
+              <Link
+                to={CHECKOUT_PATH}
+                className="font-medium text-accent underline underline-offset-4"
+              >
+                {t('subscription.extend')}
+              </Link>
+            </p>
+          )}
+          <ul aria-labelledby={titleId} className="flex flex-col divide-y divide-border">
+            {members.data.map((member) => (
+              <MemberRow key={member.id} member={member} />
+            ))}
+          </ul>
+        </>
       )}
     </section>
   );

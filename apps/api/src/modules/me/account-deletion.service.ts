@@ -50,9 +50,13 @@ export class AccountDeletionService {
   async preview(userId: string): Promise<AccountDeletionPreview> {
     const owned = await ownedWorkspaces(this.db, userId);
     const subscription = await this.entitlements.subscriptionOf(userId);
-    // Only bought time is worth a warning; the Trial cost nothing.
+    // Only bought time still to come is worth a warning; the Trial cost nothing, and in the
+    // Grace Period the bought time has already run out.
     const forfeited =
-      subscription.billingEnabled && subscription.plan === 'PLUS' && !subscription.onTrial;
+      subscription.billingEnabled &&
+      subscription.plan === 'PLUS' &&
+      !subscription.onTrial &&
+      !subscription.inGracePeriod;
     return {
       sharedWorkspaces: owned.filter((w) => w.otherMembers > 0),
       deletedWorkspaces: owned

@@ -48,6 +48,8 @@ describe('subscriptionView', () => {
       onTrial: true,
       trialEndsAt: daysFromNow(14).toISOString(),
       expiresAt: daysFromNow(14).toISOString(),
+      graceEndsAt: daysFromNow(21).toISOString(),
+      inGracePeriod: false,
       entitlements: {
         signedInDevices: 3,
         shareWorkspace: true,
@@ -73,15 +75,52 @@ describe('subscriptionView', () => {
     ).toMatchObject({ plan: 'PLUS', onTrial: false });
   });
 
-  it('puts a User whose Plus time ended on Free, keeping the dates', () => {
+  it('keeps Plus Entitlements through the Grace Period after Plus time ends', () => {
     expect(
-      view({ plan: 'PLUS', trialEndsAt: daysFromNow(-1), expiresAt: daysFromNow(-1) }),
+      view({ plan: 'PLUS', trialEndsAt: daysFromNow(-3), expiresAt: daysFromNow(-3) }),
+    ).toEqual({
+      billingEnabled: true,
+      plan: 'PLUS',
+      onTrial: false,
+      trialEndsAt: daysFromNow(-3).toISOString(),
+      expiresAt: daysFromNow(-3).toISOString(),
+      graceEndsAt: daysFromNow(4).toISOString(),
+      inGracePeriod: true,
+      entitlements: {
+        signedInDevices: 3,
+        shareWorkspace: true,
+        aiAnalysesPerMonth: 30,
+        aiAnalysesLeftThisMonth: 30,
+      },
+    });
+  });
+
+  it('starts the Grace Period at the expiry instant itself', () => {
+    expect(view({ plan: 'PLUS', trialEndsAt: null, expiresAt: now })).toMatchObject({
+      plan: 'PLUS',
+      inGracePeriod: true,
+    });
+  });
+
+  it('is not in the Grace Period while Plus time runs', () => {
+    expect(view({ plan: 'PLUS', trialEndsAt: null, expiresAt: daysFromNow(1) })).toMatchObject({
+      plan: 'PLUS',
+      inGracePeriod: false,
+      graceEndsAt: daysFromNow(8).toISOString(),
+    });
+  });
+
+  it('puts a User on Free once the Grace Period has ended, keeping the dates', () => {
+    expect(
+      view({ plan: 'PLUS', trialEndsAt: daysFromNow(-7), expiresAt: daysFromNow(-7) }),
     ).toEqual({
       billingEnabled: true,
       plan: 'FREE',
       onTrial: false,
-      trialEndsAt: daysFromNow(-1).toISOString(),
-      expiresAt: daysFromNow(-1).toISOString(),
+      trialEndsAt: daysFromNow(-7).toISOString(),
+      expiresAt: daysFromNow(-7).toISOString(),
+      graceEndsAt: now.toISOString(),
+      inGracePeriod: false,
       entitlements: {
         signedInDevices: 1,
         shareWorkspace: false,
@@ -91,8 +130,11 @@ describe('subscriptionView', () => {
     });
   });
 
-  it('ends Plus at the expiry instant itself', () => {
-    expect(view({ plan: 'PLUS', trialEndsAt: null, expiresAt: now }).plan).toBe('FREE');
+  it('takes the Grace Period from config', () => {
+    const short = { ...billing, graceDays: 2 };
+    const ended = { plan: 'PLUS', trialEndsAt: null, expiresAt: daysFromNow(-3) } as const;
+    expect(view(ended, { billing: short }).plan).toBe('FREE');
+    expect(view(ended).plan).toBe('PLUS');
   });
 
   it('puts a User with no Subscription on Free', () => {
@@ -101,6 +143,8 @@ describe('subscriptionView', () => {
       onTrial: false,
       trialEndsAt: null,
       expiresAt: null,
+      graceEndsAt: null,
+      inGracePeriod: false,
       entitlements: { signedInDevices: 1, shareWorkspace: false },
     });
   });
@@ -125,8 +169,8 @@ describe('subscriptionView', () => {
     };
     const expired = {
       plan: 'PLUS',
-      trialEndsAt: daysFromNow(-1),
-      expiresAt: daysFromNow(-1),
+      trialEndsAt: daysFromNow(-10),
+      expiresAt: daysFromNow(-10),
     } as const;
     expect(view(expired, { billing: disabled, aiAnalysesUsedThisMonth: 99 })).toMatchObject({
       billingEnabled: false,

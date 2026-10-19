@@ -5,6 +5,7 @@ import {
   index,
   pgEnum,
   pgTable,
+  primaryKey,
   smallint,
   text,
   timestamp,
@@ -79,4 +80,38 @@ export const payments = pgTable(
     check('payments_months_check', sql`${t.months} BETWEEN 1 AND 12`),
     check('payments_amount_check', sql`${t.amount} > 0`),
   ],
+);
+
+/**
+ * The steps taken as a User's Plus time ends, in order: a reminder mail 7 days
+ * and 1 day before, a mail when the Grace Period starts, and the downgrade when
+ * it ends (ADR-0008).
+ */
+export const EXPIRY_STEPS = [
+  'REMINDER_7_DAYS',
+  'REMINDER_1_DAY',
+  'GRACE_STARTED',
+  'DOWNGRADED',
+] as const;
+export type ExpiryStep = (typeof EXPIRY_STEPS)[number];
+export const expiryStep = pgEnum('expiry_step', EXPIRY_STEPS);
+
+/**
+ * What has been done about one end of a User's Plus time: each reminder mail,
+ * the Grace Period notice and the downgrade happen once per `expires_at`, so a
+ * renewal (a new expiry) starts them afresh. Belongs to the User, like
+ * `subscriptions`: no `workspace_id` and no row-level security.
+ */
+export const expirySteps = pgTable(
+  'expiry_steps',
+  {
+    userId: uuid('user_id')
+      .notNull()
+      .references(() => users.id, { onDelete: 'cascade' }),
+    step: expiryStep('step').notNull(),
+    /** The `subscriptions.expires_at` this step was taken for. */
+    expiresAt: timestamp('expires_at', { withTimezone: true }).notNull(),
+    doneAt: timestamp('done_at', { withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => [primaryKey({ columns: [t.userId, t.expiresAt, t.step] })],
 );

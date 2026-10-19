@@ -48,6 +48,8 @@ export const memberSchema = z.object({
   email: z.email(),
   role: workspaceRoleSchema,
   joinedAt: z.iso.datetime(),
+  /** Paused because the Owner's Plus and its Grace Period ended; kept, not removed. */
+  suspended: z.boolean(),
 });
 export type Member = z.infer<typeof memberSchema>;
 export const memberListSchema = z.array(memberSchema);

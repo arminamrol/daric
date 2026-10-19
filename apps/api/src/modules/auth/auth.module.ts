@@ -27,6 +27,6 @@ import { TokenService } from './token.service';
     EmailLinksService,
     SignedInDevicesService,
   ],
-  exports: [TokenService],
+  exports: [TokenService, SignedInDevicesService],
 })
 export class AuthModule {}

@@ -22,11 +22,16 @@ const UNLIMITED: Entitlements = {
   aiAnalysesLeftThisMonth: null,
 };
 
+/** When the Grace Period after Plus time ending at `expiresAt` ends (ADR-0008). */
+export function graceEnd(expiresAt: Date, graceDays: number): Date {
+  return new Date(expiresAt.getTime() + graceDays * DAY);
+}
+
 /**
  * The one place that decides what a User may do (ADR-0008): the Plan in effect
  * at `now` and its limits from config, or everything unlimited when billing is
- * disabled. A User without a Subscription is on Free. Plus ends at the expiry
- * itself for now; the 7-day Grace Period (ADR-0008) arrives with ticket 43.
+ * disabled. A User without a Subscription is on Free. Plus applies until its
+ * expiry and through the Grace Period after it (`billing.graceDays`), Free after.
  */
 export function subscriptionView(
   subscription: StoredSubscription | undefined,
@@ -35,10 +40,12 @@ export function subscriptionView(
   const { now, billing } = context;
   const trialEndsAt = subscription?.trialEndsAt ?? null;
   const expiresAt = subscription?.expiresAt ?? null;
-  const active = subscription !== undefined && expiresAt !== null && now < expiresAt;
-  const plan: Plan = active ? subscription.plan : 'FREE';
+  const graceEndsAt = expiresAt && graceEnd(expiresAt, billing.graceDays);
+  const running = expiresAt !== null && now < expiresAt;
+  const inGracePeriod = !running && graceEndsAt !== null && now < graceEndsAt;
+  const plan: Plan = subscription && (running || inGracePeriod) ? subscription.plan : 'FREE';
   // Plus bought on top of the Trial moves the expiry past the Trial's end.
-  const onTrial = active && trialEndsAt !== null && expiresAt.getTime() <= trialEndsAt.getTime();
+  const onTrial = running && trialEndsAt !== null && expiresAt.getTime() <= trialEndsAt.getTime();
 
   let entitlements = UNLIMITED;
   if (billing.enabled) {
@@ -58,6 +65,8 @@ export function subscriptionView(
     onTrial,
     trialEndsAt: trialEndsAt?.toISOString() ?? null,
     expiresAt: expiresAt?.toISOString() ?? null,
+    graceEndsAt: graceEndsAt?.toISOString() ?? null,
+    inGracePeriod,
     entitlements,
   };
 }

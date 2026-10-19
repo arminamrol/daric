@@ -65,6 +65,24 @@ describe('runInWorkspace', () => {
     ).rejects.toMatchObject(pgError(/row-level security/));
   });
 
+  it('treats a suspended Member as a non-Member', async () => {
+    const a = await seedUserWithWorkspace(db, 'A');
+    const b = await seedUserWithWorkspace(db, 'B');
+    await db
+      .insert(workspaceMembers)
+      .values({
+        workspaceId: b.workspaceId,
+        userId: a.userId,
+        role: 'MEMBER',
+        suspendedAt: new Date(),
+      });
+
+    const seen = await runInWorkspace(db, { userId: a.userId, workspaceId: b.workspaceId }, (tx) =>
+      tx.select().from(workspaces),
+    );
+    expect(seen).toEqual([]);
+  });
+
   it('has no access to identity tables', async () => {
     const a = await seedUserWithWorkspace(db, 'A');
     await expect(

@@ -9,10 +9,12 @@ export const deviceNameSchema = z.string().trim().min(1).max(100);
 
 /**
  * Why a refresh was refused with an explanation for the User: another login
- * went past their device Entitlement, or they signed this device out from
- * another one. Any other refusal (logout, expiry, reuse) carries no reason.
+ * went past their device Entitlement, they signed this device out from
+ * another one, or their Plus and its Grace Period ended and only their most
+ * recently used devices stayed signed in. Any other refusal (logout, expiry,
+ * reuse) carries no reason.
  */
-export const signedOutReasons = ['DEVICE_LIMIT', 'SIGNED_OUT_REMOTELY'] as const;
+export const signedOutReasons = ['DEVICE_LIMIT', 'SIGNED_OUT_REMOTELY', 'PLUS_ENDED'] as const;
 export type SignedOutReason = (typeof signedOutReasons)[number];
 export const signedOutReasonSchema = z.enum(signedOutReasons);
 

@@ -146,7 +146,7 @@ export function AuthForm({ mode }: { mode: Mode }) {
           className="flex flex-col gap-2 rounded-md bg-surface-muted px-3 py-2 text-sm"
         >
           <p>{t(`auth.signedOut.${signedOut}`)}</p>
-          {signedOut === 'DEVICE_LIMIT' && (
+          {(signedOut === 'DEVICE_LIMIT' || signedOut === 'PLUS_ENDED') && (
             <Link to="/settings/subscription" className={linkClass}>
               {t('auth.signedOut.upgrade')}
             </Link>

@@ -79,6 +79,15 @@ export const en = {
   'subscription.trialUntil': 'Trial until {date}',
   'subscription.plusUntil': 'Active until {date}',
   'subscription.ended': 'Plus ended on {date}.',
+  'subscription.graceUntil': 'Plus ended on {date}, but keeps working until {graceEnd}.',
+  'grace.banner.day':
+    'Your Daric Plus has ended, but it keeps working for one more day. After that only the device you used last stays signed in, and the members of your workspaces lose access until you renew.',
+  'grace.banner.days':
+    'Your Daric Plus has ended, but it keeps working for {days} more days. After that only the device you used last stays signed in, and the members of your workspaces lose access until you renew.',
+  'suspended.title': "Access paused by the owner's plan",
+  'suspended.body':
+    "The owner's Daric Plus for “{name}” has ended, so your access to this workspace is paused. Nothing was deleted: once the owner renews, everything comes back as it was.",
+  'suspended.switch': 'You can switch to another of your workspaces at the top of the page.',
   'subscription.billingDisabled': 'Everything is unlimited on this server.',
   'subscription.entitlements': 'What you can do',
   'subscription.devices': 'Signed-in devices',
@@ -719,6 +728,8 @@ export const en = {
   'auth.signedOut.DEVICE_LIMIT':
     'You were signed out because you logged in on another device, and your plan limits how many devices stay signed in.',
   'auth.signedOut.SIGNED_OUT_REMOTELY': 'This device was signed out from another of your devices.',
+  'auth.signedOut.PLUS_ENDED':
+    'You were signed out because your Daric Plus ended, and on the Free plan only the device you used last stays signed in.',
   'auth.signedOut.upgrade': 'Stay signed in on more devices with Daric Plus',
   'auth.login.forgot': 'Forgot your password?',
   'auth.signup.title': 'Create a Daric account',
@@ -782,6 +793,9 @@ export const en = {
   'members.makeOwnerConfirm': '{email} will own this workspace, and you will stay on as an admin.',
   'members.makeOwnerYes': 'Yes, make owner',
   'members.changeFailed': 'The change was not made. Please try again.',
+  'members.suspended': 'Paused',
+  'members.suspendedHint':
+    'Paused members lost access when your Daric Plus ended. They were not removed: renewing gives their access back at once.',
   'invitations.title': 'Invitations',
   'invitations.new': 'New invitation',
   'invitations.email': 'Email (optional)',
@@ -907,6 +921,9 @@ export const en = {
   'audit.action.auth.device_limit': 'Signed out of a device by the device limit',
   'audit.action.auth.device_sign_out': 'Signed a device out',
   'audit.action.user.delete': 'A member deleted their account',
+  'audit.action.auth.plus_ended': 'Signed devices out as Plus ended',
+  'audit.action.member.suspend': "Paused a member as the owner's Plus ended",
+  'audit.action.member.restore': "Gave a paused member's access back",
   'deleteAccount.link': 'Delete account',
   'deleteAccount.title': 'Delete account',
   'deleteAccount.intro':

@@ -1,12 +1,16 @@
 import { describe, expect, it } from 'vitest';
 import {
+  gracePeriodTemplate,
   invitationTemplate,
   passwordChangedTemplate,
+  plusEndingTemplate,
   resetPasswordTemplate,
   verifyEmailTemplate,
 } from './templates';
 
 const link = 'https://daric.example/verify-email?token=abc_DEF-123';
+const ending = { days: 7, onTrial: false, graceDays: 7, hasMembers: true };
+const grace = { days: 7, hasMembers: true };
 const invite = { inviterEmail: 'sara@example.com', workspaceName: 'Home', role: 'MEMBER' } as const;
 
 describe('email templates', () => {
@@ -15,6 +19,8 @@ describe('email templates', () => {
     ['password reset', resetPasswordTemplate('fa', link, 1)],
     ['password changed', passwordChangedTemplate('fa', link)],
     ['invitation', invitationTemplate('fa', invite, link, 7)],
+    ['Plus reminder', plusEndingTemplate('fa', ending, link)],
+    ['Grace Period', gracePeriodTemplate('fa', grace, link)],
   ])('render the %s mail in Persian, right to left, with the link in both bodies', (_, mail) => {
     expect(mail.subject).toMatch(/دریک/);
     expect(mail.text).toContain(link);
@@ -27,6 +33,8 @@ describe('email templates', () => {
     ['password reset', resetPasswordTemplate('en', link, 1)],
     ['password changed', passwordChangedTemplate('en', link)],
     ['invitation', invitationTemplate('en', invite, link, 7)],
+    ['Plus reminder', plusEndingTemplate('en', ending, link)],
+    ['Grace Period', gracePeriodTemplate('en', grace, link)],
   ])('render the %s mail in English, left to right, with the link in both bodies', (_, mail) => {
     expect(mail.subject).toMatch(/Daric/);
     expect(mail.text).toMatch(/^Hello,/);

@@ -22,13 +22,21 @@ export type Entitlements = z.infer<typeof entitlementsSchema>;
 export const subscriptionSchema = z.object({
   /** False on a self-hosted server: every Entitlement is unlimited and nothing is sold. */
   billingEnabled: z.boolean(),
-  /** The Plan in effect now: Free once Plus time has run out. */
+  /** The Plan in effect now: Free once Plus time and its Grace Period have run out. */
   plan: planSchema,
   /** In the Trial: Plus time that comes only from signing up, nothing bought yet. */
   onTrial: z.boolean(),
   trialEndsAt: z.iso.datetime().nullable(),
   /** When the Plus time ends (or ended); null if the User never had any. */
   expiresAt: z.iso.datetime().nullable(),
+  /**
+   * When the Grace Period after `expiresAt` ends: until then Plus Entitlements
+   * still apply; after it, extra Signed-in Devices are signed out and Members of
+   * the User's Workspaces are suspended. Null if the User never had Plus time.
+   */
+  graceEndsAt: z.iso.datetime().nullable(),
+  /** Plus time has run out but its Grace Period has not: time to renew. */
+  inGracePeriod: z.boolean(),
   entitlements: entitlementsSchema,
 });
 export type Subscription = z.infer<typeof subscriptionSchema>;

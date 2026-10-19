@@ -21,6 +21,7 @@ const columns = {
   userId: workspaceMembers.userId,
   role: workspaceMembers.role,
   createdAt: workspaceMembers.createdAt,
+  suspendedAt: workspaceMembers.suspendedAt,
 };
 type Row = Pick<typeof workspaceMembers.$inferSelect, keyof typeof columns>;
 
@@ -152,10 +153,11 @@ export class MembersService {
       this.db,
       rows.map((r) => r.userId),
     );
-    return rows.map(({ createdAt, ...row }) => ({
+    return rows.map(({ createdAt, suspendedAt, ...row }) => ({
       ...row,
       email: emailOf(row.userId) ?? '',
       joinedAt: createdAt.toISOString(),
+      suspended: suspendedAt !== null,
     }));
   }
 }

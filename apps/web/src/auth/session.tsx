@@ -1,5 +1,5 @@
 import { ApiError } from '@daric/api-client';
-import type { Me, Workspace } from '@daric/core';
+import type { Me, MyWorkspace } from '@daric/core';
 import { useQuery } from '@tanstack/react-query';
 import { useSyncExternalStore } from 'react';
 import { Navigate, Outlet, useLocation } from 'react-router';
@@ -8,6 +8,7 @@ import { useI18n } from '../i18n/locale';
 import { storedFlag } from '../lib/storedFlag';
 import { pendingInvitation } from '../members/pendingInvitation';
 import { hasSignedIn } from './signedOut';
+import { SuspendedWorkspace } from './SuspendedWorkspace';
 
 export const ME_QUERY_KEY = ['me'] as const;
 
@@ -83,14 +84,24 @@ export const currentWorkspace = {
  * The signed-in User and the Workspace they are looking at. Only for pages
  * under `RequireSession`, which renders them once `useMe` has a User.
  */
-export function useSignedIn(): { me: Me; workspace: Workspace } {
+export function useSignedIn(): { me: Me; workspace: MyWorkspace } {
   const { data: me } = useMe();
-  const chosen = useSyncExternalStore(currentWorkspace.subscribe, currentWorkspace.get);
-  // Every User has at least their Personal Workspace, listed first.
-  const workspace = me?.workspaces.find((w) => w.id === chosen) ?? me?.workspaces[0];
+  const workspace = useChosenWorkspace(me);
   if (!me || !workspace) throw new Error('useSignedIn must be used under <RequireSession>');
   return { me, workspace };
 }
+
+function useChosenWorkspace(me: Me | null | undefined): MyWorkspace | undefined {
+  const chosen = useSyncExternalStore(currentWorkspace.subscribe, currentWorkspace.get);
+  // Every User has at least their Personal Workspace, listed first.
+  return me?.workspaces.find((w) => w.id === chosen) ?? me?.workspaces[0];
+}
+
+/**
+ * Pages that are the User's own, not the Workspace's: still open while their
+ * access to the Workspace they are looking at is suspended.
+ */
+const OWN_PAGES = ['/settings/subscription', '/settings/consents', '/settings/delete-account'];
 
 function Loading() {
   const { t } = useI18n();
@@ -105,6 +116,7 @@ function Loading() {
 export function RequireSession() {
   const { t } = useI18n();
   const me = useMe();
+  const workspace = useChosenWorkspace(me.data);
   const location = useLocation();
   if (me.isPending) return <Loading />;
   // Who was signed in last time is enough offline: a failed refetch keeps it.
@@ -116,6 +128,9 @@ export function RequireSession() {
     );
   }
   if (!me.data) return <Navigate to="/login" replace state={{ from: location.pathname }} />;
+  if (workspace?.suspended && !OWN_PAGES.some((page) => location.pathname.startsWith(page))) {
+    return <SuspendedWorkspace workspace={workspace} />;
+  }
   return <Outlet />;
 }
 

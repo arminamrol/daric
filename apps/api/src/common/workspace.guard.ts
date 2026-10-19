@@ -8,7 +8,7 @@ import {
   SetMetadata,
 } from '@nestjs/common';
 import { Reflector } from '@nestjs/core';
-import { hasRole, type WorkspaceRole } from '@daric/core';
+import { hasRole, MEMBERSHIP_SUSPENDED, type WorkspaceRole } from '@daric/core';
 import { and, eq } from 'drizzle-orm';
 import type { Database } from '../db/client';
 import { workspaceMembers } from '../db/schema';
@@ -17,7 +17,8 @@ import { DATABASE } from './di-tokens';
 
 /**
  * Resolves the caller's membership in `:wsId`. A Workspace the caller is not a
- * Member of answers 404, the same as one that does not exist.
+ * Member of answers 404, the same as one that does not exist. A suspended
+ * Member (the Owner's Plus ended, ADR-0008) gets 403 `MEMBERSHIP_SUSPENDED`.
  */
 @Injectable()
 export class WorkspaceGuard implements CanActivate {
@@ -30,7 +31,7 @@ export class WorkspaceGuard implements CanActivate {
       throw new NotFoundException();
     }
     const [member] = await this.db
-      .select({ role: workspaceMembers.role })
+      .select({ role: workspaceMembers.role, suspendedAt: workspaceMembers.suspendedAt })
       .from(workspaceMembers)
       .where(
         and(
@@ -39,6 +40,13 @@ export class WorkspaceGuard implements CanActivate {
         ),
       );
     if (!member) throw new NotFoundException();
+    if (member.suspendedAt) {
+      throw new ForbiddenException({
+        statusCode: 403,
+        message: "Access to this Workspace is paused by its Owner's plan",
+        reason: MEMBERSHIP_SUSPENDED,
+      });
+    }
     req.membership = { workspaceId, role: member.role };
     return true;
   }

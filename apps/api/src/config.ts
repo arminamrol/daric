@@ -57,6 +57,8 @@ const envSchema = z.object({
   PLUS_AI_ANALYSES_PER_MONTH: z.coerce.number().int().min(0).default(30),
   /** Price of one month of Plus, an Amount in IRR (rials). */
   PLUS_MONTHLY_PRICE_IRR: positiveInt.default(2_000_000),
+  /** Minutes between runs of the Plus expiry job (reminders, Grace Period, downgrade); 0 turns it off. */
+  EXPIRY_JOB_INTERVAL_MINUTES: z.coerce.number().int().min(0).default(60),
   /** Zarinpal merchant id; without one, checkout answers 503. */
   ZARINPAL_MERCHANT_ID: z.string().trim().min(1).optional(),
   /** Use Zarinpal's sandbox, where nothing is charged (development). */
