@@ -14,6 +14,9 @@ _Avoid_: Account (reserved for money accounts), tenant, organization
 A User's membership in a Workspace with a Role (Owner, Admin, Member, Viewer).
 _Avoid_: Collaborator, participant
 
+**Suspended Member**:
+A Member whose access is paused, not removed, because the Owner's Plus and its Grace Period ended; Role, Consent and data stay, and access returns as soon as the Owner may share again. Shown to users as "Paused". The Owner is never suspended.
+
 **Invitation**:
 An Owner- or Admin-issued, revocable offer for a person to become a Member with a given Role (an Admin offers only Member or Viewer). Bound to an email, or a link one person may accept.
 

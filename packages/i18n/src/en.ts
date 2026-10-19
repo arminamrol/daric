@@ -81,9 +81,9 @@ export const en = {
   'subscription.ended': 'Plus ended on {date}.',
   'subscription.graceUntil': 'Plus ended on {date}, but keeps working until {graceEnd}.',
   'grace.banner.day':
-    'Your Daric Plus has ended, but it keeps working for one more day. After that only the device you used last stays signed in, and the members of your workspaces lose access until you renew.',
+    'Your Daric Plus has ended, but it keeps working for one more day. After that only the device you used last stays signed in, and anyone you share a workspace with loses access until you renew.',
   'grace.banner.days':
-    'Your Daric Plus has ended, but it keeps working for {days} more days. After that only the device you used last stays signed in, and the members of your workspaces lose access until you renew.',
+    'Your Daric Plus has ended, but it keeps working for {days} more days. After that only the device you used last stays signed in, and anyone you share a workspace with loses access until you renew.',
   'suspended.title': "Access paused by the owner's plan",
   'suspended.body':
     "The owner's Daric Plus for “{name}” has ended, so your access to this workspace is paused. Nothing was deleted: once the owner renews, everything comes back as it was.",

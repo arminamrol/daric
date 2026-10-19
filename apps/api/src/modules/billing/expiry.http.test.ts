@@ -260,6 +260,41 @@ describe('Plus expiry with billing enabled', () => {
       ]);
     });
 
+    it('gives a suspended Member made Owner their access back, and the others with Plus', async () => {
+      const { owner, member } = await sharedWorkspace(GRACE_DAYS * DAY + MINUTE);
+      const other = await joined(t, member, 'VIEWER');
+      // `member` invited someone into their own Workspace; now into the lapsed one too.
+      await db.insert(workspaceMembers).values({
+        workspaceId: owner.workspaceId,
+        userId: other.userId,
+        role: 'VIEWER',
+      });
+      await run(new Date(), owner, member, other);
+      expect((await accounts(t, other, owner.workspaceId)).status).toBe(403);
+
+      const [row] = await db
+        .select({ id: workspaceMembers.id })
+        .from(workspaceMembers)
+        .where(
+          and(
+            eq(workspaceMembers.workspaceId, owner.workspaceId),
+            eq(workspaceMembers.userId, member.userId),
+          ),
+        );
+      const res = await call(
+        t.url,
+        'POST',
+        `${membersPath(owner.workspaceId)}/${row?.id}/transfer-ownership`,
+        { token: owner.token },
+      );
+      expect(res.status).toBe(204);
+
+      // The new Owner is on their Trial: everyone is back at once.
+      expect((await accounts(t, member, owner.workspaceId)).status).toBe(200);
+      expect((await accounts(t, other, owner.workspaceId)).status).toBe(200);
+      expect(await auditRows(owner.workspaceId, 'member.restore')).toHaveLength(2);
+    });
+
     it('lets a suspended Member be removed by the Owner', async () => {
       const { owner, member } = await sharedWorkspace(GRACE_DAYS * DAY + MINUTE);
       await run(new Date(), owner, member);

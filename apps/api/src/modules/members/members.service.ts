@@ -13,6 +13,8 @@ import { type Database, one } from '../../db/client';
 import { workspaceMembers } from '../../db/schema';
 import { scopedTx } from '../../db/scope';
 import { AuditService } from '../audit/audit.service';
+import { EntitlementsService } from '../billing/entitlements.service';
+import { restoreMembersOf } from '../billing/suspension';
 import { emailsOf } from '../../db/user-emails';
 import { endSharing } from './sharing';
 
@@ -31,6 +33,7 @@ export class MembersService {
   constructor(
     @Inject(DATABASE) private readonly db: Database,
     @Inject(AuditService) private readonly audit: AuditService,
+    @Inject(EntitlementsService) private readonly entitlements: EntitlementsService,
   ) {}
 
   async list(): Promise<Member[]> {
@@ -123,9 +126,11 @@ export class MembersService {
       .update(workspaceMembers)
       .set({ role: 'ADMIN', ...bump })
       .where(own);
+    // An Owner is never suspended (ADR-0008): a Member paused by this Owner's lapsed Plus
+    // gets their access back with the Workspace.
     await tx
       .update(workspaceMembers)
-      .set({ role: 'OWNER', ...bump })
+      .set({ role: 'OWNER', suspendedAt: null, ...bump })
       .where(eq(workspaceMembers.id, target.id));
     await this.audit.record(tx, {
       action: 'workspace.transfer_ownership',
@@ -134,6 +139,20 @@ export class MembersService {
       client,
       metadata: { memberUserId: target.userId, from: target.role, to: 'OWNER' },
     });
+    if (target.suspendedAt) {
+      await this.audit.record(tx, {
+        action: 'member.restore',
+        actorUserId: userId,
+        workspaceId: membership.workspaceId,
+        client,
+        metadata: { memberUserId: target.userId, role: target.role },
+      });
+    }
+    // The others come back at once if the new Owner may share; row-level security keeps
+    // this to the one Workspace.
+    if ((await this.entitlements.entitlementsOf(target.userId)).shareWorkspace) {
+      await restoreMembersOf(tx, this.audit, target.userId, userId);
+    }
   }
 
   /** The membership, locked against changes until the request commits when `lock`. */

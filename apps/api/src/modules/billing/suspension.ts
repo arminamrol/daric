@@ -34,7 +34,7 @@ export async function ownsSharedWorkspace(db: Executor, userId: string): Promise
   return row !== undefined;
 }
 
-async function change(
+async function setSuspended(
   tx: Executor,
   audit: AuditService,
   {
@@ -82,7 +82,11 @@ export function suspendMembersOf(
   ownerId: string,
   now: Date,
 ): Promise<number> {
-  return change(tx, audit, { where: ownedBy(tx, ownerId), suspendedAt: now, actorUserId: null });
+  return setSuspended(tx, audit, {
+    where: ownedBy(tx, ownerId),
+    suspendedAt: now,
+    actorUserId: null,
+  });
 }
 
 /**
@@ -95,7 +99,7 @@ export function restoreMembersOf(
   ownerId: string,
   actorUserId: string | null = null,
 ): Promise<number> {
-  return change(tx, audit, { where: ownedBy(tx, ownerId), suspendedAt: null, actorUserId });
+  return setSuspended(tx, audit, { where: ownedBy(tx, ownerId), suspendedAt: null, actorUserId });
 }
 
 /** The Owners of Workspaces with a suspended Member (of `only`, when given), to check their Plan again. */

@@ -118,8 +118,10 @@ export class ExpiryService {
   /** Takes the User's step due at `now`, if it was not taken for this expiry yet. */
   private async takeDueStep(userId: string, now: Date, run: ExpiryRun): Promise<void> {
     const mail = await this.db.transaction(async (tx) => {
-      // Locked, so a Payment settling meanwhile (which locks it too) either
-      // moved the expiry already or waits until this step is taken.
+      // The User row first, as a login does, then the Subscription, as a Payment
+      // settling does: that one either moved the expiry already or waits until
+      // this step is taken.
+      await tx.select({ id: users.id }).from(users).where(eq(users.id, userId)).for('update');
       const [subscription] = await tx
         .select({
           expiresAt: subscriptions.expiresAt,
