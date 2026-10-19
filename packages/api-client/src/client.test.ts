@@ -364,6 +364,8 @@ describe('api-client', () => {
       onTrial: true,
       trialEndsAt: '2026-10-28T08:00:00.000Z',
       expiresAt: '2026-10-28T08:00:00.000Z',
+      graceEndsAt: '2026-11-04T08:00:00.000Z',
+      inGracePeriod: false,
       entitlements: {
         signedInDevices: 3,
         shareWorkspace: true,
@@ -458,6 +460,7 @@ describe('api-client', () => {
       email: user.email,
       role: 'OWNER',
       joinedAt: '2026-10-01T08:00:00.000Z',
+      suspended: false,
     };
 
     it('lists, changes and removes Members', async () => {

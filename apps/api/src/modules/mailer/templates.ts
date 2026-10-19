@@ -210,3 +210,83 @@ export function invitationTemplate(
         },
   );
 }
+
+/** "in 7 days" or "tomorrow", for a reminder that many days before Plus ends. */
+function inDays(locale: Locale, days: number): string {
+  if (days === 1) return locale === 'fa' ? 'فردا' : 'tomorrow';
+  const count = FRAME[locale].number.format(days);
+  return locale === 'fa' ? `${count} روز دیگر` : `in ${days} days`;
+}
+
+/**
+ * A reminder that the User's Plus (or their Trial) ends in `days`; there is no
+ * auto-renew, so this is how they hear of it (ADR-0008).
+ */
+export function plusEndingTemplate(
+  locale: Locale,
+  ending: { days: number; onTrial: boolean; graceDays: number; hasMembers: boolean },
+  checkoutLink: string,
+): Template {
+  const when = inDays(locale, ending.days);
+  const grace = FRAME[locale].number.format(ending.graceDays);
+  if (locale === 'fa') {
+    const what = ending.onTrial ? 'دورهٔ آزمایشی دریک پلاس شما' : 'اشتراک دریک پلاس شما';
+    return render(locale, {
+      subject: `${what} ${when} تمام می‌شود`,
+      intro: [
+        `${what} ${when} تمام می‌شود. برای ماندن روی پلاس، پیش از آن تمدید کنید؛ روزهای باقی‌مانده از دست نمی‌روند.`,
+      ],
+      action: { label: 'تمدید دریک پلاس', url: checkoutLink },
+      outro: [
+        `پس از پایان، ${grace} روز مهلت دارید و پلاس همچنان کار می‌کند. پس از آن فقط آخرین دستگاهی که با آن کار کرده‌اید وارد می‌ماند${ending.hasMembers ? ' و دسترسی اعضای فضاهای کاری شما تا تمدید متوقف می‌شود' : ''}. هیچ داده‌ای پاک نمی‌شود.`,
+      ],
+    });
+  }
+  const what = ending.onTrial ? 'Your Daric Plus trial' : 'Your Daric Plus';
+  return render(locale, {
+    subject: `${what} ends ${when}`,
+    intro: [
+      `${what} ends ${when}. Renew before then to stay on Plus; the days you have left are kept.`,
+    ],
+    action: { label: 'Renew Daric Plus', url: checkoutLink },
+    outro: [
+      `After it ends you have ${grace} days of grace in which Plus keeps working. After that only the device you used last stays signed in${ending.hasMembers ? ', and the members of your workspaces lose access until you renew' : ''}. No data is deleted.`,
+    ],
+  });
+}
+
+/**
+ * Plus has ended and its Grace Period started: what happens when it ends,
+ * warning an Owner whose Workspaces have Members that they will be suspended.
+ */
+export function gracePeriodTemplate(
+  locale: Locale,
+  grace: { days: number; hasMembers: boolean },
+  checkoutLink: string,
+): Template {
+  const days = FRAME[locale].number.format(grace.days);
+  if (locale === 'fa') {
+    return render(locale, {
+      subject: `دریک پلاس شما تمام شد؛ ${days} روز مهلت دارید`,
+      intro: [
+        `دریک پلاس شما تمام شد، اما تا ${days} روز دیگر همهٔ امکانات پلاس همچنان کار می‌کنند.`,
+        grace.hasMembers
+          ? `اگر تا آن موقع تمدید نکنید، فقط آخرین دستگاهی که با آن کار کرده‌اید وارد می‌ماند و دسترسی اعضای فضاهای کاری شما متوقف می‌شود. اعضا حذف نمی‌شوند و با تمدید، دسترسی‌شان بی‌درنگ برمی‌گردد.`
+          : `اگر تا آن موقع تمدید نکنید، فقط آخرین دستگاهی که با آن کار کرده‌اید وارد می‌ماند.`,
+      ],
+      action: { label: 'تمدید دریک پلاس', url: checkoutLink },
+      outro: ['هیچ داده‌ای به خاطر پایان اشتراک پاک نمی‌شود.'],
+    });
+  }
+  return render(locale, {
+    subject: `Your Daric Plus has ended; you have ${days} days of grace`,
+    intro: [
+      `Your Daric Plus has ended, but everything in Plus keeps working for ${days} more ${grace.days === 1 ? 'day' : 'days'}.`,
+      grace.hasMembers
+        ? 'If you do not renew by then, only the device you used last stays signed in, and the members of your workspaces lose access. They are not removed: renewing gives their access back at once.'
+        : 'If you do not renew by then, only the device you used last stays signed in.',
+    ],
+    action: { label: 'Renew Daric Plus', url: checkoutLink },
+    outro: ['No data is ever deleted because a subscription ended.'],
+  });
+}

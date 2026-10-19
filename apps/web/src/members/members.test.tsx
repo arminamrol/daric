@@ -11,6 +11,8 @@ const free: Subscription = {
   onTrial: false,
   trialEndsAt: '2026-10-01T06:30:00.000Z',
   expiresAt: '2026-10-01T06:30:00.000Z',
+  graceEndsAt: '2026-10-08T06:30:00.000Z',
+  inGracePeriod: false,
   entitlements: {
     signedInDevices: 1,
     shareWorkspace: false,

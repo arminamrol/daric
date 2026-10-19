@@ -11,6 +11,8 @@ const boughtPlus: Subscription = {
   onTrial: false,
   trialEndsAt: '2026-10-01T06:30:00.000Z',
   expiresAt: '2027-01-01T06:30:00.000Z',
+  graceEndsAt: '2027-01-08T06:30:00.000Z',
+  inGracePeriod: false,
   entitlements: {
     signedInDevices: 3,
     shareWorkspace: true,

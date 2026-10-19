@@ -13,6 +13,7 @@ import { DatabaseModule } from './db/database.module';
 import { AccountsModule } from './modules/accounts/accounts.module';
 import { AuditModule } from './modules/audit/audit.module';
 import { BillingModule } from './modules/billing/billing.module';
+import { ExpiryModule } from './modules/billing/expiry.module';
 import { AuthController } from './modules/auth/auth.controller';
 import { AuthModule } from './modules/auth/auth.module';
 import { checksPassword } from './modules/auth/checks-password';
@@ -85,6 +86,7 @@ export class AppModule {
         }),
         AuditModule,
         BillingModule,
+        ExpiryModule,
         MailerModule,
         AuthModule,
         WorkspacesModule,

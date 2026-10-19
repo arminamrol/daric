@@ -19,12 +19,14 @@ import { CONFIG, DATABASE } from '../../common/di-tokens';
 import type { Config } from '../../config';
 import { one, type Database, type Executor } from '../../db/client';
 import { payments, subscriptions } from '../../db/schema';
+import { AuditService } from '../audit/audit.service';
 import { billingConfig, type BillingConfig } from './billing-config';
 import {
   PAYMENT_PROVIDER,
   PaymentsNotConfiguredError,
   type PaymentProvider,
 } from './payment-provider';
+import { restoreMembersOf } from './suspension';
 import {
   extendedExpiry,
   MAX_PLUS_MONTHS,
@@ -92,6 +94,7 @@ export class PaymentsService {
     @Inject(DATABASE) private readonly db: Database,
     @Inject(CONFIG) private readonly config: Config,
     @Inject(PAYMENT_PROVIDER) private readonly provider: PaymentProvider,
+    @Inject(AuditService) private readonly audit: AuditService,
   ) {
     this.billing = billingConfig(config);
   }
@@ -204,7 +207,8 @@ export class PaymentsService {
 
   /**
    * Verifies the Payment matching `where` with the provider and, when paid,
-   * marks it Paid and extends the Subscription. The Payment's row is locked
+   * marks it Paid, extends the Subscription and restores any Members suspended
+   * when the User's Plus lapsed. The Payment's row is locked
    * meanwhile, so a second settle of it (a reload, a race) waits and then
    * finds it Paid: one Payment extends once. A Failed or Canceled one is
    * verified again too, since a callback anyone can send may have closed it
@@ -254,6 +258,8 @@ export class PaymentsService {
       }
 
       const plusUntil = await this.extend(tx, payment.userId, payment.months, now);
+      // Plus again: Members suspended when it lapsed get their access back at once (ADR-0008).
+      await restoreMembersOf(tx, this.audit, payment.userId, payment.userId);
       await tx
         .update(payments)
         .set({ status: 'PAID', receipt: verification.receipt, plusUntil, completedAt: now })

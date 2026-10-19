@@ -5,6 +5,7 @@ import { auditLogs, refreshTokens, signedInDevices, subscriptions } from '../../
 import { browser, call, startTestApp, testPassword, type TestApp } from '../../test/app';
 import { testDatabase, uniqueEmail } from '../../test/db';
 import { hashToken } from './token.service';
+import { GRACE_DAYS } from '../billing/billing-config';
 
 const { db, pool } = testDatabase();
 afterAll(() => pool.end());
@@ -50,9 +51,9 @@ async function refresh(t: TestApp, device: Device) {
   return res;
 }
 
-/** Ends the User's Plus time, leaving them on Free. */
+/** Ends the User's Plus time and its Grace Period, leaving them on Free. */
 async function putOnFree(userId: string) {
-  const past = new Date(Date.now() - DAY);
+  const past = new Date(Date.now() - (GRACE_DAYS + 1) * DAY);
   await db
     .update(subscriptions)
     .set({ trialEndsAt: past, expiresAt: past })

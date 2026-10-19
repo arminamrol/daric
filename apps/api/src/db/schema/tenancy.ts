@@ -47,6 +47,12 @@ export const workspaceMembers = pgTable(
       .notNull()
       .references(() => users.id, { onDelete: 'cascade' }),
     role: workspaceRole('role').notNull(),
+    /**
+     * Set while the Owner's Plus and its Grace Period have ended (ADR-0008):
+     * the membership is kept but gives no access until the Owner renews.
+     * Never set on the Owner.
+     */
+    suspendedAt: timestamp('suspended_at', { withTimezone: true }),
     ...timestamps(),
     version: version(),
   },

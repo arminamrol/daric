@@ -43,6 +43,8 @@ describe('Subscription page', () => {
         // 23 Oct 2026, 1 Aban 1405 in Tehran.
         trialEndsAt: '2026-10-23T06:30:00.000Z',
         expiresAt: '2026-10-23T06:30:00.000Z',
+        graceEndsAt: '2026-10-30T06:30:00.000Z',
+        inGracePeriod: false,
         entitlements: plus,
       }).api,
     });
@@ -67,6 +69,8 @@ describe('Subscription page', () => {
         onTrial: false,
         trialEndsAt: '2026-09-01T06:30:00.000Z',
         expiresAt: '2026-10-23T06:30:00.000Z',
+        graceEndsAt: '2026-10-30T06:30:00.000Z',
+        inGracePeriod: false,
         entitlements: plus,
       }).api,
     });
@@ -82,6 +86,8 @@ describe('Subscription page', () => {
         onTrial: false,
         trialEndsAt: '2026-10-01T06:30:00.000Z',
         expiresAt: '2026-10-01T06:30:00.000Z',
+        graceEndsAt: '2026-10-08T06:30:00.000Z',
+        inGracePeriod: false,
         entitlements: {
           signedInDevices: 1,
           shareWorkspace: false,
@@ -105,6 +111,8 @@ describe('Subscription page', () => {
         onTrial: true,
         trialEndsAt: '2026-10-23T06:30:00.000Z',
         expiresAt: '2026-10-23T06:30:00.000Z',
+        graceEndsAt: '2026-10-30T06:30:00.000Z',
+        inGracePeriod: false,
         entitlements: {
           signedInDevices: null,
           shareWorkspace: true,
@@ -174,6 +182,8 @@ describe('Subscription page', () => {
         onTrial: false,
         trialEndsAt: null,
         expiresAt: null,
+        graceEndsAt: null,
+        inGracePeriod: false,
         entitlements: {
           signedInDevices: null,
           shareWorkspace: true,

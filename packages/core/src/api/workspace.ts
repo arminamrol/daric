@@ -33,6 +33,18 @@ export const workspaceSchema = z.object({
 });
 export type Workspace = z.infer<typeof workspaceSchema>;
 
+/**
+ * A Workspace in the signed-in User's own list. `suspended`: the Owner's Plus
+ * and its Grace Period ended, so this Member's access is paused (not removed)
+ * until the Owner renews; the Workspace's routes answer 403 with
+ * `reason: MEMBERSHIP_SUSPENDED` meanwhile.
+ */
+export const myWorkspaceSchema = workspaceSchema.extend({ suspended: z.boolean() });
+export type MyWorkspace = z.infer<typeof myWorkspaceSchema>;
+
+/** The `reason` of the 403 a suspended Member gets from their Workspace's routes. */
+export const MEMBERSHIP_SUSPENDED = 'MEMBERSHIP_SUSPENDED';
+
 /** Any currency Daric knows can be a Base Currency. */
 export const baseCurrencyCodes = currencyCodes;
 
@@ -87,6 +99,6 @@ export const meSchema = z.object({
   /** `emailVerified` once the User has followed a link mailed to their address. */
   user: userSchema.extend({ emailVerified: z.boolean() }),
   preferences: userPreferencesSchema,
-  workspaces: z.array(workspaceSchema),
+  workspaces: z.array(myWorkspaceSchema),
 });
 export type Me = z.infer<typeof meSchema>;

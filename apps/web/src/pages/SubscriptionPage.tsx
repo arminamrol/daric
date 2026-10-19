@@ -26,8 +26,9 @@ function PlanCard({ subscription }: { subscription: Subscription }) {
   const { t } = useI18n();
   const format = useFormatters();
   const titleId = useId();
-  const { plan, onTrial, expiresAt } = subscription;
-  const until = expiresAt && isolate(format.date(new Date(expiresAt), { style: 'long' }));
+  const { plan, onTrial, expiresAt, inGracePeriod, graceEndsAt } = subscription;
+  const date = (iso: string) => isolate(format.date(new Date(iso), { style: 'long' }));
+  const until = expiresAt && date(expiresAt);
 
   return (
     <section
@@ -42,9 +43,11 @@ function PlanCard({ subscription }: { subscription: Subscription }) {
         <p className="text-sm text-foreground-muted">
           {plan === 'FREE'
             ? t('subscription.ended', { date: until })
-            : onTrial
-              ? t('subscription.trialUntil', { date: until })
-              : t('subscription.plusUntil', { date: until })}
+            : inGracePeriod && graceEndsAt
+              ? t('subscription.graceUntil', { date: until, graceEnd: date(graceEndsAt) })
+              : onTrial
+                ? t('subscription.trialUntil', { date: until })
+                : t('subscription.plusUntil', { date: until })}
         </p>
       )}
       <Link

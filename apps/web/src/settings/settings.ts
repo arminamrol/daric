@@ -80,7 +80,7 @@ export function useUpdateWorkspace(workspaceId: string) {
         (me) =>
           me && {
             ...me,
-            workspaces: me.workspaces.map((w) => (w.id === saved.id ? saved : w)),
+            workspaces: me.workspaces.map((w) => (w.id === saved.id ? { ...w, ...saved } : w)),
           },
       );
     },

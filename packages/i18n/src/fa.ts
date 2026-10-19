@@ -77,6 +77,15 @@ export const fa = {
   'subscription.trialUntil': 'دوره آزمایشی تا {date}',
   'subscription.plusUntil': 'فعال تا {date}',
   'subscription.ended': 'پلاس در {date} به پایان رسید.',
+  'subscription.graceUntil': 'پلاس در {date} به پایان رسید، اما تا {graceEnd} همچنان کار می‌کند.',
+  'grace.banner.day':
+    'دریک پلاس شما تمام شده، اما تا یک روز دیگر همچنان کار می‌کند. پس از آن فقط آخرین دستگاهی که با آن کار کرده‌اید وارد می‌ماند و اگر فضای کاری‌تان را با کسی به اشتراک گذاشته‌اید، دسترسی اعضای آن تا تمدید متوقف می‌شود.',
+  'grace.banner.days':
+    'دریک پلاس شما تمام شده، اما تا {days} روز دیگر همچنان کار می‌کند. پس از آن فقط آخرین دستگاهی که با آن کار کرده‌اید وارد می‌ماند و اگر فضای کاری‌تان را با کسی به اشتراک گذاشته‌اید، دسترسی اعضای آن تا تمدید متوقف می‌شود.',
+  'suspended.title': 'دسترسی با طرح مالک متوقف شده است',
+  'suspended.body':
+    'دریک پلاسِ مالک «{name}» تمام شده و برای همین دسترسی شما به این فضای کاری متوقف شده است. چیزی پاک نشده و با تمدید مالک، همه‌چیز همان‌طور که بود برمی‌گردد.',
+  'suspended.switch': 'از بالای صفحه می‌توانید به فضای کاری دیگری بروید.',
   'subscription.billingDisabled': 'روی این سرور همه امکانات بدون محدودیت در دسترس است.',
   'subscription.entitlements': 'امکانات شما',
   'subscription.devices': 'دستگاه‌های واردشده',
@@ -707,6 +716,8 @@ export const fa = {
   'auth.signedOut.DEVICE_LIMIT':
     'از این دستگاه خارج شدید، چون با دستگاه دیگری وارد شدید و طرح شما تعداد دستگاه‌های واردشده را محدود می‌کند.',
   'auth.signedOut.SIGNED_OUT_REMOTELY': 'این دستگاه از یکی دیگر از دستگاه‌هایتان خارج شد.',
+  'auth.signedOut.PLUS_ENDED':
+    'از این دستگاه خارج شدید، چون دریک پلاس شما تمام شد و در طرح رایگان فقط آخرین دستگاهی که با آن کار کرده‌اید وارد می‌ماند.',
   'auth.signedOut.upgrade': 'با دریک پلاس روی دستگاه‌های بیشتری وارد بمانید',
   'auth.login.forgot': 'رمز عبور را فراموش کرده‌اید؟',
   'auth.signup.title': 'ساخت حساب دریک',
@@ -768,6 +779,9 @@ export const fa = {
   'members.makeOwnerConfirm': '{email} مالک این فضای کاری می‌شود و شما مدیر آن می‌مانید.',
   'members.makeOwnerYes': 'بله، مالک شود',
   'members.changeFailed': 'تغییر انجام نشد. دوباره امتحان کنید.',
+  'members.suspended': 'متوقف',
+  'members.suspendedHint':
+    'دسترسی اعضای «متوقف» با پایان دریک پلاس شما متوقف شده است. آن‌ها حذف نشده‌اند و با تمدید، دسترسی‌شان بی‌درنگ برمی‌گردد.',
   'invitations.title': 'دعوت‌ها',
   'invitations.new': 'دعوت تازه',
   'invitations.email': 'ایمیل (اختیاری)',
@@ -895,6 +909,9 @@ export const fa = {
   'audit.action.auth.device_limit': 'خروج از دستگاهی دیگر به‌خاطر سقف دستگاه‌ها',
   'audit.action.auth.device_sign_out': 'خارج کردن یک دستگاه',
   'audit.action.user.delete': 'عضوی حساب کاربری‌اش را حذف کرد',
+  'audit.action.auth.plus_ended': 'خروج دستگاه‌ها با پایان پلاس',
+  'audit.action.member.suspend': 'توقف دسترسی عضو با پایان پلاس مالک',
+  'audit.action.member.restore': 'بازگشت دسترسی عضو',
   'deleteAccount.link': 'حذف حساب کاربری',
   'deleteAccount.title': 'حذف حساب کاربری',
   'deleteAccount.intro':

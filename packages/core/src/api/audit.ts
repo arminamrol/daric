@@ -56,6 +56,9 @@ export const auditActions = [
   'user.delete',
   'auth.device_limit',
   'auth.device_sign_out',
+  'auth.plus_ended',
+  'member.suspend',
+  'member.restore',
 ] as const;
 export type AuditAction = (typeof auditActions)[number];
 

@@ -274,7 +274,7 @@ describe('Account deletion with billing enabled', () => {
     expect((await deleteAccount(t, user)).status).toBe(204);
   });
 
-  it('warns of nothing once the Plus time has run out', async () => {
+  it('warns of nothing once the bought time has run out, in the Grace Period too', async () => {
     const user = await registerUser(t.url);
     const past = new Date(Date.now() - DAY);
     await db

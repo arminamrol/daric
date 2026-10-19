@@ -21,6 +21,7 @@ import {
   categoryTree,
   currencyByCode,
   hasRole,
+  MEMBERSHIP_SUSPENDED,
   money,
   rateDayOf,
   toBaseCurrency,
@@ -159,6 +160,8 @@ export function fakeApi({
     onTrial: true,
     trialEndsAt: trialEnd,
     expiresAt: trialEnd,
+    graceEndsAt: new Date(Date.parse(trialEnd) + 7 * 24 * 60 * 60 * 1000).toISOString(),
+    inGracePeriod: false,
     entitlements: {
       signedInDevices: 3,
       shareWorkspace: true,
@@ -195,6 +198,8 @@ export function fakeApi({
   >();
   /** Other Workspaces the User has joined. */
   let joined: Workspace[] = [];
+  /** Workspaces whose Owner's Plus ended, where the User's access is paused. */
+  const suspended = new Set<string>();
   const consents: Consent[] = [];
   let nextConsentId = 1;
   /** Newest first. */
@@ -272,6 +277,7 @@ export function fakeApi({
       email,
       role: memberRole,
       joinedAt: '2026-10-01T08:00:00.000Z',
+      suspended: false,
     };
     members.push(member);
     return member;
@@ -285,6 +291,9 @@ export function fakeApi({
     signedIn();
     const found = [workspace, ...joined].find((w) => w.id === workspaceId);
     if (!found) throw new ApiError(404, { message: 'Not Found' });
+    if (suspended.has(found.id)) {
+      throw new ApiError(403, { message: 'Forbidden', reason: MEMBERSHIP_SUSPENDED });
+    }
     if (!hasRole(found.role, minimum)) throw new ApiError(403, { message: 'Forbidden' });
     return found;
   }
@@ -302,7 +311,8 @@ export function fakeApi({
     const ref = { id: workspace.id, name: workspace.name };
     const owner = workspace.role === 'OWNER';
     const shared = owner && members.length > 1;
-    const bought = subscription.plan === 'PLUS' && !subscription.onTrial;
+    const bought =
+      subscription.plan === 'PLUS' && !subscription.onTrial && !subscription.inGracePeriod;
     return {
       sharedWorkspaces: shared ? [{ ...ref, otherMembers: members.length - 1 }] : [],
       deletedWorkspaces: owner && !shared ? [ref] : [],
@@ -798,7 +808,7 @@ export function fakeApi({
       return {
         user: { id: user.id, email: user.email, emailVerified: user.emailVerified },
         preferences: { ...user.preferences },
-        workspaces: [{ ...workspace }, ...joined.map((w) => ({ ...w }))],
+        workspaces: [workspace, ...joined].map((w) => ({ ...w, suspended: suspended.has(w.id) })),
       };
     },
     async updateWorkspace(workspaceId, input) {
@@ -1683,6 +1693,11 @@ export function fakeApi({
     emailVerified: (email: string) => users.get(email)?.emailVerified,
     workspace: () => workspace,
     preferences: () => signedIn().preferences,
+    /** Pauses the User's access to a Workspace, as when its Owner's Plus ended. */
+    suspend: (workspaceId: string) => void suspended.add(workspaceId),
+    /** Marks a Member of the Workspace paused, as the Owner sees them. */
+    suspendMember: (email: string) =>
+      void (members = members.map((m) => (m.email === email ? { ...m, suspended: true } : m))),
     /** Sets what the server answers about the User's Plan. */
     setSubscription: (value: Subscription) => void (subscription = value),
     /** Every Payment started, Pending ones included, oldest first. */

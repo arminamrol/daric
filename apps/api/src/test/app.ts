@@ -35,6 +35,7 @@ export function testConfig(overrides: Record<string, string> = {}): Config {
     LOG_LEVEL: 'silent',
     // Tests run the month-end job themselves, with the time they need.
     SNAPSHOT_JOB_INTERVAL_MINUTES: '0',
+    EXPIRY_JOB_INTERVAL_MINUTES: '0',
     ...overrides,
   });
 }

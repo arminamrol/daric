@@ -53,6 +53,7 @@ export const deviceEndReason = pgEnum('device_end_reason', [
   'PASSWORD_RESET',
   'DEVICE_LIMIT',
   'SIGNED_OUT_REMOTELY',
+  'PLUS_ENDED',
 ]);
 
 /**

@@ -4,6 +4,7 @@ import { DAY } from '../../common/time';
 import { subscriptions } from '../../db/schema';
 import { call, registerUser, startTestApp, testPassword, type TestApp } from '../../test/app';
 import { testDatabase, uniqueEmail } from '../../test/db';
+import { GRACE_DAYS } from './billing-config';
 
 const { db, pool } = testDatabase();
 afterAll(() => pool.end());
@@ -37,9 +38,9 @@ describe('Subscription with billing enabled', () => {
     expect(Math.abs(fromNow(res.body.expiresAt) - 14 * DAY)).toBeLessThan(60_000);
   });
 
-  it('puts a User whose Plus time ended on Free', async () => {
+  it('puts a User whose Plus time and Grace Period ended on Free', async () => {
     const a = await registerUser(t.url);
-    const past = new Date(Date.now() - DAY);
+    const past = new Date(Date.now() - (GRACE_DAYS + 1) * DAY);
     await db
       .update(subscriptions)
       .set({ trialEndsAt: past, expiresAt: past })

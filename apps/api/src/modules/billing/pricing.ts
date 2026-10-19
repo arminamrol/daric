@@ -1,5 +1,6 @@
 import type { Money } from '@daric/core';
 import { DAY } from '../../common/time';
+import { graceEnd } from './entitlements';
 import type { BillingConfig } from './billing-config';
 
 /** The longest and shortest stretch of Plus one Payment buys. */
@@ -59,7 +60,7 @@ export function extendedExpiry(input: {
   graceDays: number;
 }): Date {
   const { expiresAt, months, now, graceDays } = input;
-  const stillRunning = expiresAt !== null && now.getTime() < expiresAt.getTime() + graceDays * DAY;
+  const stillRunning = expiresAt !== null && now < graceEnd(expiresAt, graceDays);
   const from = stillRunning ? expiresAt : now;
   return new Date(from.getTime() + months * DAYS_PER_PLUS_MONTH * DAY);
 }
