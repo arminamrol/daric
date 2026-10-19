@@ -124,7 +124,7 @@ What a User has paid for: Free or Plus (Daric Plus). A Business plan may come la
 _Avoid_: Tier, package
 
 **Subscription**:
-A User's prepaid Plus time, with an expiry date. Belongs to the User, not to a Workspace. Includes a 14-day Trial at sign-up.
+A User's prepaid Plus time, with an expiry date. Belongs to the User, not to a Workspace. Includes a 14-day Trial at sign-up. Bought in whole months of 30 days, added to the current expiry while Plus or its Grace Period runs, otherwise from the time of payment.
 
 **Trial**:
 The Plus time every new User gets once at sign-up.

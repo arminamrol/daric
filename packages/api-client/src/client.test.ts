@@ -377,6 +377,69 @@ describe('api-client', () => {
     expect(await client.getSubscription()).toEqual(subscription);
   });
 
+  describe('Buying Plus', () => {
+    const payment = {
+      id: '01900000-0000-7000-8000-0000000000aa',
+      months: 3,
+      amount: '5700000',
+      currency: 'IRR',
+      status: 'PAID',
+      receipt: '201',
+      plusUntil: '2027-01-26T08:00:00.000Z',
+      createdAt: '2026-10-19T08:00:00.000Z',
+      completedAt: '2026-10-19T08:03:00.000Z',
+    };
+
+    it('reads the prices the server works out, with Amounts as bigints', async () => {
+      const { client } = fakeServer({
+        'GET /v1/me/subscription/prices': () => ({
+          status: 200,
+          body: [
+            {
+              months: 12,
+              fullAmount: '24000000',
+              amount: '20000000',
+              currency: 'IRR',
+              discountPercent: 17,
+            },
+          ],
+        }),
+      });
+      expect(await client.listPlusPrices()).toEqual([
+        {
+          months: 12,
+          fullAmount: 24_000_000n,
+          amount: 20_000_000n,
+          currency: 'IRR',
+          discountPercent: 17,
+        },
+      ]);
+    });
+
+    it('starts a checkout with only the months, and reads Payments', async () => {
+      const pending = { ...payment, status: 'PENDING', receipt: null, plusUntil: null };
+      const { client, sent } = fakeServer(
+        {
+          'POST /v1/me/payments': () => ({
+            status: 201,
+            body: { payment: pending, redirectUrl: 'https://pay.example/start/A1' },
+          }),
+          'GET /v1/me/payments': () => ({ status: 200, body: [payment] }),
+          [`GET /v1/me/payments/${payment.id}`]: () => ({ status: 200, body: payment }),
+        },
+        { '__Host-daric_csrf': 'csrf-1' },
+      );
+      expect(await client.checkout({ months: 3 })).toEqual({
+        payment: { ...pending, amount: 5_700_000n },
+        redirectUrl: 'https://pay.example/start/A1',
+      });
+      expect(sent[0]?.body).toEqual({ months: 3 });
+      expect(sent[0]?.headers.get('x-csrf-token')).toBe('csrf-1');
+      expect(await client.listPayments()).toEqual([{ ...payment, amount: 5_700_000n }]);
+      expect(await client.getPayment(payment.id)).toEqual({ ...payment, amount: 5_700_000n });
+    });
+  });
+
   describe('Sharing', () => {
     const ws = workspace.id;
     const csrf = { '__Host-daric_csrf': 'csrf-1' };

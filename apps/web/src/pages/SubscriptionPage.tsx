@@ -1,10 +1,25 @@
-import type { SignedInDevice, Subscription } from '@daric/core';
+import {
+  currencyByCode,
+  money,
+  type Payment,
+  type SignedInDevice,
+  type Subscription,
+} from '@daric/core';
 import { isolate } from '@daric/i18n';
 import { useId } from 'react';
+import { Link, useSearchParams } from 'react-router';
 import { useI18n } from '../i18n/locale';
 import { useFormatters } from '../settings/settings';
-import { useSignedInDevices, useSignOutDevice, useSubscription } from '../settings/subscription';
+import {
+  usePayment,
+  usePayments,
+  useSignedInDevices,
+  useSignOutDevice,
+  useSubscription,
+} from '../settings/subscription';
 import { ConfirmButton } from '../ui/ConfirmButton';
+import { CHECKOUT_PATH } from '../ui/Paywall';
+import { useMonthsLabel } from './CheckoutPage';
 
 /** The Plan and how long it lasts; shown only when billing is enabled. */
 function PlanCard({ subscription }: { subscription: Subscription }) {
@@ -32,6 +47,12 @@ function PlanCard({ subscription }: { subscription: Subscription }) {
               : t('subscription.plusUntil', { date: until })}
         </p>
       )}
+      <Link
+        to={CHECKOUT_PATH}
+        className="mt-2 w-fit rounded-lg bg-primary px-4 py-2 font-medium text-on-primary"
+      >
+        {t(plan === 'PLUS' && !onTrial ? 'subscription.extend' : 'subscription.buy')}
+      </Link>
     </section>
   );
 }
@@ -156,14 +177,108 @@ function DeviceList({ limit }: { limit: number | null }) {
   );
 }
 
+/** How the Payment the provider just sent the browser back from ended (`?payment=`). */
+function PaymentResult({ paymentId }: { paymentId: string }) {
+  const { t } = useI18n();
+  const format = useFormatters();
+  const payment = usePayment(paymentId);
+  const titleId = useId();
+  if (!payment.data) return null;
+  const { status, plusUntil } = payment.data;
+
+  return (
+    <div
+      role="status"
+      aria-labelledby={titleId}
+      className="flex flex-col gap-1 rounded-xl border border-accent bg-surface-muted px-6 py-4"
+    >
+      <h2 id={titleId} className="text-sm text-foreground-muted">
+        {t('payment.result')}
+      </h2>
+      <p className={status === 'PAID' ? 'font-medium' : ''}>
+        {status === 'PAID' && plusUntil
+          ? t('payment.result.PAID', {
+              date: isolate(format.date(new Date(plusUntil), { style: 'long' })),
+            })
+          : t(`payment.result.${status === 'PAID' ? 'PENDING' : status}`)}
+      </p>
+    </div>
+  );
+}
+
+function PaymentRow({ payment }: { payment: Payment }) {
+  const { t } = useI18n();
+  const format = useFormatters();
+  const monthsLabel = useMonthsLabel();
+
+  return (
+    <li className="flex flex-col gap-1 py-3">
+      <p className="flex flex-wrap items-baseline gap-x-3">
+        <span className="font-medium">{monthsLabel(payment.months)}</span>
+        <span className="tabular-nums">
+          {format.money(money(payment.amount, currencyByCode(payment.currency)))}
+        </span>
+        <span
+          className={`ms-auto text-sm ${payment.status === 'PAID' ? 'text-foreground' : 'text-foreground-muted'}`}
+        >
+          {t(`payment.status.${payment.status}`)}
+        </span>
+      </p>
+      <p className="flex flex-wrap gap-x-3 text-sm text-foreground-muted">
+        <span>{format.date(new Date(payment.createdAt), { style: 'long' })}</span>
+        {payment.receipt && (
+          <span>{t('payment.receipt', { receipt: isolate(payment.receipt) })}</span>
+        )}
+      </p>
+    </li>
+  );
+}
+
+/** The User's Paid, Failed and Canceled Payments, newest first. */
+function PaymentHistory() {
+  const { t } = useI18n();
+  const payments = usePayments();
+  const titleId = useId();
+
+  return (
+    <section aria-labelledby={titleId} className={cardClass}>
+      <h2 id={titleId} className="text-xl font-bold">
+        {t('payments.title')}
+      </h2>
+      {payments.isPending ? (
+        <p role="status" className="text-foreground-muted">
+          {t('session.loading')}
+        </p>
+      ) : payments.isError ? (
+        <p role="alert" className="text-danger">
+          {t('payments.loadFailed')}
+        </p>
+      ) : payments.data.length === 0 ? (
+        <p className="text-foreground-muted">{t('payments.empty')}</p>
+      ) : (
+        <ul aria-labelledby={titleId} className="flex flex-col divide-y divide-border">
+          {payments.data.map((payment) => (
+            <PaymentRow key={payment.id} payment={payment} />
+          ))}
+        </ul>
+      )}
+    </section>
+  );
+}
+
+const cardClass = 'flex flex-col gap-3 rounded-xl border border-border bg-surface px-6 py-5';
+
 /** `/settings/subscription`: the User's own Plan, whichever Workspace they are in. */
 export function SubscriptionPage() {
   const { t } = useI18n();
   const subscription = useSubscription();
+  const [searchParams] = useSearchParams();
+  const paymentId = searchParams.get('payment');
 
   return (
     <div className="mx-auto flex max-w-2xl flex-col gap-6">
       <h1 className="text-2xl font-bold">{t('subscription.title')}</h1>
+      {paymentId && <PaymentResult paymentId={paymentId} />}
       {subscription.isPending ? (
         <p role="status" className="text-foreground-muted">
           {t('session.loading')}
@@ -183,6 +298,7 @@ export function SubscriptionPage() {
           )}
           <EntitlementList subscription={subscription.data} />
           <DeviceList limit={subscription.data.entitlements.signedInDevices} />
+          {subscription.data.billingEnabled && <PaymentHistory />}
         </>
       )}
     </div>

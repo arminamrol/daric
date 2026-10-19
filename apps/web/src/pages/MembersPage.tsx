@@ -12,7 +12,7 @@ import {
 import { isolate } from '@daric/i18n';
 import { useQueryClient } from '@tanstack/react-query';
 import { type FormEvent, useId, useState } from 'react';
-import { Link, useNavigate } from 'react-router';
+import { useNavigate } from 'react-router';
 import { ME_QUERY_KEY, useSignedIn } from '../auth/session';
 import { useI18n } from '../i18n/locale';
 import {
@@ -27,6 +27,7 @@ import {
 import { useFormatters } from '../settings/settings';
 import { ChoiceGroup } from '../ui/ChoiceGroup';
 import { ConfirmButton } from '../ui/ConfirmButton';
+import { Paywall } from '../ui/Paywall';
 
 const cardClass = 'flex flex-col gap-4 rounded-xl border border-border bg-surface px-6 py-6';
 const alertClass = 'rounded-md bg-surface-muted px-3 py-2 text-sm text-danger';
@@ -154,21 +155,13 @@ function MemberList() {
 /** Shown instead of the Invitation form when the Owner's Plan does not include sharing (ADR-0008). */
 function SharingPaywall({ role }: { role: WorkspaceRole }) {
   const { t } = useI18n();
+  // Sharing is the Owner's Entitlement: only the Owner's own Plus helps.
   return (
-    <div className="flex flex-col gap-2 rounded-lg border border-accent bg-surface-muted px-4 py-4">
-      <p className="font-bold">{t('invitations.paywall.title')}</p>
-      <p className="text-sm">{t('invitations.paywall.body')}</p>
-      {role === 'OWNER' ? (
-        <Link
-          to="/settings/subscription"
-          className="w-fit font-medium text-accent underline underline-offset-4"
-        >
-          {t('invitations.paywall.link')}
-        </Link>
-      ) : (
-        <p className="text-sm text-foreground-muted">{t('invitations.paywall.askOwner')}</p>
-      )}
-    </div>
+    <Paywall
+      title={t('invitations.paywall.title')}
+      body={t('invitations.paywall.body')}
+      cannotBuy={role === 'OWNER' ? undefined : t('invitations.paywall.askOwner')}
+    />
   );
 }
 
