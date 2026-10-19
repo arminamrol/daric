@@ -13,7 +13,7 @@ import {
   type PaymentWire,
   type PlusPriceWire,
 } from '@daric/core';
-import { and, desc, eq, ne } from 'drizzle-orm';
+import { and, desc, eq, ne, type SQL } from 'drizzle-orm';
 import { isUuid } from '../../common/request';
 import { CONFIG, DATABASE } from '../../common/di-tokens';
 import type { Config } from '../../config';
@@ -138,12 +138,13 @@ export class PaymentsService {
     try {
       started = await this.provider.request({
         amount: price.amount,
-        description: `Daric Plus, ${months} month${months === 1 ? '' : 's'}`,
+        // Shown to the payer on Zarinpal's page, which is in Persian.
+        description: `دریک پلاس، ${months} ماه`,
         // The API shares the web app's origin (ADR-0006).
         callbackUrl: `${this.config.APP_URL}/v1/payments/callback`,
       });
     } catch (error) {
-      await this.complete(this.db, created.id, 'FAILED');
+      await this.closeUnpaid(this.db, created.id, 'FAILED');
       if (error instanceof PaymentsNotConfiguredError) {
         throw new ServiceUnavailableException('Payments are not configured on this server');
       }
@@ -168,29 +169,54 @@ export class PaymentsService {
     return rows.map(toWire);
   }
 
-  /** One of the User's Payments, Pending included; 404 for anyone else's. */
+  /**
+   * One of the User's Payments, Pending included; 404 for anyone else's. A
+   * Pending one is verified with the provider first, so a Payment whose
+   * callback could not reach the provider settles once the User looks again.
+   */
   async get(userId: string, paymentId: string): Promise<PaymentWire> {
     if (!isUuid(paymentId)) throw new NotFoundException();
-    const [row] = await this.db
-      .select(paymentColumns)
-      .from(payments)
-      .where(and(eq(payments.id, paymentId), eq(payments.userId, userId)));
+    const mine = and(eq(payments.id, paymentId), eq(payments.userId, userId));
+    const read = async () => (await this.db.select(paymentColumns).from(payments).where(mine))[0];
+    const row = await read();
     if (!row) throw new NotFoundException();
-    return toWire(row);
+    if (row.status !== 'PENDING') return toWire(row);
+    // The User may still be at the provider: only a confirmed payment changes anything here.
+    await this.settle(mine, { unpaid: null });
+    const settled = await read();
+    if (!settled) throw new NotFoundException();
+    return toWire(settled);
   }
 
   /**
-   * Handles the provider's redirect back: verifies the Payment with the
-   * provider and, when paid, extends the Subscription. The Payment's row is
-   * locked meanwhile, so a second callback for it (a reload, a race) waits and
-   * then finds it completed: one Payment extends once. A Payment that could
-   * not be verified stays Pending, and the next callback tries again. Returns
-   * the Payment's id, or null for a redirect that matches none.
+   * Handles the provider's redirect back: verifies the Payment and settles it.
+   * Returns the Payment's id, or null for a redirect that matches none.
    */
   async handleCallback(query: Record<string, unknown>, now = new Date()): Promise<string | null> {
     const callback = this.provider.parseCallback(query);
     if (!callback) return null;
+    return this.settle(
+      and(eq(payments.provider, this.provider.name), eq(payments.reference, callback.reference)),
+      { unpaid: callback.canceled ? 'CANCELED' : 'FAILED' },
+      now,
+    );
+  }
 
+  /**
+   * Verifies the Payment matching `where` with the provider and, when paid,
+   * marks it Paid and extends the Subscription. The Payment's row is locked
+   * meanwhile, so a second settle of it (a reload, a race) waits and then
+   * finds it Paid: one Payment extends once. A Failed or Canceled one is
+   * verified again too, since a callback anyone can send may have closed it
+   * before the User paid. When the provider says it is unpaid, a Pending one
+   * becomes `unpaid`, or stays Pending when that is null; when the provider
+   * cannot tell, nothing changes and a later look tries again.
+   */
+  private settle(
+    where: SQL | undefined,
+    { unpaid }: { unpaid: 'FAILED' | 'CANCELED' | null },
+    now = new Date(),
+  ): Promise<string | null> {
     return this.db.transaction(async (tx) => {
       const [payment] = await tx
         .select({
@@ -200,22 +226,19 @@ export class PaymentsService {
           amount: payments.amount,
           currency: payments.currency,
           status: payments.status,
+          reference: payments.reference,
         })
         .from(payments)
-        .where(
-          and(
-            eq(payments.provider, this.provider.name),
-            eq(payments.reference, callback.reference),
-          ),
-        )
+        .where(where)
         .for('update');
       if (!payment) return null;
-      if (payment.status !== 'PENDING') return payment.id;
+      // No reference: the provider never started it, so there is nothing to verify.
+      if (payment.status === 'PAID' || payment.reference === null) return payment.id;
 
       let verification;
       try {
         verification = await this.provider.verify({
-          reference: callback.reference,
+          reference: payment.reference,
           amount: { amount: payment.amount, currency: currencyByCode(payment.currency) },
         });
       } catch (error) {
@@ -224,7 +247,9 @@ export class PaymentsService {
       }
 
       if (!verification.paid) {
-        await this.complete(tx, payment.id, callback.canceled ? 'CANCELED' : 'FAILED', now);
+        if (payment.status === 'PENDING' && unpaid !== null) {
+          await this.closeUnpaid(tx, payment.id, unpaid, now);
+        }
         return payment.id;
       }
 
@@ -237,7 +262,8 @@ export class PaymentsService {
     });
   }
 
-  private async complete(
+  /** Ends a Payment that brought no money. */
+  private async closeUnpaid(
     db: Executor,
     paymentId: string,
     status: 'FAILED' | 'CANCELED',
@@ -248,6 +274,12 @@ export class PaymentsService {
 
   /** Moves the User's expiry on by `months` (see `extendedExpiry`); returns the new expiry. */
   private async extend(tx: Executor, userId: string, months: number, now: Date): Promise<Date> {
+    // A User without a row gets an empty one first, so there is always a row to lock:
+    // two Payments settling at once then extend one after the other.
+    await tx
+      .insert(subscriptions)
+      .values({ userId, plan: 'PLUS' })
+      .onConflictDoNothing({ target: subscriptions.userId });
     const [current] = await tx
       .select({ expiresAt: subscriptions.expiresAt })
       .from(subscriptions)
@@ -259,14 +291,10 @@ export class PaymentsService {
       now,
       graceDays: this.billing.graceDays,
     });
-    if (current) {
-      await tx
-        .update(subscriptions)
-        .set({ plan: 'PLUS', expiresAt })
-        .where(eq(subscriptions.userId, userId));
-    } else {
-      await tx.insert(subscriptions).values({ userId, plan: 'PLUS', expiresAt });
-    }
+    await tx
+      .update(subscriptions)
+      .set({ plan: 'PLUS', expiresAt })
+      .where(eq(subscriptions.userId, userId));
     return expiresAt;
   }
 }

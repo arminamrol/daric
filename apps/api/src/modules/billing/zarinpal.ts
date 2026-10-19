@@ -13,6 +13,8 @@ const TIMEOUT_MS = 15_000;
 
 /** Verify codes that mean paid: 100 verified now, 101 verified before. */
 const PAID_CODES = new Set([100, 101]);
+/** The one verify refusal that means the payer did not pay (or turned back). */
+const NOT_PAID_CODE = -51;
 
 interface ZarinpalAnswer {
   data?: { code?: number; authority?: string; ref_id?: number | string } | unknown[];
@@ -73,7 +75,9 @@ export class ZarinpalProvider implements PaymentProvider {
     if (data?.code !== undefined && PAID_CODES.has(data.code) && data.ref_id !== undefined) {
       return { paid: true, receipt: String(data.ref_id) };
     }
-    return { paid: false };
+    if (fields(answer.errors)?.code === NOT_PAID_CODE) return { paid: false };
+    // A rate limit, a merchant problem or anything unexpected says nothing about the money.
+    throw new Error(`Zarinpal could not verify the payment: ${describeErrors(answer)}`);
   }
 
   /**

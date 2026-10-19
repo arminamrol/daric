@@ -1,6 +1,9 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import { isolate } from '@daric/i18n';
 import { useApi } from '../api/api';
+import { useI18n } from '../i18n/locale';
 import { leave } from '../lib/leave';
+import { useFormatters } from './settings';
 
 export const SUBSCRIPTION_QUERY_KEY = ['subscription'] as const;
 export const DEVICES_QUERY_KEY = ['devices'] as const;
@@ -62,4 +65,14 @@ export function usePayment(paymentId: string | null) {
     queryFn: () => api.getPayment(paymentId ?? ''),
     enabled: paymentId !== null,
   });
+}
+
+/** "3 months" for a number of months of Plus, in the User's digits. */
+export function useMonthsLabel() {
+  const { t } = useI18n();
+  const format = useFormatters();
+  return (months: number) =>
+    t(months === 1 ? 'checkout.month' : 'checkout.months', {
+      count: isolate(format.count(months)),
+    });
 }

@@ -1,21 +1,16 @@
-import { IRR, money, type PlusPrice } from '@daric/core';
+import { currencyByCode, money, type PlusPrice } from '@daric/core';
 import { isolate } from '@daric/i18n';
 import { useId, useState } from 'react';
 import { useI18n } from '../i18n/locale';
 import { useFormatters } from '../settings/settings';
-import { useCheckout, usePlusPrices, useSubscription } from '../settings/subscription';
+import {
+  useCheckout,
+  useMonthsLabel,
+  usePlusPrices,
+  useSubscription,
+} from '../settings/subscription';
 
 const cardClass = 'flex flex-col gap-3 rounded-xl border border-border bg-surface px-6 py-5';
-
-/** "3 months", in the User's digits. */
-export function useMonthsLabel() {
-  const { t } = useI18n();
-  const format = useFormatters();
-  return (months: number) =>
-    t(months === 1 ? 'checkout.month' : 'checkout.months', {
-      count: isolate(format.count(months)),
-    });
-}
 
 function PriceChoice({
   price,
@@ -43,7 +38,9 @@ function PriceChoice({
         className="accent-primary"
       />
       <span className="font-medium">{monthsLabel(price.months)}</span>
-      <span className="ms-auto tabular-nums">{format.money(money(price.amount, IRR))}</span>
+      <span className="ms-auto tabular-nums">
+        {format.money(money(price.amount, currencyByCode(price.currency)))}
+      </span>
       {price.discountPercent > 0 && (
         <span className="rounded-full bg-surface-muted px-2 py-0.5 text-xs text-accent">
           {t('checkout.discount', { percent: isolate(format.count(price.discountPercent)) })}
@@ -62,6 +59,7 @@ function Checkout({ prices }: { prices: PlusPrice[] }) {
   const totalId = useId();
   const chosen = prices.find((p) => p.months === months) ?? prices[0];
   if (!chosen) return null;
+  const currency = currencyByCode(chosen.currency);
 
   return (
     <>
@@ -86,11 +84,13 @@ function Checkout({ prices }: { prices: PlusPrice[] }) {
         <h2 id={totalId} className="text-sm text-foreground-muted">
           {t('checkout.total')}
         </h2>
-        <p className="text-2xl font-bold tabular-nums">{format.money(money(chosen.amount, IRR))}</p>
+        <p className="text-2xl font-bold tabular-nums">
+          {format.money(money(chosen.amount, currency))}
+        </p>
         {chosen.discountPercent > 0 && (
           <p className="flex gap-2 text-sm text-foreground-muted">
             <span className="sr-only">{t('checkout.fullPrice')}</span>
-            <s className="tabular-nums">{format.money(money(chosen.fullAmount, IRR))}</s>
+            <s className="tabular-nums">{format.money(money(chosen.fullAmount, currency))}</s>
             <span className="text-accent">
               {t('checkout.discount', { percent: isolate(format.count(chosen.discountPercent)) })}
             </span>

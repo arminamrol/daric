@@ -11,6 +11,7 @@ import { Link, useSearchParams } from 'react-router';
 import { useI18n } from '../i18n/locale';
 import { useFormatters } from '../settings/settings';
 import {
+  useMonthsLabel,
   usePayment,
   usePayments,
   useSignedInDevices,
@@ -19,7 +20,6 @@ import {
 } from '../settings/subscription';
 import { ConfirmButton } from '../ui/ConfirmButton';
 import { CHECKOUT_PATH } from '../ui/Paywall';
-import { useMonthsLabel } from './CheckoutPage';
 
 /** The Plan and how long it lasts; shown only when billing is enabled. */
 function PlanCard({ subscription }: { subscription: Subscription }) {

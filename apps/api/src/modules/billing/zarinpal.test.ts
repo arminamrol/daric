@@ -122,6 +122,16 @@ describe('ZarinpalProvider', () => {
     expect(await zarinpal.verify({ reference: 'A1', amount: rials(1n) })).toEqual({ paid: false });
   });
 
+  it.each([
+    [{ data: [], errors: { code: -9, message: 'The input params invalid' } }, 422],
+    [{ data: [], errors: { code: -12, message: 'Too many attempts' } }, 429],
+    [{ data: { code: -50 }, errors: [] }, 200],
+  ])('throws on any other refusal, so it is not taken for unpaid: %j', async (body, status) => {
+    const { fetch } = stubFetch(body, status);
+    const zarinpal = new ZarinpalProvider({ merchantId, sandbox: false, fetch });
+    await expect(zarinpal.verify({ reference: 'A1', amount: rials(1n) })).rejects.toThrow();
+  });
+
   it('throws when Zarinpal cannot be reached, so the Payment stays Pending', async () => {
     const fetch = (() => Promise.reject(new TypeError('fetch failed'))) as typeof globalThis.fetch;
     const zarinpal = new ZarinpalProvider({ merchantId, sandbox: false, fetch });

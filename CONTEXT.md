@@ -137,5 +137,5 @@ _Avoid_: Permission (that is a Role's concern), feature flag
 The 7 days after a Subscription ends during which Plus Entitlements still apply.
 
 **Payment**:
-One completed or failed purchase of Plus months through a payment provider.
+One purchase of Plus months through a payment provider. Pending until the provider confirms it was Paid, or says it was not (Failed, or Canceled when the User turned back); only a Paid one extends the Subscription.
 _Avoid_: Transaction (reserved for money movements in a Workspace), invoice

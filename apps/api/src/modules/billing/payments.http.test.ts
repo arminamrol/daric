@@ -189,7 +189,7 @@ describe('Buying Plus with billing enabled', () => {
   it('keeps a Payment Pending when the provider cannot be asked, and verifies it next time', async () => {
     const a = await registerUser(t.url);
     const before = await subscription(t, a);
-    const { payment, reference } = await startCheckout(t, a, 1);
+    const { reference } = await startCheckout(t, a, 1);
     t.payments.pay(reference);
 
     t.payments.failVerify = true;
@@ -198,13 +198,69 @@ describe('Buying Plus with billing enabled', () => {
     } finally {
       t.payments.failVerify = false;
     }
-    const pending = await call(t.url, 'GET', `/v1/me/payments/${payment.id}`, { token: a.token });
-    expect(pending.body.status).toBe('PENDING');
+    // Still Pending: left out of the history, and the expiry has not moved.
     expect(await history(t, a)).toEqual([]);
+    expect((await subscription(t, a)).expiresAt).toBe(before.expiresAt);
 
     await callback(t, reference, 'OK');
     const after = await subscription(t, a);
     expect(ms(after.expiresAt) - ms(before.expiresAt)).toBe(30 * DAY);
+  });
+
+  it('still takes a payment made after an early callback said it was canceled', async () => {
+    const a = await registerUser(t.url);
+    const before = await subscription(t, a);
+    const { payment, reference } = await startCheckout(t, a, 1);
+
+    // Someone (a stale tab, or anyone who saw the reference) comes back before the User pays.
+    await callback(t, reference, 'NOK');
+    t.payments.pay(reference);
+    await callback(t, reference, 'OK');
+
+    const after = await subscription(t, a);
+    expect(ms(after.expiresAt) - ms(before.expiresAt)).toBe(30 * DAY);
+    expect(await history(t, a)).toMatchObject([{ id: payment.id, status: 'PAID' }]);
+  });
+
+  it('verifies a Pending Payment again when the User looks at it', async () => {
+    const a = await registerUser(t.url);
+    const before = await subscription(t, a);
+    const { payment, reference } = await startCheckout(t, a, 1);
+    const get = () => call(t.url, 'GET', `/v1/me/payments/${payment.id}`, { token: a.token });
+
+    // Still at the provider: nothing is decided yet.
+    expect((await get()).body.status).toBe('PENDING');
+
+    t.payments.pay(reference);
+    t.payments.failVerify = true;
+    try {
+      await callback(t, reference, 'OK');
+    } finally {
+      t.payments.failVerify = false;
+    }
+    expect((await get()).body).toMatchObject({ status: 'PAID', receipt: `R-${reference}` });
+    const after = await subscription(t, a);
+    expect(ms(after.expiresAt) - ms(before.expiresAt)).toBe(30 * DAY);
+  });
+
+  it('extends a User with no Subscription row once per Payment, even at the same time', async () => {
+    const a = await registerUser(t.url);
+    await db.delete(subscriptions).where(eq(subscriptions.userId, a.userId));
+    const first = await startCheckout(t, a, 1);
+    const second = await startCheckout(t, a, 1);
+    t.payments.pay(first.reference);
+    t.payments.pay(second.reference);
+
+    const start = Date.now();
+    const backs = await Promise.all([
+      callback(t, first.reference, 'OK'),
+      callback(t, second.reference, 'OK'),
+    ]);
+    expect(backs.map((b) => b.status)).toEqual([302, 302]);
+
+    const after = await subscription(t, a);
+    expect(ms(after.expiresAt)).toBeGreaterThanOrEqual(start + 60 * DAY);
+    expect(await history(t, a)).toMatchObject([{ status: 'PAID' }, { status: 'PAID' }]);
   });
 
   it('sends a callback that matches no Payment to the Subscription page', async () => {
