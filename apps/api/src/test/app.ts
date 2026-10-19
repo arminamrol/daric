@@ -6,15 +6,19 @@ import { inject } from 'vitest';
 import { configureApp } from '../app';
 import { AppModule } from '../app.module';
 import { loadConfig, type Config } from '../config';
+import { PAYMENT_PROVIDER } from '../modules/billing/payment-provider';
 import { MAILER } from '../modules/mailer/mailer';
 import { uniqueEmail } from './db';
 import { FakeMailer } from './fake-mailer';
+import { FakePaymentProvider } from './fake-payment-provider';
 
 export interface TestApp {
   app: INestApplication;
   url: string;
   /** Every mail the app sent; the API never talks to an SMTP server in tests. */
   mail: FakeMailer;
+  /** The payment provider; the API never talks to Zarinpal in tests. */
+  payments: FakePaymentProvider;
   close(): Promise<void>;
 }
 
@@ -48,11 +52,14 @@ export async function startTestApp(
 ): Promise<TestApp> {
   const config = testConfig(options.env);
   const mail = new FakeMailer();
+  const payments = new FakePaymentProvider();
   const builder = Test.createTestingModule({
     imports: [AppModule.forRoot(config, { logStream: options.logStream })],
   })
     .overrideProvider(MAILER)
-    .useValue(mail);
+    .useValue(mail)
+    .overrideProvider(PAYMENT_PROVIDER)
+    .useValue(payments);
   const moduleRef = await (options.override?.(builder) ?? builder).compile();
   const app = configureApp(
     moduleRef.createNestApplication<NestExpressApplication>({ bufferLogs: true }),
@@ -60,7 +67,13 @@ export async function startTestApp(
   );
   await app.listen(0, '127.0.0.1');
   const url = await app.getUrl();
-  return { app, url: url.replace('[::1]', '127.0.0.1'), mail, close: () => app.close() };
+  return {
+    app,
+    url: url.replace('[::1]', '127.0.0.1'),
+    mail,
+    payments,
+    close: () => app.close(),
+  };
 }
 
 export async function call(

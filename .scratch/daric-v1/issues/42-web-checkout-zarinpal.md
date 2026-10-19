@@ -4,7 +4,7 @@
 
 **Blocked by:** 40
 
-**Status:** ready-for-agent
+**Status:** in-progress
 
 - [ ] PaymentProvider interface with a Zarinpal adapter and a deterministic fake for tests
 - [ ] Price computed on the server from config: monthly price × months with discounts (3+ 5%, 6+ 10%, 12 ~17%), as an integer Amount; client never sends a price
