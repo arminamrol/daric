@@ -1,6 +1,7 @@
 {
   "name": "daric",
   "private": true,
+  "license": "AGPL-3.0-only",
   "packageManager": "pnpm@10.12.1",
   "engines": {
     "node": ">=22.12.0"

@@ -130,6 +130,15 @@ All variables live in `.env` (copied from [`.env.example`](.env.example), git-ig
 
 Postgres credentials only apply when its volume is first created; after changing them run `docker compose --project-directory . -f docker/compose.yml down -v` (this deletes local data).
 
+## Licensing
+
+Daric is free software under the [GNU Affero General Public License v3.0](LICENSE) (`AGPL-3.0-only`). You may read, change and run it, including for others; if you run a modified copy as a network service, you must offer its users the source of your changes. See [ADR-0007](docs/adr/0007-agpl-license-with-cla.md).
+
+- **Self-hosting is free.** A server you run yourself keeps `BILLING_ENABLED=false` (the default in `.env.example`): there are no Plans to buy, every Entitlement is unlimited, and nothing is held back in a separately licensed part of the code.
+- **Daric Plus is the paid, hosted service.** It runs this same code with billing enabled, so Free and Plus Plans apply and Plus is bought through the web checkout (ADR-0008). Paying for Plus pays for hosting, backups and upkeep, not for a different version of the app.
+
 ## Contributing
 
 Work is tracked as local Markdown tickets under `.scratch/`; see [`AGENTS.md`](AGENTS.md). Each ticket gets its own branch and pull request. CI (`.github/workflows/ci.yml`) runs format check, lint, typecheck, test and build on every pull request and every push to `main`.
+
+Outside contributions need a signed [Contributor License Agreement](CLA.md), which lets the maintainer also publish your contribution under terms other than the AGPL (for example, app store builds). The CLA check (`.github/workflows/cla.yml`) comments on your first pull request with how to sign: reply with the sentence it gives. You sign once, and the pull request cannot be merged until you have.
