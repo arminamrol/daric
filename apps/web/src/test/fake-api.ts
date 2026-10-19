@@ -40,6 +40,8 @@ import {
   todayIn,
 } from '@daric/core';
 import type {
+  Payment,
+  PlusPrice,
   AccountDeletionPreview,
   AuditEntry,
   Consent,
@@ -82,6 +84,26 @@ interface FakeUser {
 }
 
 type MailedLinkPurpose = 'verify' | 'reset';
+
+/** Plus at 2,000,000 rials a month: 3+ months 5% off, 6+ 10%, a year for ten months. */
+function plusPrice(months: number): PlusPrice {
+  const fullAmount = 2_000_000n * BigInt(months);
+  const [off, of, discountPercent] =
+    months >= 12
+      ? [1n, 6n, 17]
+      : months >= 6
+        ? [10n, 100n, 10]
+        : months >= 3
+          ? [5n, 100n, 5]
+          : [0n, 1n, 0];
+  return {
+    months,
+    fullAmount,
+    amount: (fullAmount * (of - off)) / of,
+    currency: 'IRR',
+    discountPercent,
+  };
+}
 
 /**
  * An in-memory stand-in for the API, as the browser sees it: the session is
@@ -144,6 +166,9 @@ export function fakeApi({
       aiAnalysesLeftThisMonth: 30,
     },
   };
+  /** Every Payment the User started, Pending ones included, oldest first. */
+  const payments: Payment[] = [];
+  let nextPaymentId = 1;
   /** Formats of the exports asked for, oldest first. */
   const exports: ExportFormat[] = [];
   /** Occurrences confirmed (with their Transaction) or skipped, by `ruleId|dueOn`. */
@@ -1401,6 +1426,41 @@ export function fakeApi({
       signedIn();
       return structuredClone(subscription);
     },
+    async listPlusPrices() {
+      signedIn();
+      if (!subscription.billingEnabled) throw new ApiError(404, { message: 'Not Found' });
+      return Array.from({ length: 12 }, (_, i) => plusPrice(i + 1));
+    },
+    async checkout({ months }) {
+      signedIn();
+      if (!subscription.billingEnabled) throw new ApiError(404, { message: 'Not Found' });
+      const payment: Payment = {
+        id: `01900000-0000-7000-8e00-${String(nextPaymentId++).padStart(12, '0')}`,
+        months,
+        amount: plusPrice(months).amount,
+        currency: 'IRR',
+        status: 'PENDING',
+        receipt: null,
+        plusUntil: null,
+        createdAt: new Date().toISOString(),
+        completedAt: null,
+      };
+      payments.push(payment);
+      return {
+        payment: structuredClone(payment),
+        redirectUrl: `https://pay.example/start/${payment.id}`,
+      };
+    },
+    async listPayments() {
+      signedIn();
+      return structuredClone(payments.filter((p) => p.status !== 'PENDING').reverse());
+    },
+    async getPayment(paymentId) {
+      signedIn();
+      const payment = payments.find((p) => p.id === paymentId);
+      if (!payment) throw new ApiError(404, { message: 'Not Found' });
+      return structuredClone(payment);
+    },
     async listDevices() {
       signedIn();
       return structuredClone(devices);
@@ -1625,6 +1685,10 @@ export function fakeApi({
     preferences: () => signedIn().preferences,
     /** Sets what the server answers about the User's Plan. */
     setSubscription: (value: Subscription) => void (subscription = value),
+    /** Every Payment started, Pending ones included, oldest first. */
+    payments: () => payments,
+    /** A Payment as if made earlier; added last, so it is the newest. */
+    addPayment: (payment: Payment) => void payments.push(structuredClone(payment)),
     /** Sets the User's Signed-in Devices, most recently used first. */
     setDevices: (value: SignedInDevice[]) => void (devices = structuredClone(value)),
     devices: () => devices,

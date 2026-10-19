@@ -13,6 +13,7 @@ export * from './planned-item';
 export * from './report';
 export * from './export';
 export * from './subscription';
+export * from './payment';
 export {
   currencyCodes,
   monthParamSchema,

@@ -86,6 +86,34 @@ export const fa = {
   'subscription.ai': 'تحلیل هوش مصنوعی در این ماه',
   'subscription.aiLeft': '{left} از {limit} مانده',
   'subscription.unlimited': 'نامحدود',
+  'subscription.buy': 'خرید دریک پلاس',
+  'subscription.extend': 'تمدید دریک پلاس',
+  'checkout.intro':
+    'با دریک پلاس از چند دستگاه وارد می‌شوید، فضای کاری‌تان را با دیگران به اشتراک می‌گذارید و تحلیل هوش مصنوعی بیشتری دارید. زمانی که می‌خرید به زمان باقی‌مانده اضافه می‌شود. تمدید خودکار در کار نیست.',
+  'checkout.length': 'مدت',
+  'checkout.month': '{count} ماه',
+  'checkout.months': '{count} ماه',
+  'checkout.discount': '{percent}٪ تخفیف',
+  'checkout.total': 'مبلغ قابل پرداخت',
+  'checkout.fullPrice': 'قیمت بدون تخفیف',
+  'checkout.pay': 'پرداخت با زرین‌پال',
+  'checkout.failed': 'پرداخت شروع نشد. کمی بعد دوباره امتحان کنید.',
+  'checkout.loadFailed': 'قیمت‌ها بارگذاری نشد. صفحه را دوباره باز کنید.',
+  'payment.result': 'نتیجه پرداخت',
+  'payment.result.PAID': 'پرداخت انجام شد. پلاس تا {date} فعال است.',
+  'payment.result.CANCELED': 'پرداخت لغو شد و مبلغی کسر نشد.',
+  'payment.result.FAILED':
+    'پرداخت انجام نشد. اگر مبلغی کسر شده باشد، بانک تا ۷۲ ساعت آن را برمی‌گرداند.',
+  'payment.result.PENDING':
+    'پرداخت هنوز تأیید نشده است. چند دقیقه بعد این صفحه را دوباره باز کنید.',
+  'payments.title': 'پرداخت‌ها',
+  'payments.empty': 'هنوز پرداختی نکرده‌اید.',
+  'payments.loadFailed': 'پرداخت‌ها بارگذاری نشد.',
+  'payment.status.PENDING': 'در انتظار تأیید',
+  'payment.status.PAID': 'پرداخت‌شده',
+  'payment.status.FAILED': 'ناموفق',
+  'payment.status.CANCELED': 'لغوشده',
+  'payment.receipt': 'کد پیگیری {receipt}',
   'devices.title': 'دستگاه‌های واردشده',
   'devices.limit':
     'تا {count} دستگاه هم‌زمان. با ورود از دستگاهی دیگر، از دستگاهی که دیرتر از همه استفاده شده خارج می‌شوید.',
@@ -768,7 +796,6 @@ export const fa = {
   'invitations.paywall.title': 'اشتراک‌گذاری با دریک پلاس',
   'invitations.paywall.body':
     'برای دعوت همسر، شریک یا حسابدار، مالک این فضای کاری باید دریک پلاس داشته باشد. اعضا به طرحی از خودشان نیاز ندارند.',
-  'invitations.paywall.link': 'دیدن اشتراک شما',
   'invitations.paywall.askOwner': 'از مالک این فضای کاری بخواهید طرحش را به پلاس ببرد.',
   'invitation.title': 'دعوت به فضای کاری',
   'invitation.offer':

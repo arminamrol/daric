@@ -97,8 +97,8 @@ describe('Members page', () => {
     renderApp({ path: '/settings/members', api: server.api });
     const region = await invitationRegion();
     expect(await region.findByText('اشتراک‌گذاری با دریک پلاس')).toBeTruthy();
-    expect(region.getByRole('link', { name: 'دیدن اشتراک شما' }).getAttribute('href')).toBe(
-      '/settings/subscription',
+    expect(region.getByRole('link', { name: 'خرید دریک پلاس' }).getAttribute('href')).toBe(
+      '/settings/subscription/checkout',
     );
     expect(region.queryByRole('button', { name: 'ساختن دعوت' })).toBeNull();
   });

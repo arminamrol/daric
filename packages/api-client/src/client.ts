@@ -51,6 +51,14 @@ import {
   sessionSchema,
   type Subscription,
   subscriptionSchema,
+  type Checkout,
+  checkoutSchema,
+  type CheckoutInput,
+  type Payment,
+  paymentListSchema,
+  paymentSchema,
+  type PlusPrice,
+  plusPriceListSchema,
   type Transaction,
   transactionListSchema,
   transactionSchema,
@@ -199,6 +207,14 @@ export interface ApiClient {
   updatePreferences(input: UpdateUserPreferencesInput): Promise<UserPreferences>;
   /** The User's Plan, its expiry and their Entitlements, as the server decides them. */
   getSubscription(): Promise<Subscription>;
+  /** What 1 to 12 months of Plus cost, priced by the server; 404 when billing is disabled. */
+  listPlusPrices(): Promise<PlusPrice[]>;
+  /** Starts buying Plus; the browser goes to `redirectUrl` next. Never sends a price. */
+  checkout(input: CheckoutInput): Promise<Checkout>;
+  /** The User's Paid, Failed and Canceled Payments, newest first. */
+  listPayments(): Promise<Payment[]>;
+  /** One of the User's Payments, Pending included. */
+  getPayment(paymentId: string): Promise<Payment>;
   /** The User's Signed-in Devices, most recently used first; `current` is this one. */
   listDevices(): Promise<SignedInDevice[]>;
   /** Signs one of the User's devices out; 404 when it is not signed in any more. */
@@ -636,6 +652,11 @@ export function createApiClient(options: ApiClientOptions = {}): ApiClient {
     updatePreferences: (input) =>
       request('PATCH', '/v1/me/preferences', userPreferencesSchema, input),
     getSubscription: () => request('GET', '/v1/me/subscription', subscriptionSchema),
+    listPlusPrices: () => request('GET', '/v1/me/subscription/prices', plusPriceListSchema),
+    checkout: (input) => request('POST', '/v1/me/payments', checkoutSchema, input),
+    listPayments: () => request('GET', '/v1/me/payments', paymentListSchema),
+    getPayment: (paymentId) =>
+      request('GET', `/v1/me/payments/${encodeURIComponent(paymentId)}`, paymentSchema),
     listDevices: () => request('GET', '/v1/me/devices', signedInDeviceListSchema),
     signOutDevice: (deviceId) =>
       request('DELETE', `/v1/me/devices/${encodeURIComponent(deviceId)}`, noContent),
