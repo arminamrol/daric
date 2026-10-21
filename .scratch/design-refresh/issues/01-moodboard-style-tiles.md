@@ -4,12 +4,14 @@
 
 **Blocked by:** None (can start immediately)
 
-**Status:** ready-for-human
+**Status:** in-progress
 
-- [ ] Reference screens gathered and annotated with what to take from each
-- [ ] Style tiles show palette (gold kept for primary actions and highlights), type scale for Persian and Latin, radii, elevation, core components
-- [ ] Home screen mock in both themes and both languages
+- [x] Reference screens gathered and annotated with what to take from each
+- [x] Style tiles show palette (gold kept for primary actions and highlights), type scale for Persian and Latin, radii, elevation, core components
+- [x] Home screen mock in both themes and both languages
 - [ ] Bottom tab bar split decided (which four sections get a tab next to the "+")
 - [ ] Direction approved by the person running Daric; decisions recorded under Comments
 
 Spec: `.scratch/design-refresh/spec.md`.
+
+Page: `.scratch/design-refresh/moodboard.html` (published at https://claude.ai/artifact/AprP5bCJyguKJh1qqbRHAc).
