@@ -7,6 +7,7 @@ Issues and specs for this repo live as markdown files in `.scratch/`.
 - One feature per directory: `.scratch/<feature-slug>/`
 - The spec is `.scratch/<feature-slug>/spec.md`
 - Implementation issues are one file per ticket at `.scratch/<feature-slug>/issues/<NN>-<slug>.md`, numbered from `01`, never a single combined tickets file
+- A blocker in another feature directory is written with that directory's prefix: `DR-07` is `.scratch/design-refresh/issues/07-*`, `BO-09` is `.scratch/back-office/issues/09-*`
 - A ticket never comes before its blockers. A ticket blocked by a later-numbered one takes that blocker's number plus a decimal step (`40.1`, `40.2`, …), so the files sort in the order they can be built
 - Triage state is recorded as a `Status:` line near the top of each issue file (see `triage-labels.md` for the role strings)
 - Comments and conversation history append to the bottom of the file under a `## Comments` heading

@@ -4,7 +4,11 @@
 
 **Blocked by:** 33
 
-**Status:** ready-for-agent
+**Status:** superseded
 
 - [ ] First-run wizard on web and mobile; skippable steps with sensible defaults
 - [ ] Choices persisted through existing settings APIs
+
+## Comments
+
+- Folded into `.scratch/design-refresh/spec.md` and rebuilt there under the new visual language; new tickets come from that spec. Kept for reference only.

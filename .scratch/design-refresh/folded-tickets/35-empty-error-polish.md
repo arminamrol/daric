@@ -4,8 +4,12 @@
 
 **Blocked by:** 34
 
-**Status:** ready-for-agent
+**Status:** superseded
 
 - [ ] Empty states for all lists; error boundaries and retry
 - [ ] Accessibility pass (contrast in both themes, labels, focus order, screen readers)
 - [ ] Logo with subtle coin/archer motif
+
+## Comments
+
+- Folded into `.scratch/design-refresh/spec.md` and rebuilt there under the new visual language; new tickets come from that spec. Kept for reference only.
