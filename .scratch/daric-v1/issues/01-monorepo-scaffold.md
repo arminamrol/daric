@@ -4,12 +4,12 @@
 
 **Blocked by:** None (can start immediately)
 
-**Status:** in-progress
+**Status:** done
 
 - [x] pnpm workspaces + Turborepo with apps (api, web, mobile placeholders) and packages (core, api-client, offline-queue, i18n, design-tokens, config)
 - [x] TypeScript strict everywhere via shared tsconfig bases; shared ESLint and Vitest presets
 - [x] `lint`, `typecheck`, `test` pipelines run across all packages via Turbo
-- [ ] CI workflow runs lint, typecheck, test on every push/PR and is green
+- [x] CI workflow runs lint, typecheck, test on every push/PR and is green
 - [x] Docker Compose starts Postgres and Mailpit; `.env.example` documents every variable
 - [x] README with setup steps and environment variables
 

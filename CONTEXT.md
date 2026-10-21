@@ -123,22 +123,49 @@ _Avoid_: Recommendation, advice
 ### Billing
 
 **Plan**:
-What a User has paid for: Free or Plus (Daric Plus). A Business plan may come later.
+What a User has paid for: Free or Plus (Daric Plus). Its price, discounts and limits are set by the Operator, not fixed. A Business plan may come later.
 _Avoid_: Tier, package
 
 **Subscription**:
 A User's prepaid Plus time, with an expiry date. Belongs to the User, not to a Workspace. Includes a 14-day Trial at sign-up. Bought in whole months of 30 days, added to the current expiry while Plus or its Grace Period runs, otherwise from the time of payment.
 
 **Trial**:
-The Plus time every new User gets once at sign-up.
+The Plus time every new User gets once at sign-up. Its length is set by the Operator; a change applies only to Users who sign up afterwards.
 
 **Entitlement**:
-What a User may do under their Plan (Signed-in Devices, sharing a Workspace, AI analyses per month), decided by the server. All unlimited when billing is disabled (self-hosted).
+What a User may do under their Plan (Signed-in Devices, sharing a Workspace, AI analyses per month), decided by the server. All unlimited when billing is disabled (self-hosted). AI analyses are not offered yet: no Plan advertises them until AI ships.
 _Avoid_: Permission (that is a Role's concern), feature flag
 
 **Grace Period**:
-The 7 days after a Subscription ends during which Plus Entitlements still apply.
+The days after a Subscription ends (7 unless the Operator changes it) during which Plus Entitlements still apply.
 
 **Payment**:
-One purchase of Plus months through a payment provider. Pending until the provider confirms it was Paid, or says it was not (Failed, or Canceled when the User turned back); only a Paid one extends the Subscription.
+One purchase of Plus months through a Payment Method, at the price set when it was started. Pending until the Payment Provider confirms it was Paid, or says it was not (Failed, or Canceled when the User turned back); a card-to-card Payment is Awaiting Review instead until the Operator approves it (Paid) or rejects it. Only a Paid one extends the Subscription.
 _Avoid_: Transaction (reserved for money movements in a Workspace), invoice
+
+**Awaiting Review**:
+The state of a card-to-card Payment the User has reported (tracking number, card's last four digits, transfer time) and the Operator has not yet approved or rejected. Distinct from Pending, which waits on a Payment Provider.
+
+**Payment Provider**:
+A payment gateway Daric integrates with (Zarinpal first). Adding one is a code change; its credentials live in the deployment, never in the Back Office.
+_Avoid_: Gateway (in user-facing text)
+
+**Payment Method**:
+A way to pay that the User picks at checkout: an enabled Payment Provider, or card-to-card. The Operator turns each on or off and orders them; with only one enabled, there is no choice to make.
+
+**Tier Discount**:
+A percentage off for buying at least a number of months at once; the largest tier reached applies.
+
+**Promotion**:
+A time-limited percentage off every purchase (e.g. a Nowruz sale), set by the Operator. When a Tier Discount also applies, the larger one is used; they never compound.
+_Avoid_: Coupon, discount code (codes the User types are a separate, later idea)
+
+### Operation
+
+**Operator**:
+A person who runs a Daric instance and works its Back Office. Sees Users' account and billing details, never their financial data.
+_Avoid_: Admin (that is a Workspace Role), superuser, staff
+
+**Back Office**:
+The Operator's part of the web app: Users and their Payments, metrics, billing configuration, card-to-card review, and granting Plus time. Every change made there is audit-logged with the Operator and a reason.
+_Avoid_: Admin panel, dashboard
