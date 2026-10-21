@@ -1,0 +1,746 @@
+<title>Daric Moodboard</title>
+<meta name="description" content="Daric design refresh: reference screens, style tiles and the Home screen in both themes and both languages, for approval.">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:opsz,wght@14..32,400..700&family=Vazirmatn:wght@400..800&display=swap">
+<style>
+/* Proposed Daric tokens v2. The page itself is set in them, and the mocks pin one theme each. */
+:root, .t-light {
+  color-scheme: light;
+  --bg: #f5f6f8;
+  --surface: #ffffff;
+  --surface-muted: #eef1f6;
+  --surface-raised: #ffffff;
+  --fg: #0a1328;
+  --fg-muted: #46587a;
+  --border: #e3e8f0;
+  --border-strong: #7489ad;
+  --primary: #c38f26;
+  --on-primary: #0a1328;
+  --accent: #7f5719;
+  --focus: #a1711c;
+  --income: #067647;
+  --transfer: #5a45c7;
+  --warning: #b54708;
+  --info: #0b6aa2;
+  --danger: #b42318;
+  --chart-income: #067647;
+  --chart-expense: #4a6aa3;
+  --gold-wash: #fcf8ec;
+  --hero-line: #c38f26;
+  --shadow-1: 0 1px 2px rgb(10 19 40 / .06), 0 1px 1px rgb(10 19 40 / .04);
+  --shadow-2: 0 4px 12px -2px rgb(10 19 40 / .08), 0 2px 4px rgb(10 19 40 / .04);
+  --shadow-3: 0 16px 40px -8px rgb(10 19 40 / .18), 0 4px 10px rgb(10 19 40 / .06);
+  --font-fa: Vazirmatn, Tahoma, system-ui, sans-serif;
+  --font-en: Inter, system-ui, sans-serif;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    color-scheme: dark;
+    --bg: #0a1328; --surface: #111d36; --surface-muted: #18284a; --surface-raised: #1a2b4d;
+    --fg: #f4f1e8; --fg-muted: #9db2d5; --border: #1f3053; --border-strong: #5b77a8;
+    --primary: #d9a93c; --on-primary: #0a1328; --accent: #e5c163; --focus: #e5c163;
+    --income: #47cd89; --transfer: #ada1ff; --warning: #f5b046; --info: #6cc3f5; --danger: #f97066;
+    --chart-income: #2fbf71; --chart-expense: #7d9bd0; --gold-wash: #2a2410; --hero-line: #e5c163;
+    --shadow-1: 0 1px 0 rgb(255 255 255 / .04) inset, 0 1px 2px rgb(0 0 0 / .4);
+    --shadow-2: 0 1px 0 rgb(255 255 255 / .05) inset, 0 6px 16px -4px rgb(0 0 0 / .5);
+    --shadow-3: 0 1px 0 rgb(255 255 255 / .06) inset, 0 20px 44px -10px rgb(0 0 0 / .65);
+  }
+}
+:root[data-theme="dark"], .t-dark {
+  color-scheme: dark;
+  --bg: #0a1328; --surface: #111d36; --surface-muted: #18284a; --surface-raised: #1a2b4d;
+  --fg: #f4f1e8; --fg-muted: #9db2d5; --border: #1f3053; --border-strong: #5b77a8;
+  --primary: #d9a93c; --on-primary: #0a1328; --accent: #e5c163; --focus: #e5c163;
+  --income: #47cd89; --transfer: #ada1ff; --warning: #f5b046; --info: #6cc3f5; --danger: #f97066;
+  --chart-income: #2fbf71; --chart-expense: #7d9bd0; --gold-wash: #2a2410; --hero-line: #e5c163;
+  --shadow-1: 0 1px 0 rgb(255 255 255 / .04) inset, 0 1px 2px rgb(0 0 0 / .4);
+  --shadow-2: 0 1px 0 rgb(255 255 255 / .05) inset, 0 6px 16px -4px rgb(0 0 0 / .5);
+  --shadow-3: 0 1px 0 rgb(255 255 255 / .06) inset, 0 20px 44px -10px rgb(0 0 0 / .65);
+}
+.t-light { color-scheme: light; }
+
+* { box-sizing: border-box; }
+body {
+  background: var(--bg); color: var(--fg);
+  font: 400 15px/1.6 var(--font-en);
+  padding-inline: 20px; padding-block: 0 80px;
+  -webkit-font-smoothing: antialiased;
+}
+:lang(fa) { font-family: var(--font-fa); }
+.wrap { max-width: 1120px; margin-inline: auto; }
+a { color: var(--accent); text-underline-offset: 3px; }
+:focus-visible { outline: 2px solid var(--focus); outline-offset: 2px; border-radius: 6px; }
+h1, h2, h3 { text-wrap: balance; margin: 0; letter-spacing: -0.015em; }
+h2 { font-size: 26px; line-height: 34px; font-weight: 650; }
+h3 { font-size: 16px; line-height: 24px; font-weight: 600; }
+p { margin: 0; max-width: 66ch; }
+.muted { color: var(--fg-muted); }
+.eyebrow { font-size: 12px; font-weight: 600; letter-spacing: .08em; text-transform: uppercase; color: var(--fg-muted); }
+.tnum { font-variant-numeric: tabular-nums; }
+
+/* masthead */
+.mast { padding-block: 48px 36px; display: grid; gap: 20px; border-bottom: 1px solid var(--border); }
+.mast-top { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; }
+.coin { width: 34px; height: 34px; border-radius: 50%; background: radial-gradient(circle at 35% 30%, #efd998, #c38f26 55%, #7f5719); box-shadow: inset 0 0 0 2px rgb(255 255 255 / .25), 0 2px 6px rgb(10 19 40 / .2); flex: none; }
+.status { margin-inline-start: auto; font-size: 13px; font-weight: 600; padding: 4px 12px; border-radius: 999px; border: 1px solid var(--warning); color: var(--warning); }
+.mast h1 { font-size: clamp(30px, 5vw, 46px); line-height: 1.12; font-weight: 700; letter-spacing: -0.03em; max-width: 20ch; }
+.mast h1 em { font-style: normal; color: var(--accent); }
+.mast .lede { font-size: 17px; color: var(--fg-muted); }
+.principles { display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 12px 28px; margin-top: 8px; }
+.principles div { display: grid; gap: 2px; }
+.principles b { font-weight: 600; }
+.principles span { color: var(--fg-muted); font-size: 14px; }
+
+nav.toc { position: sticky; top: env(safe-area-inset-top, 0px); z-index: 5; background: color-mix(in srgb, var(--bg) 88%, transparent); backdrop-filter: blur(10px); border-bottom: 1px solid var(--border); margin-inline: -20px; padding-inline: 20px; }
+nav.toc ul { list-style: none; margin: 0 auto; padding: 10px 0; max-width: 1120px; display: flex; gap: 6px 18px; overflow-x: auto; font-size: 14px; scrollbar-width: none; }
+nav.toc a { color: var(--fg-muted); text-decoration: none; white-space: nowrap; }
+nav.toc a:hover { color: var(--fg); }
+
+section { padding-block: 56px 8px; display: grid; gap: 24px; scroll-margin-top: 48px; }
+.sec-head { display: grid; gap: 8px; }
+
+/* references */
+.refs { display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: 20px; }
+.ref { background: var(--surface); border: 1px solid var(--border); border-radius: 16px; padding: 20px; display: grid; gap: 16px; align-content: start; }
+.ref header { display: flex; align-items: baseline; justify-content: space-between; gap: 12px; }
+.ref header a { font-size: 13px; }
+.sketch { border-radius: 14px; padding: 14px; height: 210px; display: grid; gap: 8px; align-content: start; overflow: hidden; font-size: 10px; }
+.sk-copilot { background: #12141b; color: #e7e9ef; }
+.sk-revolut { background: linear-gradient(170deg, #2b2f6b, #0f1029 70%); color: #fff; }
+.sk-monzo { background: #f3f1ee; color: #11233c; }
+.sk-row { display: flex; align-items: center; gap: 8px; }
+.sk-dot { width: 18px; height: 18px; border-radius: 6px; flex: none; }
+.sk-bar { height: 6px; border-radius: 3px; background: currentColor; opacity: .22; }
+.sk-big { font-size: 22px; font-weight: 700; letter-spacing: -.02em; }
+.sk-pill { padding: 3px 9px; border-radius: 999px; background: rgb(255 255 255 / .14); font-weight: 600; }
+.ref ul { margin: 0; padding-inline-start: 18px; display: grid; gap: 6px; font-size: 14px; }
+.ref .lbl { font-size: 12px; font-weight: 600; letter-spacing: .06em; text-transform: uppercase; }
+.take .lbl { color: var(--income); }
+.leave .lbl { color: var(--danger); }
+.matrix-wrap { overflow-x: auto; border: 1px solid var(--border); border-radius: 14px; background: var(--surface); }
+table.matrix { border-collapse: collapse; width: 100%; min-width: 640px; font-size: 14px; }
+.matrix th, .matrix td { text-align: start; padding: 12px 16px; border-bottom: 1px solid var(--border); vertical-align: top; }
+.matrix tr:last-child td { border-bottom: 0; }
+.matrix th { font-size: 12px; letter-spacing: .06em; text-transform: uppercase; color: var(--fg-muted); font-weight: 600; }
+.matrix td:first-child { font-weight: 600; white-space: nowrap; }
+.src { display: inline-block; font-size: 12px; font-weight: 600; padding: 1px 8px; border-radius: 999px; background: var(--surface-muted); color: var(--fg-muted); margin-inline-end: 6px; }
+.note { font-size: 13px; color: var(--fg-muted); border-inline-start: 2px solid var(--border-strong); padding-inline-start: 12px; }
+
+/* colour */
+.ramps { display: grid; gap: 10px; }
+.ramp { display: grid; grid-template-columns: 64px repeat(11, 1fr); gap: 4px; align-items: stretch; }
+.ramp > span:first-child { font-size: 13px; font-weight: 600; align-self: center; }
+.chip { height: 46px; border-radius: 8px; display: flex; align-items: flex-end; padding: 4px 6px; font-size: 10px; font-weight: 600; font-variant-numeric: tabular-nums; }
+.chip.key { outline: 2px solid var(--fg); outline-offset: 2px; }
+.themes2 { display: grid; grid-template-columns: repeat(auto-fit, minmax(320px, 1fr)); gap: 20px; }
+.tile { background: var(--bg); color: var(--fg); border: 1px solid var(--border); border-radius: 18px; padding: 20px; display: grid; gap: 14px; }
+.tile-head { display: flex; justify-content: space-between; align-items: baseline; }
+.swatches { display: grid; grid-template-columns: repeat(auto-fill, minmax(132px, 1fr)); gap: 8px; }
+.sw { display: grid; grid-template-columns: 28px 1fr; gap: 2px 10px; align-items: center; padding: 8px; border-radius: 10px; background: var(--surface); border: 1px solid var(--border); }
+.sw i { grid-row: span 2; width: 28px; height: 28px; border-radius: 8px; box-shadow: inset 0 0 0 1px rgb(127 127 127 / .25); }
+.sw b { font-size: 12px; font-weight: 600; }
+.sw small { font-size: 11px; color: var(--fg-muted); font-variant-numeric: tabular-nums; }
+.pairs { display: grid; gap: 6px; font-size: 13px; }
+.pair { display: flex; align-items: center; gap: 10px; padding: 7px 10px; border-radius: 8px; background: var(--surface); }
+.pair .ratio { margin-inline-start: auto; font-variant-numeric: tabular-nums; color: var(--fg-muted); font-size: 12px; }
+.pair .ratio b { color: var(--income); font-weight: 600; }
+
+/* type */
+.type-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(320px, 1fr)); gap: 20px; }
+.type-card { background: var(--surface); border: 1px solid var(--border); border-radius: 16px; padding: 20px; display: grid; gap: 4px; }
+.type-row { display: grid; grid-template-columns: 74px 1fr; gap: 12px; align-items: baseline; padding-block: 8px; border-bottom: 1px dashed var(--border); }
+.type-row:last-child { border-bottom: 0; }
+.type-row code { font: 500 11px/1.4 ui-monospace, SFMono-Regular, Menlo, monospace; color: var(--fg-muted); }
+.type-row div { overflow-wrap: anywhere; }
+
+/* shape and depth */
+.shape-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap: 20px; }
+.radii, .elev, .space { display: flex; gap: 14px; flex-wrap: wrap; align-items: flex-end; }
+.radii div { width: 60px; height: 60px; background: var(--surface-muted); border: 1.5px solid var(--border-strong); display: grid; place-items: center; font-size: 11px; font-weight: 600; }
+.elev div { width: 84px; height: 64px; border-radius: 14px; background: var(--surface-raised); display: grid; place-items: center; font-size: 11px; font-weight: 600; }
+.space div { display: grid; gap: 6px; justify-items: center; font-size: 11px; color: var(--fg-muted); }
+.space i { display: block; background: var(--primary); opacity: .75; border-radius: 2px; width: 10px; }
+
+/* components (shared by tiles and mocks) */
+.comp-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(320px, 1fr)); gap: 20px; }
+.kit { background: var(--bg); color: var(--fg); border-radius: 18px; padding: 20px; display: grid; gap: 18px; border: 1px solid var(--border); }
+.kit .row { display: flex; flex-wrap: wrap; gap: 10px; align-items: center; }
+.btn { font: inherit; font-weight: 600; font-size: 14px; border-radius: 12px; padding: 0 16px; height: 44px; border: 0; display: inline-flex; align-items: center; gap: 8px; cursor: pointer; }
+.btn svg { width: 18px; height: 18px; }
+.stat .k svg { width: 14px; height: 14px; }
+.toast svg { width: 18px; height: 18px; }
+.btn-primary { background: var(--primary); color: var(--on-primary); box-shadow: var(--shadow-1); }
+.btn-secondary { background: var(--surface); color: var(--fg); box-shadow: inset 0 0 0 1px var(--border-strong); }
+.btn-ghost { background: transparent; color: var(--fg); }
+.btn-danger { background: transparent; color: var(--danger); box-shadow: inset 0 0 0 1px var(--danger); }
+.field { display: grid; gap: 6px; font-size: 13px; font-weight: 600; flex: 1 1 200px; }
+.field .input { height: 48px; border-radius: 12px; background: var(--surface); box-shadow: inset 0 0 0 1px var(--border-strong); display: flex; align-items: center; padding-inline: 14px; gap: 8px; font-weight: 400; font-size: 15px; }
+.field .input.focus { box-shadow: inset 0 0 0 2px var(--focus); }
+.field .amount-in { font-size: 22px; font-weight: 650; font-variant-numeric: tabular-nums; }
+.field .unit { margin-inline-start: auto; color: var(--fg-muted); font-size: 13px; }
+.amt { font-weight: 600; font-variant-numeric: tabular-nums; white-space: nowrap; display: inline-flex; align-items: center; gap: 4px; }
+.amt.inc { color: var(--income); }
+.amt.exp { color: var(--fg); }
+.amt.trf { color: var(--transfer); }
+.amt svg { width: 14px; height: 14px; }
+.cat { display: inline-grid; place-items: center; width: 36px; height: 36px; border-radius: 11px; color: #fff; flex: none; }
+.cat svg { width: 18px; height: 18px; }
+.chip-lbl { display: inline-flex; align-items: center; gap: 6px; font-size: 12px; font-weight: 600; padding: 3px 10px 3px 8px; border-radius: 999px; background: var(--surface-muted); color: var(--fg); }
+.chip-lbl i { width: 8px; height: 8px; border-radius: 50%; }
+.prog { display: grid; gap: 6px; font-size: 13px; }
+.prog .top { display: flex; justify-content: space-between; gap: 8px; align-items: baseline; }
+.prog .track { height: 8px; border-radius: 999px; background: var(--surface-muted); overflow: hidden; }
+.prog .fill { height: 100%; border-radius: inherit; background: var(--income); }
+.prog.warn .fill { background: var(--warning); }
+.prog.over .fill { background: var(--danger); background-image: repeating-linear-gradient(135deg, rgb(255 255 255 / .35) 0 4px, transparent 4px 8px); }
+.prog .state { font-size: 12px; font-weight: 600; display: inline-flex; gap: 4px; align-items: center; }
+.prog.warn .state { color: var(--warning); }
+.prog.over .state { color: var(--danger); }
+.prog .state svg { width: 13px; height: 13px; }
+.card { background: var(--surface); border-radius: 18px; box-shadow: var(--shadow-1); border: 1px solid var(--border); padding: 16px; display: grid; gap: 12px; }
+.stat { display: grid; gap: 2px; }
+.stat .k { font-size: 12px; color: var(--fg-muted); font-weight: 500; display: flex; gap: 6px; align-items: center; }
+.stat .v { font-size: 20px; font-weight: 650; font-variant-numeric: tabular-nums; letter-spacing: -0.01em; }
+.toast { display: flex; align-items: center; gap: 10px; background: var(--fg); color: var(--bg); padding: 10px 14px; border-radius: 12px; box-shadow: var(--shadow-3); font-size: 14px; }
+.toast button { margin-inline-start: auto; background: none; border: 0; color: var(--primary); font: inherit; font-weight: 600; cursor: pointer; }
+.empty { display: grid; justify-items: center; text-align: center; gap: 8px; padding: 18px; border: 1.5px dashed var(--border); border-radius: 16px; font-size: 14px; }
+.empty .mark { width: 44px; height: 44px; border-radius: 50%; background: var(--gold-wash); display: grid; place-items: center; color: var(--accent); }
+.seg { display: inline-flex; background: var(--surface-muted); border-radius: 12px; padding: 3px; font-size: 13px; font-weight: 600; }
+.seg span { padding: 6px 14px; border-radius: 9px; color: var(--fg-muted); }
+.seg span.on { background: var(--surface); color: var(--fg); box-shadow: var(--shadow-1); }
+
+/* phone mocks */
+.phones { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, max(300px, 40%)), 1fr)); gap: 28px 20px; justify-items: center; }
+.phone-cap { display: grid; gap: 10px; justify-items: center; width: 100%; }
+.phone-cap > span { font-size: 13px; font-weight: 600; color: var(--fg-muted); }
+.phone { width: 100%; max-width: 360px; border-radius: 40px; padding: 10px; background: #05080f; box-shadow: 0 30px 60px -20px rgb(10 19 40 / .45); }
+.screen { background: var(--bg); color: var(--fg); border-radius: 31px; overflow: hidden; position: relative; display: grid; grid-template-rows: auto 1fr auto; height: 720px; }
+.screen[lang="fa"] { font-family: var(--font-fa); }
+.screen[lang="en"] { font-family: var(--font-en); }
+.sbar { display: flex; justify-content: space-between; padding: 12px 24px 4px; font-size: 12px; font-weight: 600; direction: ltr; }
+.scroll { overflow: hidden; padding: 6px 16px 16px; display: grid; gap: 12px; align-content: start; }
+.topbar { display: flex; align-items: center; gap: 10px; }
+.ws { display: inline-flex; align-items: center; gap: 6px; font-weight: 600; font-size: 14px; padding: 6px 10px 6px 6px; border-radius: 999px; background: var(--surface); box-shadow: var(--shadow-1); }
+.ws .coin { width: 22px; height: 22px; }
+.ws svg { width: 14px; height: 14px; color: var(--fg-muted); }
+.topbar .date { margin-inline-start: auto; font-size: 12px; color: var(--fg-muted); }
+.iconbtn { width: 36px; height: 36px; border-radius: 50%; display: grid; place-items: center; background: var(--surface); box-shadow: var(--shadow-1); position: relative; }
+.iconbtn svg { width: 17px; height: 17px; }
+.iconbtn .badge { position: absolute; top: 6px; inset-inline-end: 7px; width: 7px; height: 7px; border-radius: 50%; background: var(--primary); box-shadow: 0 0 0 2px var(--surface); }
+.hero { padding: 6px 4px 0; display: grid; gap: 2px; }
+.hero .k { font-size: 13px; color: var(--fg-muted); }
+.hero .big { font-size: 38px; line-height: 1.15; font-weight: 700; letter-spacing: -0.03em; font-variant-numeric: tabular-nums; display: flex; align-items: baseline; gap: 6px; }
+.screen[lang="fa"] .hero .big { letter-spacing: 0; font-weight: 750; }
+.hero .big small { font-size: 14px; font-weight: 500; color: var(--fg-muted); letter-spacing: 0; }
+.delta { display: inline-flex; align-items: center; gap: 4px; font-size: 12px; font-weight: 600; color: var(--income); background: color-mix(in srgb, var(--income) 12%, transparent); padding: 2px 8px; border-radius: 999px; width: max-content; }
+.delta svg { width: 12px; height: 12px; }
+.spark { width: 100%; height: 64px; display: block; margin-top: 4px; }
+.duo { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+.duo .stat .v { font-size: 17px; }
+.ie-bar { display: flex; height: 6px; border-radius: 999px; overflow: hidden; gap: 2px; }
+.sect-h { display: flex; justify-content: space-between; align-items: baseline; font-size: 14px; font-weight: 650; }
+.sect-h a { font-size: 12px; font-weight: 600; color: var(--accent); text-decoration: none; }
+.due { display: flex; align-items: center; gap: 10px; }
+.due .txt { display: grid; font-size: 13px; line-height: 1.4; min-width: 0; }
+.due .txt small { color: var(--fg-muted); font-size: 12px; }
+.due .btn { height: 34px; font-size: 13px; padding: 0 14px; margin-inline-start: auto; border-radius: 10px; }
+.tx { display: flex; align-items: center; gap: 10px; }
+.tx .txt { display: grid; line-height: 1.35; font-size: 14px; min-width: 0; flex: 1; }
+.tx .txt small { font-size: 12px; color: var(--fg-muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.tx .amt { font-size: 14px; }
+.list { display: grid; gap: 12px; }
+.tabbar { position: relative; display: grid; grid-template-columns: repeat(5, 1fr); align-items: end; padding: 8px 8px 22px; background: color-mix(in srgb, var(--surface) 92%, transparent); border-top: 1px solid var(--border); backdrop-filter: blur(12px); }
+.tab { display: grid; justify-items: center; gap: 3px; font-size: 10.5px; font-weight: 600; color: var(--fg-muted); }
+.tab svg { width: 22px; height: 22px; }
+.tab.on { color: var(--fg); }
+.tab.on svg { color: var(--accent); }
+.fab { justify-self: center; width: 54px; height: 54px; border-radius: 50%; background: var(--primary); color: var(--on-primary); display: grid; place-items: center; margin-top: -26px; box-shadow: 0 0 0 5px var(--bg), var(--shadow-2); }
+.fab svg { width: 26px; height: 26px; }
+.ico { width: 1.1em; height: 1.1em; flex: none; fill: none; stroke: currentColor; stroke-width: 1.9; stroke-linecap: round; stroke-linejoin: round; }
+
+/* tab bar decision */
+.options { display: grid; grid-template-columns: repeat(auto-fit, minmax(320px, 1fr)); gap: 20px; }
+.opt { background: var(--surface); border: 1px solid var(--border); border-radius: 16px; padding: 20px; display: grid; gap: 14px; align-content: start; }
+.opt.rec { border-color: var(--primary); box-shadow: 0 0 0 1px var(--primary); }
+.opt header { display: flex; justify-content: space-between; align-items: center; gap: 10px; flex-wrap: wrap; }
+.rec-pill { font-size: 12px; font-weight: 700; padding: 3px 10px; border-radius: 999px; background: var(--primary); color: var(--on-primary); }
+.opt .mini { border-radius: 16px; overflow: hidden; border: 1px solid var(--border); }
+.opt .mini .tabbar { padding-bottom: 10px; position: static; }
+.opt .more-list { font-size: 13px; color: var(--fg-muted); }
+.opt ul { margin: 0; padding-inline-start: 18px; display: grid; gap: 4px; font-size: 14px; }
+
+/* decisions */
+.decisions { display: grid; gap: 0; background: var(--surface); border: 1px solid var(--border); border-radius: 16px; overflow: hidden; }
+.dec { display: grid; grid-template-columns: 1fr auto; gap: 4px 16px; padding: 16px 20px; border-bottom: 1px solid var(--border); align-items: start; }
+.dec:last-child { border-bottom: 0; }
+.dec p { font-size: 14px; color: var(--fg-muted); grid-column: 1; }
+.dec .tag { grid-row: 1 / span 2; grid-column: 2; font-size: 12px; font-weight: 600; padding: 3px 10px; border-radius: 999px; background: var(--surface-muted); color: var(--fg-muted); white-space: nowrap; }
+
+@media (max-width: 560px) {
+  .ramp { grid-template-columns: repeat(11, 1fr); }
+  .ramp > span:first-child { grid-column: 1 / -1; }
+  .chip { font-size: 0; height: 34px; }
+  .dec { grid-template-columns: 1fr; }
+  .dec .tag { grid-row: auto; grid-column: 1; justify-self: start; }
+}
+@media (prefers-reduced-motion: reduce) { * { transition: none !important; animation: none !important; } }
+</style>
+
+<svg width="0" height="0" style="position:absolute" aria-hidden="true">
+  <defs>
+    <symbol id="i-home" viewBox="0 0 24 24"><path d="M3 10.5 12 3l9 7.5V20a1 1 0 0 1-1 1h-5v-6H9v6H4a1 1 0 0 1-1-1z"/></symbol>
+    <symbol id="i-list" viewBox="0 0 24 24"><path d="M9 6h12M9 12h12M9 18h12M4 6h.01M4 12h.01M4 18h.01"/></symbol>
+    <symbol id="i-insights" viewBox="0 0 24 24"><path d="M21 12a9 9 0 1 1-9-9v9z"/><path d="M15 3.5A9 9 0 0 1 20.5 9H15z"/></symbol>
+    <symbol id="i-budget" viewBox="0 0 24 24"><path d="M20 12V8H6a2 2 0 0 1 0-4h12v4"/><path d="M4 6v12a2 2 0 0 0 2 2h14v-4"/><path d="M18 12a2 2 0 0 0 0 4h4v-4z"/></symbol>
+    <symbol id="i-more" viewBox="0 0 24 24"><rect x="4" y="4" width="6.5" height="6.5" rx="1.5"/><rect x="13.5" y="4" width="6.5" height="6.5" rx="1.5"/><rect x="4" y="13.5" width="6.5" height="6.5" rx="1.5"/><rect x="13.5" y="13.5" width="6.5" height="6.5" rx="1.5"/></symbol>
+    <symbol id="i-plus" viewBox="0 0 24 24"><path d="M12 5v14M5 12h14"/></symbol>
+    <symbol id="i-cart" viewBox="0 0 24 24"><circle cx="9" cy="20" r="1.3"/><circle cx="18" cy="20" r="1.3"/><path d="M2 3h3l2.6 12.4a2 2 0 0 0 2 1.6h8.6a2 2 0 0 0 2-1.6L22 7H6"/></symbol>
+    <symbol id="i-work" viewBox="0 0 24 24"><rect x="3" y="7" width="18" height="13" rx="2"/><path d="M9 7V5a2 2 0 0 1 2-2h2a2 2 0 0 1 2 2v2M3 13h18"/></symbol>
+    <symbol id="i-food" viewBox="0 0 24 24"><path d="M7 3v18M4 3v5a3 3 0 0 0 6 0V3M18 21V3c-2.5 1-4 4-4 8h4"/></symbol>
+    <symbol id="i-key" viewBox="0 0 24 24"><circle cx="8" cy="15" r="4"/><path d="m11 12 9-9M17 6l3 3M14 9l2 2"/></symbol>
+    <symbol id="i-transfer" viewBox="0 0 24 24"><path d="m16 3 4 4-4 4M20 7H8M8 21l-4-4 4-4M4 17h12"/></symbol>
+    <symbol id="i-in" viewBox="0 0 24 24"><path d="M17 7 7 17M17 17H7V7"/></symbol>
+    <symbol id="i-out" viewBox="0 0 24 24"><path d="M7 17 17 7M7 7h10v10"/></symbol>
+    <symbol id="i-up" viewBox="0 0 24 24"><path d="m5 15 7-7 7 7"/></symbol>
+    <symbol id="i-chev" viewBox="0 0 24 24"><path d="m6 9 6 6 6-6"/></symbol>
+    <symbol id="i-bell" viewBox="0 0 24 24"><path d="M6 8a6 6 0 0 1 12 0c0 7 3 9 3 9H3s3-2 3-9M10.3 21a1.94 1.94 0 0 0 3.4 0"/></symbol>
+    <symbol id="i-warn" viewBox="0 0 24 24"><path d="M10.3 3.9 1.8 18a2 2 0 0 0 1.7 3h17a2 2 0 0 0 1.7-3L13.7 3.9a2 2 0 0 0-3.4 0zM12 9v4M12 17h.01"/></symbol>
+    <symbol id="i-check" viewBox="0 0 24 24"><path d="M20 6 9 17l-5-5"/></symbol>
+    <symbol id="i-repeat" viewBox="0 0 24 24"><path d="m17 2 4 4-4 4M3 11V9a3 3 0 0 1 3-3h15M7 22l-4-4 4-4M21 13v2a3 3 0 0 1-3 3H3"/></symbol>
+  </defs>
+</svg>
+
+<div class="wrap">
+  <header class="mast">
+    <div class="mast-top">
+      <span class="coin" aria-hidden="true"></span>
+      <span class="eyebrow">Daric design refresh · ticket DR-01</span>
+      <span class="status" style="border-color:var(--income);color:var(--income)">Approved 21 Oct 2026</span>
+    </div>
+    <h1>Calm, premium, and <em>gold only where it matters</em>.</h1>
+    <p class="lede">One page to approve the direction before any screen is redesigned: what we borrow from Copilot Money, Revolut and Monzo, the proposed tokens, type and components, and the Home screen in light and dark, Persian and English.</p>
+    <div class="principles">
+      <div><b>Big, quiet numbers</b><span>Balances lead every screen. Labels step back in muted navy.</span></div>
+      <div><b>Gold is a signal</b><span>The “+”, the one primary button, the active tab and highlights. Never a surface.</span></div>
+      <div><b>Two designed themes</b><span>Porcelain light and deep-navy dark, each tuned on its own, both WCAG AA.</span></div>
+      <div><b>Persian first</b><span>Right-to-left, Persian digits and roomy leading first; English mirrors it.</span></div>
+    </div>
+  </header>
+</div>
+
+<nav class="toc" aria-label="Sections">
+  <ul>
+    <li><a href="#references">References</a></li>
+    <li><a href="#colour">Colour</a></li>
+    <li><a href="#type">Type</a></li>
+    <li><a href="#shape">Shape &amp; depth</a></li>
+    <li><a href="#components">Components</a></li>
+    <li><a href="#home">Home screen</a></li>
+    <li><a href="#tabs">Tab bar</a></li>
+    <li><a href="#decisions">To approve</a></li>
+  </ul>
+</nav>
+
+<main class="wrap">
+
+<section id="references">
+  <div class="sec-head">
+    <span class="eyebrow">Moodboard</span>
+    <h2>Reference screens</h2>
+    <p class="muted">Three apps that get the calm, premium feel right, looked at across the four surfaces we care about: dashboard, transaction list, budgets and charts. The sketches show each app’s layout. They are not screenshots.</p>
+  </div>
+
+  <div class="refs">
+    <article class="ref">
+      <header><h3>Copilot Money</h3><a href="https://copilot.money" target="_blank" rel="noopener">copilot.money ↗</a></header>
+      <div class="sketch sk-copilot" aria-hidden="true">
+        <div class="sk-row" style="justify-content:space-between"><span style="opacity:.6">Spent this month</span><span class="sk-pill" style="background:#2a2d38">Oct</span></div>
+        <div class="sk-big">$3,412</div>
+        <svg viewBox="0 0 200 50" style="width:100%;height:46px"><path d="M0 45 L40 40 L80 30 L120 26 L160 14 L200 10" fill="none" stroke="#7dd3a8" stroke-width="2.5"/><path d="M0 45 L200 18" fill="none" stroke="#6b7280" stroke-width="1.5" stroke-dasharray="4 4"/></svg>
+        <div class="sk-row"><span class="sk-dot" style="background:#f59e0b"></span><div style="flex:1;display:grid;gap:4px"><div class="sk-bar" style="width:60%;opacity:.5"></div><div style="height:5px;border-radius:3px;background:#2a2d38"><div style="width:82%;height:100%;border-radius:3px;background:#f59e0b"></div></div></div></div>
+        <div class="sk-row"><span class="sk-dot" style="background:#8b5cf6"></span><div style="flex:1;display:grid;gap:4px"><div class="sk-bar" style="width:45%;opacity:.5"></div><div style="height:5px;border-radius:3px;background:#2a2d38"><div style="width:40%;height:100%;border-radius:3px;background:#8b5cf6"></div></div></div></div>
+        <div class="sk-row"><span class="sk-dot" style="background:#ec4899"></span><div class="sk-bar" style="flex:1;opacity:.35"></div><span>-$42</span></div>
+      </div>
+      <div class="take"><span class="lbl">Take</span>
+        <ul>
+          <li>Spend-to-date line against a dashed “typical month” line: one glance tells you if the month is on track.</li>
+          <li>Coloured rounded-square category icons. They make a long list scannable.</li>
+          <li>Budgets as thin bars under the category name, not big charts.</li>
+          <li>A dark theme that feels designed, with soft greys instead of pure black.</li>
+        </ul>
+      </div>
+      <div class="leave"><span class="lbl">Leave</span>
+        <ul><li>Lots of saturated colours at once; ours stay muted so gold can lead.</li></ul>
+      </div>
+    </article>
+
+    <article class="ref">
+      <header><h3>Revolut</h3><a href="https://www.revolut.com" target="_blank" rel="noopener">revolut.com ↗</a></header>
+      <div class="sketch sk-revolut" aria-hidden="true">
+        <div class="sk-row" style="justify-content:center;opacity:.75">Personal · GBP</div>
+        <div class="sk-big" style="text-align:center;font-size:28px">£12,480<span style="font-size:16px;opacity:.7">.52</span></div>
+        <div class="sk-row" style="justify-content:center"><span class="sk-pill">Accounts</span></div>
+        <div class="sk-row" style="justify-content:space-around;margin-top:6px">
+          <span style="display:grid;justify-items:center;gap:3px"><span style="width:30px;height:30px;border-radius:50%;background:rgb(255 255 255 / .16)"></span>Add</span>
+          <span style="display:grid;justify-items:center;gap:3px"><span style="width:30px;height:30px;border-radius:50%;background:rgb(255 255 255 / .16)"></span>Move</span>
+          <span style="display:grid;justify-items:center;gap:3px"><span style="width:30px;height:30px;border-radius:50%;background:rgb(255 255 255 / .16)"></span>Details</span>
+          <span style="display:grid;justify-items:center;gap:3px"><span style="width:30px;height:30px;border-radius:50%;background:rgb(255 255 255 / .16)"></span>More</span>
+        </div>
+        <div style="background:rgb(255 255 255 / .1);border-radius:12px;padding:8px;display:grid;gap:6px">
+          <div class="sk-row"><span class="sk-dot" style="border-radius:50%;background:rgb(255 255 255 / .3)"></span><div class="sk-bar" style="flex:1;opacity:.4"></div><span>-£8.40</span></div>
+          <div class="sk-row"><span class="sk-dot" style="border-radius:50%;background:rgb(255 255 255 / .3)"></span><div class="sk-bar" style="flex:1;opacity:.4"></div><span>+£2,100</span></div>
+        </div>
+      </div>
+      <div class="take"><span class="lbl">Take</span>
+        <ul>
+          <li>The balance as the hero: centred, huge, with smaller decimals and currency.</li>
+          <li>Recent transactions on Home in one grouped card, with “See all”.</li>
+          <li>Pill segmented controls and bottom sheets for every form.</li>
+          <li>Charts with one highlighted bar and a tap-for-detail tooltip.</li>
+        </ul>
+      </div>
+      <div class="leave"><span class="lbl">Leave</span>
+        <ul><li>Promo cards and upsells on Home. Ours stays about your money.</li><li>Gradient backgrounds that drift with the theme.</li></ul>
+      </div>
+    </article>
+
+    <article class="ref">
+      <header><h3>Monzo</h3><a href="https://monzo.com" target="_blank" rel="noopener">monzo.com ↗</a></header>
+      <div class="sketch sk-monzo" aria-hidden="true">
+        <div class="sk-row" style="justify-content:space-between;font-weight:700;font-size:12px"><span>Today</span><span style="opacity:.55">-£23.10</span></div>
+        <div class="sk-row"><span class="sk-dot" style="border-radius:50%;background:#ff4f40"></span><div style="flex:1;display:grid;gap:3px"><div class="sk-bar" style="width:55%;opacity:.5"></div><div class="sk-bar" style="width:30%"></div></div><span>14.60</span></div>
+        <div class="sk-row"><span class="sk-dot" style="border-radius:50%;background:#14233c"></span><div style="flex:1;display:grid;gap:3px"><div class="sk-bar" style="width:40%;opacity:.5"></div><div class="sk-bar" style="width:22%"></div></div><span>8.50</span></div>
+        <div class="sk-row" style="justify-content:space-between;font-weight:700;font-size:12px;margin-top:4px"><span>Yesterday</span><span style="opacity:.55">+£1,950.00</span></div>
+        <div class="sk-row"><span class="sk-dot" style="border-radius:50%;background:#2fa36b"></span><div style="flex:1;display:grid;gap:3px"><div class="sk-bar" style="width:50%;opacity:.5"></div><div class="sk-bar" style="width:26%"></div></div><span style="color:#2a8a5b;font-weight:700">+1,950</span></div>
+        <div style="display:flex;gap:4px;align-items:flex-end;height:38px;margin-top:4px"><span style="flex:1;height:40%;background:#cfd6e0;border-radius:3px"></span><span style="flex:1;height:65%;background:#cfd6e0;border-radius:3px"></span><span style="flex:1;height:50%;background:#cfd6e0;border-radius:3px"></span><span style="flex:1;height:90%;background:#ff4f40;border-radius:3px"></span><span style="flex:1;height:35%;background:#cfd6e0;border-radius:3px"></span></div>
+      </div>
+      <div class="take"><span class="lbl">Take</span>
+        <ul>
+          <li>Transactions grouped by day, with the day’s net on the header row.</li>
+          <li>Spending in plain colour, income green with a “+”. Spending is the norm, so it stays quiet.</li>
+          <li>“Trends” bars: muted months with the current one highlighted.</li>
+          <li>Friendly, plain-spoken empty states and copy.</li>
+        </ul>
+      </div>
+      <div class="leave"><span class="lbl">Leave</span>
+        <ul><li>The playful coral brand. Daric is calmer and more formal.</li></ul>
+      </div>
+    </article>
+  </div>
+
+  <div class="matrix-wrap">
+    <table class="matrix">
+      <thead><tr><th>Surface</th><th>What Daric takes</th><th>Where it lands</th></tr></thead>
+      <tbody>
+        <tr><td>Dashboard</td><td><span class="src">Revolut</span>Hero balance with muted unit · <span class="src">Copilot</span>spend-to-date versus typical month</td><td>Home: Net Worth hero with sparkline, then this Period’s Income and Expense</td></tr>
+        <tr><td>Transaction list</td><td><span class="src">Monzo</span>Day groups with daily net, quiet spending, green income · <span class="src">Copilot</span>coloured category squares</td><td>Transactions (DR-11), Home recent list</td></tr>
+        <tr><td>Budgets</td><td><span class="src">Copilot</span>Thin progress bars under the name, warning before the limit</td><td>Budgets (DR-14), the near-limit card on Home</td></tr>
+        <tr><td>Charts</td><td><span class="src">Monzo</span>muted bars with one highlighted · <span class="src">Revolut</span>tap for detail</td><td>Reports, Net Worth, Projection (DR-16 to DR-18), chart frame component</td></tr>
+      </tbody>
+    </table>
+  </div>
+  <p class="note">The sketches are drawn from the apps’ public screens and simplified to their layout. If you want real screenshots on this page, connect the Mobbin integration and I’ll pull them in.</p>
+</section>
+
+<section id="colour">
+  <div class="sec-head">
+    <span class="eyebrow">Style tile · Colour</span>
+    <h2>Gold and navy, kept and refined</h2>
+    <p class="muted">The brand ramps stay as they are. The theme roles change: the light ground moves from warm cream to a navy-tinted porcelain so gold stands out, the dark theme gets a third surface step for raised cards, and there are new roles for Transfer, warning, info and strong borders. Each pair below shows its contrast ratio, calculated live on this page.</p>
+  </div>
+  <div class="ramps" id="ramps"></div>
+  <div class="themes2">
+    <div class="tile t-light" id="tile-light"></div>
+    <div class="tile t-dark" id="tile-dark"></div>
+  </div>
+</section>
+
+<section id="type">
+  <div class="sec-head">
+    <span class="eyebrow">Style tile · Type</span>
+    <h2>Vazirmatn for Persian, Inter for English</h2>
+    <p class="muted">These are the two faces Daric already ships. The scale gets three display sizes for balances and totals. Persian keeps roughly 1.6× leading for body text so dots and descenders have room. Amounts always use tabular digits, Persian digits in Persian.</p>
+  </div>
+  <div class="type-grid">
+    <div class="type-card" lang="fa" dir="rtl" id="type-fa"></div>
+    <div class="type-card" lang="en" id="type-en"></div>
+  </div>
+</section>
+
+<section id="shape">
+  <div class="sec-head">
+    <span class="eyebrow">Style tile · Shape &amp; depth</span>
+    <h2>Soft corners, low shadows, a 4-point grid</h2>
+    <p class="muted">Radii get bigger as objects get bigger: chips are fully round, inputs and buttons 12, cards 18, sheets 28. Light mode uses soft shadows for elevation. Dark mode adds a lighter surface step and an inner top highlight, because shadows barely show on navy.</p>
+  </div>
+  <div class="shape-grid">
+    <div class="card"><span class="eyebrow">Radii</span>
+      <div class="radii"><div style="border-radius:6px">sm 6</div><div style="border-radius:12px">md 12</div><div style="border-radius:18px">lg 18</div><div style="border-radius:28px">xl 28</div><div style="border-radius:999px">full</div></div>
+    </div>
+    <div class="card"><span class="eyebrow">Elevation</span>
+      <div class="elev"><div style="box-shadow:none;border:1px solid var(--border)">0 flat</div><div style="box-shadow:var(--shadow-1)">1 card</div><div style="box-shadow:var(--shadow-2)">2 popover</div><div style="box-shadow:var(--shadow-3)">3 sheet</div></div>
+    </div>
+    <div class="card"><span class="eyebrow">Spacing (×4px)</span>
+      <div class="space" id="space"></div>
+    </div>
+  </div>
+</section>
+
+<section id="components">
+  <div class="sec-head">
+    <span class="eyebrow">Style tile · Components</span>
+    <h2>Core components</h2>
+    <p class="muted">The pieces every screen is built from, shown in both themes. Income, Expense and Transfer differ in sign, icon and colour, so they never rely on colour alone. Budget states add an icon, a word and a striped fill when over the limit.</p>
+  </div>
+  <div class="comp-grid" id="kits"></div>
+</section>
+
+<section id="home">
+  <div class="sec-head">
+    <span class="eyebrow">Sample screen</span>
+    <h2>Home, four ways</h2>
+    <p class="muted">The same screen in light and dark, Persian and English, at phone width. From the top: Workspace switcher, Net Worth with this month’s change, this Period’s Income and Expense, Budgets close to their limit, a Due Occurrence to confirm, and recent Transactions. The figures are examples.</p>
+  </div>
+  <div class="phones" id="phones"></div>
+</section>
+
+<section id="tabs">
+  <div class="sec-head">
+    <span class="eyebrow">Navigation</span>
+    <h2>Which four sections get a tab?</h2>
+    <p class="muted">Home, Transactions and More are fixed. Budgets and Insights compete for the last slot next to the “+”. The section that loses is reached from a Home card and from More.</p>
+  </div>
+  <div class="options" id="options"></div>
+</section>
+
+<section id="decisions">
+  <div class="sec-head">
+    <span class="eyebrow">Sign-off</span>
+    <h2>What this approval locks in</h2>
+    <p class="muted">Your decisions are recorded under Comments in ticket DR-01. DR-04 (tokens v2) and every later screen build on them.</p>
+  </div>
+  <div class="decisions">
+    <div class="dec"><h3>Palette roles</h3><p>Porcelain light ground (#f5f6f8), three-step navy surfaces in dark, new Transfer, warning, info and strong-border roles. Gold only for primary action, active state and highlights.</p><span class="tag">Approved</span></div>
+    <div class="dec"><h3>Money semantics</h3><p>Expense in the normal text colour with “−”, Income in green with “+”, Transfer in violet with the ⇄ icon.</p><span class="tag">Approved</span></div>
+    <div class="dec"><h3>Type</h3><p>Keep Vazirmatn and Inter. Add display sizes 36, 48 and 60 for balances, and tabular digits for every amount.</p><span class="tag">Approved</span></div>
+    <div class="dec"><h3>Shape and depth</h3><p>Radii 6/12/18/28/full, three shadow levels, an inner highlight for dark elevation, the 4-point spacing grid.</p><span class="tag">Approved</span></div>
+    <div class="dec"><h3>Icons</h3><p>One outline set at 1.9 stroke (Lucide, which has React and React Native packages). Category icons in white on rounded squares of the category colour.</p><span class="tag">Approved</span></div>
+    <div class="dec"><h3>Tab bar</h3><p>Home · Transactions · + · Insights · More (option A).</p><span class="tag">Approved</span></div>
+  </div>
+</section>
+
+</main>
+
+<script>
+(() => {
+  const palette = {
+    gold: { 50:'#fcf8ec',100:'#f7edcd',200:'#efd998',300:'#e5c163',400:'#d9a93c',500:'#c38f26',600:'#a1711c',700:'#7f5719',800:'#67461a',900:'#563b1a',950:'#311f0b' },
+    navy: { 50:'#f3f6fb',100:'#e4eaf4',200:'#c8d4e8',300:'#9db2d5',400:'#6b89bc',500:'#4a6aa3',600:'#385287',700:'#2e426d',800:'#27385a',900:'#152443',950:'#0a1328' },
+  };
+  const themes = {
+    light: { background:'#f5f6f8', surface:'#ffffff', surfaceMuted:'#eef1f6', foreground:'#0a1328', foregroundMuted:'#46587a', border:'#e3e8f0', borderStrong:'#7489ad', primary:'#c38f26', onPrimary:'#0a1328', accent:'#7f5719', focus:'#a1711c', income:'#067647', transfer:'#5a45c7', warning:'#b54708', info:'#0b6aa2', danger:'#b42318', chartIncome:'#067647', chartExpense:'#4a6aa3' },
+    dark:  { background:'#0a1328', surface:'#111d36', surfaceMuted:'#18284a', surfaceRaised:'#1a2b4d', foreground:'#f4f1e8', foregroundMuted:'#9db2d5', border:'#1f3053', borderStrong:'#5b77a8', primary:'#d9a93c', onPrimary:'#0a1328', accent:'#e5c163', focus:'#e5c163', income:'#47cd89', transfer:'#ada1ff', warning:'#f5b046', info:'#6cc3f5', danger:'#f97066', chartIncome:'#2fbf71', chartExpense:'#7d9bd0' },
+  };
+  const NEW = new Set(['surfaceRaised','borderStrong','income','transfer','warning','info']);
+  const CHANGED = { light: new Set(['background','surfaceMuted','foregroundMuted','border','chartExpense']), dark: new Set(['surface','surfaceMuted','border','chartIncome','chartExpense']) };
+
+  const lum = (h) => { const [r,g,b] = [1,3,5].map(i => { const c = parseInt(h.slice(i,i+2),16)/255; return c <= .04045 ? c/12.92 : ((c+.055)/1.055)**2.4; }); return .2126*r + .7152*g + .0722*b; };
+  const ratio = (a,b) => { const [x,y] = [lum(a),lum(b)].sort((p,q) => q-p); return (x+.05)/(y+.05); };
+  const el = (html) => { const t = document.createElement('template'); t.innerHTML = html.trim(); return t.content; };
+  const icon = (id, cls = 'ico') => `<svg class="${cls}" aria-hidden="true"><use href="#i-${id}"/></svg>`;
+
+  // brand ramps
+  const ramps = document.getElementById('ramps');
+  for (const [name, steps] of Object.entries(palette)) {
+    const keys = name === 'gold' ? ['400','500','700'] : ['50','600','900','950'];
+    ramps.append(el(`<div class="ramp"><span>${name[0].toUpperCase() + name.slice(1)}</span>${Object.entries(steps).map(([s,hex]) =>
+      `<span class="chip${keys.includes(s) ? ' key' : ''}" style="background:${hex};color:${lum(hex) > .3 ? '#0a1328' : '#f4f1e8'}" title="${name}-${s} ${hex}">${s}</span>`).join('')}</div>`));
+  }
+
+  // theme tiles with live contrast
+  const pairs = [
+    ['foreground','background',4.5,'Body text'], ['foregroundMuted','surface',4.5,'Secondary text'],
+    ['onPrimary','primary',4.5,'Primary button'], ['accent','surface',4.5,'Links, active tab'],
+    ['income','surface',4.5,'Income amount'], ['transfer','surface',4.5,'Transfer amount'],
+    ['warning','surface',4.5,'Near limit'], ['danger','surface',4.5,'Over limit, errors'],
+    ['borderStrong','surface',3,'Input border'], ['focus','surfaceMuted',3,'Focus ring'],
+  ];
+  for (const [name, t] of Object.entries(themes)) {
+    const tile = document.getElementById(`tile-${name}`);
+    const sw = Object.entries(t).map(([k,hex]) => {
+      const tag = NEW.has(k) ? ' · new' : CHANGED[name].has(k) ? ' · changed' : '';
+      return `<div class="sw"><i style="background:${hex}"></i><b>${k}</b><small>${hex}${tag}</small></div>`;
+    }).join('');
+    const pr = pairs.map(([fg,bg,min,label]) => {
+      const r = ratio(t[fg], t[bg]);
+      return `<div class="pair"><span class="amt" style="color:${t[fg]};background:${t[bg]};padding:2px 8px;border-radius:6px">Aa ۱۲۳</span><span>${label}</span><span class="ratio"><b>${r >= min ? '✓' : '✗'}</b> ${r.toFixed(2)} : 1 · needs ${min}</span></div>`;
+    }).join('');
+    tile.append(el(`<div class="tile-head"><h3>${name === 'light' ? 'Light' : 'Dark'}</h3><span class="muted" style="font-size:13px">${name === 'light' ? 'Porcelain' : 'Deep navy'}</span></div><div class="swatches">${sw}</div><div class="pairs">${pr}</div>`));
+  }
+
+  // type scale
+  const scale = [
+    ['display-lg', 60, 72, 700], ['display', 48, 60, 700], ['display-sm', 36, 48, 700],
+    ['3xl', 30, 40, 650], ['2xl', 24, 34, 650], ['xl', 20, 30, 600], ['lg', 18, 28, 500], ['base', 16, 26, 400], ['sm', 14, 22, 400], ['xs', 12, 20, 500],
+  ];
+  const samples = {
+    fa: { display: '۱٬۸۴۲٬۳۵۰٬۰۰۰', heading: 'دارایی خالص شما', body: 'هزینه‌های این ماه ۱۲٪ کمتر از ماه قبل است.', small: '۲۹ مهر ۱۴۰۵ · حساب جاری' },
+    en: { display: '1,842,350,000', heading: 'Your Net Worth', body: 'This month’s spending is 12% lower than last month.', small: '21 Oct 2026 · Current account' },
+  };
+  for (const lang of ['fa','en']) {
+    const s = samples[lang];
+    document.getElementById(`type-${lang}`).append(el(
+      `<div class="eyebrow" style="margin-bottom:6px">${lang === 'fa' ? 'Vazirmatn · فارسی' : 'Inter · English'}</div>` +
+      scale.map(([n, size, lh, w]) => {
+        const text = size >= 36 ? s.display : size >= 20 ? s.heading : size >= 16 ? s.body : s.small;
+        const shown = Math.min(size, 44);
+        return `<div class="type-row"><code dir="ltr">${n}<br>${size}/${lh} · ${w}</code><div class="tnum" style="font-size:${shown}px;line-height:${lh * shown / size}px;font-weight:${w};${size >= 30 && lang === 'en' ? 'letter-spacing:-0.025em' : ''}">${text}</div></div>`;
+      }).join('')));
+  }
+  document.querySelector('#type').append(el('<p class="note">Display sizes are drawn at up to 44px here so they fit the column. The labels give the real size.</p>'));
+
+  // spacing
+  document.getElementById('space').append(el([1,2,3,4,6,8,12,16].map(n => `<div><i style="height:${n*4}px"></i>${n}</div>`).join('')));
+
+  // money and copy, per language
+  const fmt = (lang, n, sign) => {
+    const s = new Intl.NumberFormat(lang === 'fa' ? 'fa-IR' : 'en-US').format(Math.abs(n));
+    return sign ? (n < 0 ? '−' : '+') + s : s;
+  };
+  const copy = {
+    fa: {
+      ws: 'شخصی', date: '۲۹ مهر ۱۴۰۵', unit: 'تومان', nw: 'دارایی خالص', delta: '۳٫۲٪ این ماه',
+      period: 'مهر ۱۴۰۵', income: 'درآمد', expense: 'هزینه', budgets: 'بودجه‌های نزدیک سقف', all: 'همه',
+      groceries: 'خوراک و سوپرمارکت', dining: 'رستوران و کافه', near: '۹۲٪ · نزدیک سقف', over: 'بیش از بودجه',
+      spentOf: (a,b) => `${a} از ${b}`, due: 'در انتظار تأیید', rent: 'اجاره خانه', rentWhen: '۱ آبان · تکرار ماهانه', confirm: 'تأیید',
+      recent: 'تراکنش‌های اخیر', tx: [['سوپرمارکت محله','خوراک · امروز','cart','#15803d',-840000,'exp'], ['حقوق مهر','درآمد · دیروز','work','#0369a1',48000000,'inc'], ['به حساب پس‌انداز','انتقال · دیروز','transfer','#4338ca',10000000,'trf']],
+      tabs: ['خانه','تراکنش‌ها','تحلیل‌ها','بیشتر','بودجه‌ها'], add: 'ثبت تراکنش',
+    },
+    en: {
+      ws: 'Personal', date: '21 Oct 2026', unit: 'Toman', nw: 'Net Worth', delta: '3.2% this month',
+      period: 'October 2026', income: 'Income', expense: 'Expense', budgets: 'Budgets near their limit', all: 'All',
+      groceries: 'Groceries', dining: 'Eating out', near: '92% · near limit', over: 'Over budget',
+      spentOf: (a,b) => `${a} of ${b}`, due: 'Due to confirm', rent: 'Rent', rentWhen: '23 Oct · monthly', confirm: 'Confirm',
+      recent: 'Recent Transactions', tx: [['Corner grocery','Groceries · Today','cart','#15803d',-840000,'exp'], ['October salary','Income · Yesterday','work','#0369a1',48000000,'inc'], ['To savings account','Transfer · Yesterday','transfer','#4338ca',10000000,'trf']],
+      tabs: ['Home','Transactions','Insights','More','Budgets'], add: 'Record a Transaction',
+    },
+  };
+  const amount = (lang, n, kind) => {
+    const ic = kind === 'inc' ? 'in' : kind === 'exp' ? 'out' : 'transfer';
+    const text = kind === 'trf' ? fmt(lang, n) : fmt(lang, n, true);
+    return `<span class="amt ${kind}">${icon(ic)}<bdi>${text}</bdi></span>`;
+  };
+  const progress = (c, lang, name, color, ic, spent, limit, state) => {
+    const pct = Math.round(spent / limit * 100);
+    const st = state === 'warn' ? `<span class="state">${icon('warn')}${c.near}</span>` : state === 'over' ? `<span class="state">${icon('warn')}${c.over}</span>` : `<span class="state muted">${new Intl.NumberFormat(lang === 'fa' ? 'fa-IR' : 'en-US').format(pct)}${lang === 'fa' ? '٪' : '%'}</span>`;
+    return `<div class="prog ${state}"><div class="top"><span style="display:inline-flex;gap:8px;align-items:center;font-weight:600"><span class="cat" style="background:${color};width:26px;height:26px;border-radius:8px">${icon(ic)}</span>${name}</span>${st}</div><div class="track"><div class="fill" style="width:${Math.min(pct,100)}%"></div></div><span class="muted tnum" style="font-size:12px">${c.spentOf(fmt(lang, spent), fmt(lang, limit))}</span></div>`;
+  };
+  const tabbar = (c, active, slot) => {
+    const items = [['home', c.tabs[0]], ['list', c.tabs[1]], null, slot === 'budgets' ? ['budget', c.tabs[4]] : ['insights', c.tabs[2]], ['more', c.tabs[3]]];
+    return `<nav class="tabbar">${items.map((it, i) => it ? `<span class="tab${i === active ? ' on' : ''}">${icon(it[0])}${it[1]}</span>` : `<span class="fab" role="img" aria-label="${c.add}">${icon('plus')}</span>`).join('')}</nav>`;
+  };
+
+  // component kits
+  for (const theme of ['light','dark']) {
+    const c = copy.fa;
+    document.getElementById('kits').append(el(`
+      <div class="kit t-${theme}">
+        <div class="tile-head"><h3>${theme === 'light' ? 'Light' : 'Dark'}</h3><span class="seg"><span class="on">Month</span><span>Quarter</span><span>Year</span></span></div>
+        <div class="row"><button class="btn btn-primary" type="button">${icon('plus')}Record</button><button class="btn btn-secondary" type="button">Export</button><button class="btn btn-ghost" type="button">Cancel</button><button class="btn btn-danger" type="button">Delete</button></div>
+        <div class="row">
+          <label class="field">Amount<span class="input focus"><span class="amount-in">2,450,000</span><span class="unit">Toman</span></span></label>
+          <label class="field" lang="fa" dir="rtl">مبلغ<span class="input"><span class="amount-in" style="font-family:var(--font-fa)">۲٬۴۵۰٬۰۰۰</span><span class="unit">تومان</span></span></label>
+        </div>
+        <div class="row" style="justify-content:space-between">${amount('en', -840000, 'exp')}${amount('en', 48000000, 'inc')}${amount('en', 10000000, 'trf')}</div>
+        <div class="row">
+          <span class="cat" style="background:#15803d">${icon('cart')}</span><span class="cat" style="background:#b45309">${icon('food')}</span><span class="cat" style="background:#0369a1">${icon('work')}</span><span class="cat" style="background:#6d28d9">${icon('key')}</span><span class="cat" style="background:#be185d">${icon('home')}</span>
+          <span class="chip-lbl"><i style="background:#c2410c"></i>Trip to Shiraz</span><span class="chip-lbl"><i style="background:#0f766e"></i>Controllable</span>
+        </div>
+        <div class="card" style="gap:14px">
+          ${progress(copy.en, 'en', 'Transport', '#0f766e', 'key', 1200000, 4000000, 'ok')}
+          ${progress(copy.en, 'en', 'Groceries', '#15803d', 'cart', 9200000, 10000000, 'warn')}
+          ${progress(copy.en, 'en', 'Eating out', '#b45309', 'food', 5400000, 5000000, 'over')}
+        </div>
+        <div class="duo">
+          <div class="card stat"><span class="k">${icon('in')}Income</span><span class="v">48,000,000</span></div>
+          <div class="card stat"><span class="k">${icon('out')}Expense</span><span class="v">31,420,000</span></div>
+        </div>
+        <div class="empty"><span class="mark"><span class="coin" style="width:24px;height:24px"></span></span><b>No Budgets yet</b><span class="muted">Set a limit for a Category and Daric warns you before you pass it.</span><button class="btn btn-primary" type="button" style="height:38px">Create a Budget</button></div>
+        <div class="toast">${icon('check')}<span>Transaction recorded</span><button type="button">Undo</button></div>
+      </div>`));
+  }
+
+  // sparkline path (Net Worth over 12 months)
+  const nw = [1.52,1.55,1.54,1.6,1.63,1.62,1.68,1.71,1.7,1.76,1.785,1.842];
+  const spark = (rtl) => {
+    const W = 320, H = 64, min = 1.48, max = 1.86;
+    const pts = nw.map((v,i) => { const x = 4 + i * (W - 8) / (nw.length - 1); return [rtl ? W - x : x, H - 6 - (v - min) / (max - min) * (H - 14)]; });
+    const d = pts.map((p,i) => (i ? 'L' : 'M') + p[0].toFixed(1) + ' ' + p[1].toFixed(1)).join(' ');
+    const last = pts[pts.length - 1];
+    const area = `${d} L${last[0].toFixed(1)} ${H} L${pts[0][0].toFixed(1)} ${H} Z`;
+    const id = 'g' + Math.random().toString(36).slice(2,7);
+    return `<svg class="spark" viewBox="0 0 ${W} ${H}" preserveAspectRatio="none" aria-hidden="true"><defs><linearGradient id="${id}" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="var(--hero-line)" stop-opacity=".28"/><stop offset="1" stop-color="var(--hero-line)" stop-opacity="0"/></linearGradient></defs><path d="${area}" fill="url(#${id})"/><path d="${d}" fill="none" stroke="var(--hero-line)" stroke-width="2.2" stroke-linejoin="round" vector-effect="non-scaling-stroke"/><circle cx="${last[0]}" cy="${last[1]}" r="4" fill="var(--hero-line)" stroke="var(--surface)" stroke-width="2"/></svg>`;
+  };
+
+  // phones
+  const phone = (lang, theme) => {
+    const c = copy[lang], rtl = lang === 'fa';
+    return `
+    <div class="phone-cap"><span>${theme === 'light' ? 'Light' : 'Dark'} · ${lang === 'fa' ? 'Persian, right to left' : 'English'}</span>
+    <div class="phone"><div class="screen t-${theme}" lang="${lang}" dir="${rtl ? 'rtl' : 'ltr'}">
+      <div class="sbar"><span>9:41</span><span>●●● 5G ▮</span></div>
+      <div class="scroll">
+        <div class="topbar"><span class="ws"><span class="coin"></span>${c.ws}${icon('chev')}</span><span class="date">${c.date}</span><span class="iconbtn">${icon('bell')}<span class="badge"></span></span></div>
+        <div class="hero">
+          <span class="k">${c.nw}</span>
+          <span class="big"><bdi>${fmt(lang, 1842350000)}</bdi><small>${c.unit}</small></span>
+          <span class="delta">${icon('up')}${c.delta}</span>
+          ${spark(rtl)}
+        </div>
+        <div class="card">
+          <div class="sect-h"><span>${c.period}</span></div>
+          <div class="duo">
+            <div class="stat"><span class="k" style="color:var(--income)">${icon('in')}<span style="color:var(--fg-muted)">${c.income}</span></span><span class="v"><bdi>${fmt(lang, 48000000)}</bdi></span></div>
+            <div class="stat"><span class="k">${icon('out')}${c.expense}</span><span class="v"><bdi>${fmt(lang, 31420000)}</bdi></span></div>
+          </div>
+          <div class="ie-bar"><span style="flex:48;background:var(--chart-income)"></span><span style="flex:31.4;background:var(--chart-expense)"></span><span style="flex:16.6;background:var(--surface-muted)"></span></div>
+        </div>
+        <div class="card">
+          <div class="sect-h"><span>${c.budgets}</span><a href="#home">${c.all}</a></div>
+          ${progress(c, lang, c.groceries, '#15803d', 'cart', 9200000, 10000000, 'warn')}
+          ${progress(c, lang, c.dining, '#b45309', 'food', 5400000, 5000000, 'over')}
+        </div>
+        <div class="card" style="padding:12px 14px">
+          <div class="due"><span class="cat" style="background:#6d28d9">${icon('repeat')}</span><span class="txt"><b>${c.rent} · <bdi class="tnum">${fmt(lang, 25000000)}</bdi></b><small>${c.due} · ${c.rentWhen}</small></span><button class="btn btn-primary" type="button">${c.confirm}</button></div>
+        </div>
+        <div class="card">
+          <div class="sect-h"><span>${c.recent}</span><a href="#home">${c.all}</a></div>
+          <div class="list">${c.tx.map(([t, sub, ic, col, n, kind]) => `<div class="tx"><span class="cat" style="background:${col}">${icon(ic)}</span><span class="txt"><b style="font-weight:600">${t}</b><small>${sub}</small></span>${amount(lang, n, kind)}</div>`).join('')}</div>
+        </div>
+      </div>
+      ${tabbar(c, 0, 'insights')}
+    </div></div></div>`;
+  };
+  const phones = document.getElementById('phones');
+  for (const [lang, theme] of [['fa','light'],['fa','dark'],['en','light'],['en','dark']]) phones.append(el(phone(lang, theme)));
+
+  // tab options
+  const opt = (slot, rec) => {
+    const c = copy.fa;
+    const title = slot === 'insights' ? 'A · Insights gets the tab' : 'B · Budgets gets the tab';
+    const more = slot === 'insights'
+      ? 'More: Budgets, Accounts, Categories, Labels, Recurring, Rates, Settings (7)'
+      : 'More: Reports, Controllable Spending, Projection, Net Worth, Accounts, Categories, Labels, Recurring, Rates, Settings (10)';
+    const why = slot === 'insights'
+      ? ['One tab opens four screens (Reports, Controllable Spending, Projection, Net Worth), so More stays short.', 'Budgets close to their limit are already on Home, one tap from the full list.', 'Matches the spec’s section order, so the sidebar and tab bar read the same.']
+      : ['Budgets are checked more often than reports, often daily.', 'But More grows to ten rows and the four Insights screens get split up.', 'Net Worth and Reports would only be reached from Home cards or More.'];
+    return `<div class="opt${rec ? ' rec' : ''}"><header><h3>${title}</h3>${rec ? '<span class="rec-pill">Recommended</span>' : ''}</header>
+      <div class="mini t-light" lang="fa" dir="rtl" style="font-family:var(--font-fa)">${tabbar(c, 0, slot)}</div>
+      <div class="mini t-dark" lang="en" style="background:var(--bg)">${tabbar(copy.en, 0, slot)}</div>
+      <ul>${why.map(w => `<li>${w}</li>`).join('')}</ul>
+      <p class="more-list">${more}</p></div>`;
+  };
+  document.getElementById('options').append(el(opt('insights', true) + opt('budgets', false)));
+})();
+</script>
