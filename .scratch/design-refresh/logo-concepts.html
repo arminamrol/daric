@@ -1,0 +1,300 @@
+<title>Daric Logo Concepts</title>
+<meta name="description" content="Four coin-and-archer logo concepts for Daric, each at 16px, 48px, as an app icon and with the name in Persian and English, in light and dark.">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:opsz,wght@14..32,400..700&family=Vazirmatn:wght@400..800&display=swap">
+<style>
+/* Daric tokens v2, as approved in DR-01. Panels pin one theme each with .t-light / .t-dark. */
+:root, .t-light {
+  color-scheme: light;
+  --bg: #f5f6f8;
+  --surface: #ffffff;
+  --surface-muted: #eef1f6;
+  --fg: #0a1328;
+  --fg-muted: #46587a;
+  --border: #e3e8f0;
+  --accent: #7f5719;
+  --focus: #a1711c;
+  --warning: #b54708;
+  --coin: #c38f26;
+  --ink: #0a1328;
+  --icon-bg: #fcf8ec;
+  --tab-strip: #dfe4ec;
+  --tab-active: #ffffff;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    color-scheme: dark;
+    --bg: #0a1328; --surface: #111d36; --surface-muted: #18284a;
+    --fg: #f4f1e8; --fg-muted: #9db2d5; --border: #1f3053;
+    --accent: #e5c163; --focus: #e5c163; --warning: #f5b046;
+    --coin: #d9a93c; --ink: #0a1328; --icon-bg: #0a1328;
+    --tab-strip: #0d1730; --tab-active: #18284a;
+  }
+}
+:root[data-theme="dark"], .t-dark {
+  color-scheme: dark;
+  --bg: #0a1328; --surface: #111d36; --surface-muted: #18284a;
+  --fg: #f4f1e8; --fg-muted: #9db2d5; --border: #1f3053;
+  --accent: #e5c163; --focus: #e5c163; --warning: #f5b046;
+  --coin: #d9a93c; --ink: #0a1328; --icon-bg: #0a1328;
+  --tab-strip: #0d1730; --tab-active: #18284a;
+}
+.t-light { color-scheme: light; }
+
+* { box-sizing: border-box; }
+body {
+  background: var(--bg); color: var(--fg);
+  font: 400 15px/1.6 Inter, system-ui, sans-serif;
+  padding-inline: 20px; padding-block: 0 80px;
+  -webkit-font-smoothing: antialiased;
+}
+:lang(fa) { font-family: Vazirmatn, Tahoma, system-ui, sans-serif; }
+.wrap { max-width: 1120px; margin-inline: auto; }
+:focus-visible { outline: 2px solid var(--focus); outline-offset: 2px; border-radius: 6px; }
+h1, h2, h3 { text-wrap: balance; margin: 0; letter-spacing: -0.015em; }
+h2 { font-size: 26px; line-height: 34px; font-weight: 650; }
+h3 { font-size: 13px; line-height: 20px; font-weight: 600; letter-spacing: .06em; text-transform: uppercase; color: var(--fg-muted); }
+p { margin: 0; max-width: 66ch; }
+.muted { color: var(--fg-muted); }
+.eyebrow { font-size: 12px; font-weight: 600; letter-spacing: .08em; text-transform: uppercase; color: var(--fg-muted); }
+
+.mast { padding-block: 48px 36px; display: grid; gap: 18px; border-bottom: 1px solid var(--border); }
+.mast-top { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; }
+.status { margin-inline-start: auto; font-size: 13px; font-weight: 600; padding: 4px 12px; border-radius: 999px; border: 1px solid var(--warning); color: var(--warning); }
+.mast h1 { font-size: clamp(30px, 5vw, 46px); line-height: 1.12; font-weight: 700; letter-spacing: -0.03em; max-width: 22ch; }
+.mast .lede { font-size: 17px; color: var(--fg-muted); }
+
+/* the 16px line-up: every concept in a real browser tab */
+.lineup { display: grid; gap: 12px; }
+.tabs { background: var(--tab-strip); border-radius: 12px; padding: 8px 8px 0; display: flex; gap: 2px; overflow-x: auto; scrollbar-width: none; }
+.tab { background: transparent; color: var(--fg-muted); display: flex; align-items: center; gap: 8px; padding: 8px 14px; border-radius: 9px 9px 0 0; font-size: 12.5px; white-space: nowrap; min-width: 0; }
+.tab.on { background: var(--tab-active); color: var(--fg); }
+.tab .ab { font-weight: 700; color: var(--fg); }
+.tab svg { width: 16px; height: 16px; flex: none; }
+
+section { padding-block: 56px 8px; display: grid; gap: 22px; scroll-margin-top: 24px; }
+.sec-head { display: grid; gap: 8px; }
+.sec-head h2 span { color: var(--fg-muted); font-weight: 500; }
+.idea { display: grid; grid-template-columns: repeat(auto-fit, minmax(260px, 1fr)); gap: 8px 28px; font-size: 14px; }
+.idea b { display: block; font-weight: 600; }
+.idea span { color: var(--fg-muted); }
+
+.board { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
+@media (max-width: 760px) { .board { grid-template-columns: 1fr; } }
+.panel { background: var(--bg); color: var(--fg); border: 1px solid var(--border); border-radius: 18px; padding: 22px; display: grid; gap: 22px; align-content: start; }
+.panel > .eyebrow { margin-block-end: -10px; }
+
+.hero-row { display: flex; align-items: center; gap: 22px; flex-wrap: wrap; }
+.hero-row .big { width: 132px; height: 132px; flex: none; }
+.sizes { display: flex; align-items: flex-end; gap: 18px; flex-wrap: wrap; }
+.size { display: grid; justify-items: center; gap: 6px; font-size: 11px; color: var(--fg-muted); font-variant-numeric: tabular-nums; }
+.size canvas { width: 64px; height: 64px; image-rendering: pixelated; border-radius: 4px; outline: 1px solid var(--border); }
+
+.icons { display: flex; align-items: flex-end; gap: 18px; flex-wrap: wrap; }
+.appicon { width: 76px; height: 76px; border-radius: 22.5%; background: var(--icon-bg); display: grid; place-items: center; box-shadow: 0 1px 0 rgb(255 255 255 / .06) inset, 0 6px 16px -6px rgb(10 19 40 / .35); }
+.appicon.lightbg { background: #fcf8ec; }
+.appicon.darkbg { background: #0a1328; }
+.appicon svg { width: 72%; height: 72%; }
+.appicon.small { width: 48px; height: 48px; }
+
+.lockups { display: grid; gap: 14px; }
+.lockup { display: flex; align-items: center; gap: 12px; }
+.lockup svg { width: 44px; height: 44px; flex: none; }
+.lockup .fa { font-family: Vazirmatn, Tahoma, sans-serif; font-weight: 800; font-size: 34px; line-height: 1; letter-spacing: 0; }
+.lockup .en { font-family: Inter, system-ui, sans-serif; font-weight: 700; font-size: 32px; line-height: 1; letter-spacing: -0.035em; }
+.lockup.sm svg { width: 22px; height: 22px; }
+.lockup.sm { gap: 8px; }
+.lockup.sm .fa { font-size: 18px; }
+.lockup.sm .en { font-size: 17px; letter-spacing: -0.02em; }
+.lockup-row { display: flex; gap: 28px; flex-wrap: wrap; align-items: center; justify-content: space-between; }
+
+
+.pick { border-top: 1px solid var(--border); margin-top: 48px; padding-top: 32px; display: grid; gap: 12px; }
+.pick ol { margin: 0; padding-inline-start: 20px; display: grid; gap: 6px; max-width: 70ch; }
+</style>
+
+<div class="wrap">
+<header class="mast">
+  <div class="mast-top">
+    <span class="eyebrow">Daric design refresh · ticket DR-02</span>
+    <span class="status">Awaiting a choice</span>
+  </div>
+  <h1>Four ways to strike the coin</h1>
+  <p class="lede">The Daric was the gold coin of the Achaemenid kings, stamped with a kneeling archer drawing his bow. Each concept below keeps the gold disc and borrows one part of that archer, simplified until it still reads in a 16-pixel browser tab.</p>
+  <div class="lineup">
+    <span class="eyebrow">All four at 16px, actual size, in a tab bar</span>
+    <div class="tabs t-light" id="tabs-light"></div>
+    <div class="tabs t-dark" id="tabs-dark"></div>
+  </div>
+</header>
+
+<main id="concepts"></main>
+
+<footer class="pick">
+  <h2>Choosing</h2>
+  <ol>
+    <li>Pick one concept; changes to it are welcome (stroke weight, arrow direction, gold tone, how much of the rim shows).</li>
+    <li>The choice and the requested changes are recorded under Comments in ticket 02.</li>
+    <li>Ticket 03 refines the chosen mark into the final files: mark, lockups in Persian and English, light and dark, favicon, installed-web-app icons, and the mobile app icon and splash.</li>
+  </ol>
+</footer>
+</div>
+
+<script>
+// Each concept draws on a 64-unit grid: a gold coin (c) and navy ink (i).
+const CONCEPTS = [
+  {
+    id: 'bow',
+    name: 'Bow D',
+    fa: 'کمان',
+    idea: 'The drawn bow, nothing else. Its curve is also a Latin D, and the arrow runs through the coin like the line of a chart.',
+    good: 'Cleanest at 16px. Reads as a coin with a bow even when blurred.',
+    risk: 'The D only works in English; in Persian it is simply a bow.',
+    svg: (c, i) => `
+      <circle cx="32" cy="32" r="30" fill="${c}"/>
+      <g fill="none" stroke="${i}" stroke-linecap="round">
+        <path d="M24 13 A19 19 0 0 1 24 51" stroke-width="5.5"/>
+        <path d="M24 13 V51" stroke-width="2"/>
+        <path d="M10 32 H46" stroke-width="4.5"/>
+      </g>
+      <path d="M55 32 L45 25 V39 Z" fill="${i}"/>`,
+  },
+  {
+    id: 'archer',
+    name: 'The archer',
+    fa: 'کماندار',
+    idea: 'The kneeling archer himself, rebuilt from circles and straight strokes: head, torso, bent knee, drawn bow.',
+    good: 'Most faithful to the coin and the most storytelling at large sizes and on the splash.',
+    risk: 'At 16px the figure turns into a blob; the favicon would need a simplified cut.',
+    svg: (c, i) => `
+      <circle cx="32" cy="32" r="30" fill="${c}"/>
+      <circle cx="22" cy="17" r="5" fill="${i}"/>
+      <g fill="none" stroke="${i}" stroke-linecap="round" stroke-linejoin="round">
+        <path d="M22 24 L24 38" stroke-width="7"/>
+        <path d="M24 38 L36 40 L36 51" stroke-width="5"/>
+        <path d="M24 39 L18 51" stroke-width="5"/>
+        <path d="M22 27 L32 27" stroke-width="4"/>
+        <path d="M44 11 Q56 27 44 43" stroke-width="4"/>
+        <path d="M44 11 L32 27 L44 43" stroke-width="1.5"/>
+        <path d="M32 27 L51 27" stroke-width="3"/>
+      </g>
+      <path d="M56 27 L49 22.5 V31.5 Z" fill="${i}"/>`,
+  },
+  {
+    id: 'rim',
+    name: 'Breaking rim',
+    fa: 'تیر از لبه',
+    idea: 'Only the archer’s arrow, rising through the struck rim of the coin. Money that moves forward, without a single arrow-up chart cliché.',
+    good: 'Strongest silhouette at 16px and the most modern. Direction-neutral enough for both languages.',
+    risk: 'The least literal: the archer is implied, not shown.',
+    svg: (c, i) => `
+      <circle cx="32" cy="32" r="30" fill="${c}"/>
+      <circle cx="32" cy="32" r="23" fill="none" stroke="${i}" stroke-width="2.5"/>
+      <path d="M45 19 L50 14" stroke="${c}" stroke-width="12"/>
+      <path d="M22 42 L41 23" stroke="${i}" stroke-width="5" stroke-linecap="round"/>
+      <path d="M50 14 L47 27 L37 17 Z" fill="${i}" stroke="${i}" stroke-width="1.5" stroke-linejoin="round"/>
+      <g fill="none" stroke="${i}" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+        <path d="M16 42 H22 V48"/>
+        <path d="M20 38 H26 V44"/>
+      </g>`,
+  },
+  {
+    id: 'dal',
+    name: 'Dāl bow',
+    fa: 'کمانِ دال',
+    idea: 'The Persian letter د, the first letter of دریک, drawn as a strung bow. A Persian-first mark that still reads as a bow to everyone else.',
+    good: 'The only concept that is bilingual by itself: Persian readers see د, others see a bow.',
+    risk: 'The asymmetric hook is busier than Bow D at 16px.',
+    svg: (c, i) => `
+      <circle cx="32" cy="32" r="30" fill="${c}"/>
+      <g fill="none" stroke="${i}" stroke-linecap="round" stroke-linejoin="round">
+        <path d="M25 13 Q46 30 42 42 Q39 49 30 49 L17 49" stroke-width="5.5"/>
+        <path d="M25 13 L17 49" stroke-width="2"/>
+        <path d="M9 31 H44" stroke-width="4.5"/>
+      </g>
+      <path d="M53 31 L44 25 V37 Z" fill="${i}"/>`,
+  },
+];
+
+const THEMES = {
+  light: { coin: '#c38f26', ink: '#0a1328', label: 'Light' },
+  dark: { coin: '#d9a93c', ink: '#0a1328', label: 'Dark' },
+};
+
+const svg = (concept, theme, label) =>
+  `<svg viewBox="0 0 64 64" xmlns="http://www.w3.org/2000/svg"${label ? ` role="img" aria-label="${label}"` : ' aria-hidden="true"'}>${concept.svg(THEMES[theme].coin, THEMES[theme].ink)}</svg>`;
+
+// Rasterise the mark at its real pixel size, then show it enlarged so the pixel grid is visible.
+const raster = (concept, theme, px) => {
+  const canvas = document.createElement('canvas');
+  canvas.width = canvas.height = px;
+  canvas.setAttribute('role', 'img');
+  canvas.setAttribute('aria-label', `${concept.name} rendered at ${px} pixels, enlarged`);
+  const img = new Image();
+  img.onload = () => canvas.getContext('2d').drawImage(img, 0, 0, px, px);
+  img.src = 'data:image/svg+xml;charset=utf-8,' + encodeURIComponent(svg(concept, theme).replace('<svg ', `<svg width="${px}" height="${px}" `));
+  return canvas;
+};
+
+for (const theme of ['light', 'dark']) {
+  document.getElementById(`tabs-${theme}`).innerHTML = CONCEPTS.map((c, n) =>
+    `<div class="tab${n === 0 ? ' on' : ''}">${svg(c, theme)}<span class="ab">${c.name}</span><span>· Daric</span></div>`).join('');
+}
+
+const panel = (c, theme) => {
+  const el = document.createElement('div');
+  el.className = `panel t-${theme}`;
+  el.innerHTML = `
+    <span class="eyebrow">${THEMES[theme].label}</span>
+    <div class="hero-row">
+      <div class="big">${svg(c, theme, `${c.name} mark, ${theme}`)}</div>
+      <div class="sizes" data-sizes></div>
+    </div>
+    <div class="icons">
+      <div class="size"><div class="appicon ${theme === 'light' ? 'lightbg' : 'darkbg'}">${svg(c, theme)}</div>App icon</div>
+      <div class="size"><div class="appicon small ${theme === 'light' ? 'lightbg' : 'darkbg'}">${svg(c, theme)}</div>Small icon</div>
+    </div>
+    <div class="lockups">
+      <div class="lockup" dir="rtl" lang="fa">${svg(c, theme)}<span class="fa">دریک</span></div>
+      <div class="lockup" dir="ltr" lang="en">${svg(c, theme)}<span class="en">Daric</span></div>
+      <div class="lockup-row">
+        <div class="lockup sm" dir="rtl" lang="fa">${svg(c, theme)}<span class="fa">دریک</span></div>
+        <div class="lockup sm" dir="ltr" lang="en">${svg(c, theme)}<span class="en">Daric</span></div>
+      </div>
+    </div>`;
+  const sizes = el.querySelector('[data-sizes]');
+  for (const px of [16, 32]) {
+    const cell = document.createElement('div');
+    cell.className = 'size';
+    cell.append(raster(c, theme, px), `${px}px, ×${64 / px}`);
+    sizes.append(cell);
+  }
+  for (const px of [16, 48]) {
+    const cell = document.createElement('div');
+    cell.className = 'size';
+    cell.innerHTML = `<div style="width:${px}px;height:${px}px">${svg(c, theme)}</div>${px}px`;
+    sizes.append(cell);
+  }
+  return el;
+};
+
+const main = document.getElementById('concepts');
+for (const c of CONCEPTS) {
+  const sec = document.createElement('section');
+  sec.id = c.id;
+  sec.innerHTML = `
+    <div class="sec-head">
+      <h2>${c.name} <span lang="fa">· ${c.fa}</span></h2>
+      <p class="muted">${c.idea}</p>
+    </div>
+    <div class="idea">
+      <div><b>Works because</b><span>${c.good}</span></div>
+      <div><b>Watch out</b><span>${c.risk}</span></div>
+    </div>
+    <div class="board"></div>`;
+  const board = sec.querySelector('.board');
+  board.append(panel(c, 'light'), panel(c, 'dark'));
+  main.append(sec);
+}
+</script>
