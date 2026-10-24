@@ -95,12 +95,13 @@ describe('login', () => {
 });
 
 describe('sign-up', () => {
-  it('lands on the empty home', async () => {
+  it('lands on the empty home once setup is skipped', async () => {
     const server = fakeApi();
     renderApp({ path: '/signup', api: server.api });
 
     await fillIn('new@example.com', testPassword);
     await userEvent.click(screen.getByRole('button', { name: 'ثبت‌نام' }));
+    await userEvent.click(await screen.findByRole('button', { name: 'رد شدن از راه‌اندازی' }));
 
     expect(await emptyHome()).toBeTruthy();
     expect(server.signedInUser()).toBe('new@example.com');

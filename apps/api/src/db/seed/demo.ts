@@ -563,7 +563,8 @@ export async function seedDemo(
   return db.transaction(async (tx) => {
     await removeDemo(tx, email);
 
-    const user = one(await tx.insert(users).values({ email }).returning());
+    // Set up already: the demo opens on its data, not the first-run wizard.
+    const user = one(await tx.insert(users).values({ email, onboardedAt: new Date() }).returning());
     await tx
       .insert(authIdentities)
       .values({ userId: user.id, provider: 'PASSWORD', identifier: email, secretHash });

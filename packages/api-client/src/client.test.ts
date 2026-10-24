@@ -87,11 +87,15 @@ describe('api-client', () => {
     const { client, sent } = fakeServer({
       'GET /v1/me': () => ({
         status: 200,
-        body: { user: { ...user, emailVerified: true }, preferences, workspaces: [] },
+        body: {
+          user: { ...user, emailVerified: true, onboarded: true },
+          preferences,
+          workspaces: [],
+        },
       }),
     });
     expect(await client.me()).toEqual({
-      user: { ...user, emailVerified: true },
+      user: { ...user, emailVerified: true, onboarded: true },
       preferences,
       workspaces: [],
     });
@@ -133,7 +137,11 @@ describe('api-client', () => {
       {
         'GET /v1/me': () => ({
           status: 200,
-          body: { user: { ...user, emailVerified: true }, preferences, workspaces: [] },
+          body: {
+            user: { ...user, emailVerified: true, onboarded: true },
+            preferences,
+            workspaces: [],
+          },
         }),
       },
       { '__Host-daric_csrf': 'csrf-1' },
@@ -143,7 +151,11 @@ describe('api-client', () => {
   });
 
   describe('refreshing a lapsed web session', () => {
-    const me = { user: { ...user, emailVerified: true }, preferences, workspaces: [] };
+    const me = {
+      user: { ...user, emailVerified: true, onboarded: true },
+      preferences,
+      workspaces: [],
+    };
 
     /** `/v1/me` answers 401 until a refresh succeeded. */
     function lapsed(
@@ -354,6 +366,17 @@ describe('api-client', () => {
 
     expect(updated).toEqual({ ...preferences, digits: 'latin' });
     expect(sent[0]?.body).toEqual({ digits: 'latin' });
+    expect(sent[0]?.headers.get('x-csrf-token')).toBe('csrf-1');
+  });
+
+  it('marks onboarding finished for the User', async () => {
+    const { client, sent } = fakeServer(
+      { 'POST /v1/me/onboarding': () => ({ status: 204 }) },
+      { '__Host-daric_csrf': 'csrf-1' },
+    );
+    await client.finishOnboarding();
+
+    expect(sent).toHaveLength(1);
     expect(sent[0]?.headers.get('x-csrf-token')).toBe('csrf-1');
   });
 
@@ -1408,7 +1431,11 @@ describe('api-client', () => {
       fetch: async (input) => {
         sent.push(String(input));
         return new Response(
-          JSON.stringify({ user: { ...user, emailVerified: true }, preferences, workspaces: [] }),
+          JSON.stringify({
+            user: { ...user, emailVerified: true, onboarded: true },
+            preferences,
+            workspaces: [],
+          }),
           { status: 200 },
         );
       },
@@ -1418,7 +1445,11 @@ describe('api-client', () => {
     expect(sent).toEqual(['https://api.daric.test/v1/me']);
   });
   describe('with a token store (the mobile app)', () => {
-    const me = { user: { ...user, emailVerified: true }, preferences, workspaces: [] };
+    const me = {
+      user: { ...user, emailVerified: true, onboarded: true },
+      preferences,
+      workspaces: [],
+    };
     const signedIn = { ...session, accessToken: 'access-1', refreshToken: 'refresh-1' };
 
     function mobile(

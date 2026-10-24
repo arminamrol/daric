@@ -82,6 +82,8 @@ interface FakeUser {
   password: string;
   preferences: UserPreferences;
   emailVerified: boolean;
+  /** Finished or skipped the first-run wizard. */
+  onboarded: boolean;
 }
 
 type MailedLinkPurpose = 'verify' | 'reset';
@@ -114,7 +116,8 @@ export function fakeApi({
   signedInAs,
   role = 'OWNER',
   locale = 'fa',
-}: { signedInAs?: string; role?: WorkspaceRole; locale?: Locale } = {}) {
+  onboarded = true,
+}: { signedInAs?: string; role?: WorkspaceRole; locale?: Locale; onboarded?: boolean } = {}) {
   const users = new Map<string, FakeUser>();
   let current: FakeUser | undefined;
   /** Tokens of links "mailed" to Users, until used or replaced; newest last. */
@@ -220,18 +223,25 @@ export function fakeApi({
     return current;
   }
 
-  /** A User as if registered earlier; they followed the verification link unless told not. */
+  /**
+   * A User as if registered earlier; they followed the verification link and
+   * went through onboarding unless told not.
+   */
   function addUser(
     email: string,
     password = testPassword,
-    { emailVerified = true, locale = 'fa' }: { emailVerified?: boolean; locale?: Locale } = {},
+    {
+      emailVerified = true,
+      locale = 'fa',
+      onboarded = true,
+    }: { emailVerified?: boolean; locale?: Locale; onboarded?: boolean } = {},
   ): FakeUser {
     const id = `01900000-0000-7000-8000-${String(nextId++).padStart(12, '0')}`;
     const preferences: UserPreferences =
       locale === 'fa'
         ? { locale, displayCalendar: 'jalali', digits: 'persian', theme: 'system' }
         : { locale, displayCalendar: 'gregorian', digits: 'latin', theme: 'system' };
-    const user = { id, email, password, preferences, emailVerified };
+    const user = { id, email, password, preferences, emailVerified, onboarded };
     users.set(email, user);
     return user;
   }
@@ -268,7 +278,7 @@ export function fakeApi({
     };
   }
 
-  if (signedInAs) current = addUser(signedInAs, testPassword, { locale });
+  if (signedInAs) current = addUser(signedInAs, testPassword, { locale, onboarded });
 
   function addMember(email: string, memberRole: WorkspaceRole, userId?: string): Member {
     const member: Member = {
@@ -772,7 +782,11 @@ export function fakeApi({
   const endpoints: ApiClient = {
     async register({ email, password, locale }) {
       if (users.has(email)) throw new ApiError(409, { message: 'Email is already registered' });
-      const user = addUser(email, password, { emailVerified: false, ...(locale && { locale }) });
+      const user = addUser(email, password, {
+        emailVerified: false,
+        onboarded: false,
+        ...(locale && { locale }),
+      });
       mailLink(email, 'verify');
       return session(user);
     },
@@ -806,10 +820,18 @@ export function fakeApi({
     async me(): Promise<Me> {
       const user = signedIn();
       return {
-        user: { id: user.id, email: user.email, emailVerified: user.emailVerified },
+        user: {
+          id: user.id,
+          email: user.email,
+          emailVerified: user.emailVerified,
+          onboarded: user.onboarded,
+        },
         preferences: { ...user.preferences },
         workspaces: [workspace, ...joined].map((w) => ({ ...w, suspended: suspended.has(w.id) })),
       };
+    },
+    async finishOnboarding() {
+      signedIn().onboarded = true;
     },
     async updateWorkspace(workspaceId, input) {
       signedIn();
@@ -1693,6 +1715,8 @@ export function fakeApi({
     emailVerified: (email: string) => users.get(email)?.emailVerified,
     workspace: () => workspace,
     preferences: () => signedIn().preferences,
+    /** Whether the User finished or skipped the first-run wizard. */
+    onboarded: (email: string) => users.get(email)?.onboarded,
     /** Pauses the User's access to a Workspace, as when its Owner's Plus ended. */
     suspend: (workspaceId: string) => void suspended.add(workspaceId),
     /** Marks a Member of the Workspace paused, as the Owner sees them. */

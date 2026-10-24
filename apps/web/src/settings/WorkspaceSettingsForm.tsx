@@ -1,6 +1,5 @@
 import { baseCurrencyCodes, calendarSystems, hasRole, moneyDisplays } from '@daric/core';
 import type { CalendarSystem, MoneyDisplay, UpdateWorkspaceInput, Workspace } from '@daric/core';
-import type { PlainMessageKey } from '@daric/i18n';
 import { useId, useState } from 'react';
 import type { FormEvent } from 'react';
 import { useI18n } from '../i18n/locale';
@@ -16,13 +15,8 @@ import {
   NativeSelect,
 } from '../ui/Field';
 import { SegmentedControl } from '../ui/SegmentedControl';
-import { CALENDAR_LABELS, CURRENCY_NAMES } from './labels';
+import { CALENDAR_LABELS, CURRENCY_NAMES, MONEY_DISPLAY_UNITS } from './labels';
 import { useUpdateWorkspace } from './settings';
-
-const MONEY_DISPLAY_LABELS: Record<MoneyDisplay, PlainMessageKey> = {
-  rial: 'settings.workspace.moneyDisplay.rial',
-  toman: 'settings.workspace.moneyDisplay.toman',
-};
 
 type Draft = Required<UpdateWorkspaceInput>;
 
@@ -43,9 +37,22 @@ function changesOf(workspace: Workspace, draft: Draft): UpdateWorkspaceInput {
 }
 
 /** IANA timezones the browser knows, with the Workspace's own first if the list lacks it. */
-function timeZoneChoices(current: string): string[] {
+export function timeZoneChoices(current: string): string[] {
   const all = Intl.supportedValuesOf('timeZone');
   return all.includes(current) ? all : [current, ...all];
+}
+
+/** Every currency that can be a Base Currency, named in the User's language where Daric can. */
+export function BaseCurrencyOptions() {
+  const { t } = useI18n();
+  return baseCurrencyCodes.map((code) => {
+    const name = CURRENCY_NAMES[code];
+    return (
+      <option key={code} value={code}>
+        {name ? t(name) : code}
+      </option>
+    );
+  });
 }
 
 /** Base Currency, Workspace Calendar, timezone and Rial/Toman: Owner and Admin only. */
@@ -110,14 +117,7 @@ export function WorkspaceSettingsForm({ workspace }: { workspace: Workspace }) {
               onChange={(e) => change({ baseCurrency: e.target.value })}
               aria-describedby={ids.currencyHint}
             >
-              {baseCurrencyCodes.map((code) => {
-                const name = CURRENCY_NAMES[code];
-                return (
-                  <option key={code} value={code}>
-                    {name ? t(name) : code}
-                  </option>
-                );
-              })}
+              <BaseCurrencyOptions />
             </NativeSelect>
             <FieldDescription id={ids.currencyHint}>
               {t('settings.workspace.baseCurrencyHint')}
@@ -158,7 +158,7 @@ export function WorkspaceSettingsForm({ workspace }: { workspace: Workspace }) {
             legend={t('settings.workspace.moneyDisplay')}
             choices={moneyDisplays.map((value) => ({
               value,
-              label: t(MONEY_DISPLAY_LABELS[value]),
+              label: t(MONEY_DISPLAY_UNITS[value]),
             }))}
             value={draft.moneyDisplay}
             onChange={(moneyDisplay) => change({ moneyDisplay })}

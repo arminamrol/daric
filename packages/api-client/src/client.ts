@@ -205,6 +205,8 @@ export interface ApiClient {
   /** Owner or Admin only. */
   updateWorkspace(workspaceId: string, input: UpdateWorkspaceInput): Promise<Workspace>;
   updatePreferences(input: UpdateUserPreferencesInput): Promise<UserPreferences>;
+  /** The User finished or skipped the first-run wizard; it is not shown again on any device. */
+  finishOnboarding(): Promise<void>;
   /** The User's Plan, its expiry and their Entitlements, as the server decides them. */
   getSubscription(): Promise<Subscription>;
   /** What 1 to 12 months of Plus cost, priced by the server; 404 when billing is disabled. */
@@ -651,6 +653,7 @@ export function createApiClient(options: ApiClientOptions = {}): ApiClient {
       request('PATCH', `/v1/workspaces/${encodeURIComponent(workspaceId)}`, workspaceSchema, input),
     updatePreferences: (input) =>
       request('PATCH', '/v1/me/preferences', userPreferencesSchema, input),
+    finishOnboarding: () => request('POST', '/v1/me/onboarding', noContent),
     getSubscription: () => request('GET', '/v1/me/subscription', subscriptionSchema),
     listPlusPrices: () => request('GET', '/v1/me/subscription/prices', plusPriceListSchema),
     checkout: (input) => request('POST', '/v1/me/payments', checkoutSchema, input),

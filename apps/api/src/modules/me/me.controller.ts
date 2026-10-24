@@ -1,5 +1,5 @@
-import { Controller, Get, Inject, NotFoundException, Patch } from '@nestjs/common';
-import { ApiBearerAuth, ApiOkResponse, ApiTags } from '@nestjs/swagger';
+import { Controller, Get, HttpCode, Inject, NotFoundException, Patch, Post } from '@nestjs/common';
+import { ApiBearerAuth, ApiNoContentResponse, ApiOkResponse, ApiTags } from '@nestjs/swagger';
 import {
   meSchema,
   updateUserPreferencesInputSchema,
@@ -7,7 +7,7 @@ import {
   type Me,
   type UserPreferences,
 } from '@daric/core';
-import { eq } from 'drizzle-orm';
+import { eq, sql } from 'drizzle-orm';
 import { createZodDto } from 'nestjs-zod';
 import { CurrentUserId } from '../../common/request';
 import { ZodBody } from '../../common/zod';
@@ -44,14 +44,15 @@ export class MeController {
         id: users.id,
         email: users.email,
         verifiedAt: users.emailVerifiedAt,
+        onboardedAt: users.onboardedAt,
         preferences: preferenceColumns,
       })
       .from(users)
       .where(eq(users.id, userId));
     if (!row) throw new NotFoundException();
-    const { preferences, verifiedAt, ...user } = row;
+    const { preferences, verifiedAt, onboardedAt, ...user } = row;
     return {
-      user: { ...user, emailVerified: verifiedAt !== null },
+      user: { ...user, emailVerified: verifiedAt !== null, onboarded: onboardedAt !== null },
       preferences,
       workspaces: await this.workspaces.listForUser(userId),
     };
@@ -71,5 +72,17 @@ export class MeController {
       .returning(preferenceColumns);
     if (!preferences) throw new NotFoundException();
     return preferences;
+  }
+
+  /** The User finished or skipped the first-run wizard; it is not shown again on any device. */
+  @Post('onboarding')
+  @HttpCode(204)
+  @ApiNoContentResponse({ description: 'Onboarding is finished for the User' })
+  async finishOnboarding(@CurrentUserId() userId: string): Promise<void> {
+    // The first time is kept: finishing again changes nothing.
+    await this.db
+      .update(users)
+      .set({ onboardedAt: sql`coalesce(${users.onboardedAt}, now())` })
+      .where(eq(users.id, userId));
   }
 }

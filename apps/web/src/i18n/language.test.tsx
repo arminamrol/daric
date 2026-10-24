@@ -78,7 +78,7 @@ describe('language', () => {
     await userEvent.type(screen.getByLabelText('Email'), 'new@example.com');
     await userEvent.type(screen.getByLabelText('Password'), 'correct horse battery');
     await userEvent.click(screen.getByRole('button', { name: 'Sign up' }));
-    expect(await screen.findByRole('heading', { name: 'Welcome to Daric' })).toBeTruthy();
+    expect(await screen.findByRole('heading', { name: 'Set up Daric' })).toBeTruthy();
     expect((await server.api.me()).preferences.locale).toBe('en');
   });
 

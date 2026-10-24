@@ -25,7 +25,10 @@ export function Shell() {
   const me = useMe();
   const wide = useWideScreen();
   const signedIn = Boolean(me.data);
-  const frame = me.isPending ? 'none' : !signedIn ? 'guest' : wide ? 'sidebar' : 'tabs';
+  // A new User sets Daric up before the app opens around them.
+  const settingUp = me.data?.user.onboarded === false;
+  const frame =
+    me.isPending || settingUp ? 'none' : !signedIn ? 'guest' : wide ? 'sidebar' : 'tabs';
 
   return (
     <div className={cn('flex min-h-dvh', frame === 'sidebar' ? 'flex-row' : 'flex-col')}>

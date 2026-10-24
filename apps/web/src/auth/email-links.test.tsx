@@ -128,6 +128,7 @@ describe('email verification', () => {
   it('reminds an unverified User at home and mails the link again', async () => {
     const server = fakeApi();
     await server.api.register({ email, password: testPassword });
+    await server.api.finishOnboarding();
     const first = server.verificationToken(email);
     renderApp({ api: server.api });
 

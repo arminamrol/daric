@@ -7,6 +7,7 @@ import { useApi } from '../api/api';
 import { useI18n } from '../i18n/locale';
 import { storedFlag } from '../lib/storedFlag';
 import { pendingInvitation } from '../members/pendingInvitation';
+import { Onboarding } from '../onboarding/Onboarding';
 import { hasSignedIn } from './signedOut';
 import { SuspendedWorkspace } from './SuspendedWorkspace';
 
@@ -112,7 +113,10 @@ function Loading() {
   );
 }
 
-/** Layout route for pages that need a signed-in User; everyone else goes to login. */
+/**
+ * Layout route for pages that need a signed-in User; everyone else goes to
+ * login, and a new User sets Daric up first.
+ */
 export function RequireSession() {
   const { t } = useI18n();
   const me = useMe();
@@ -128,6 +132,7 @@ export function RequireSession() {
     );
   }
   if (!me.data) return <Navigate to="/login" replace state={{ from: location.pathname }} />;
+  if (!me.data.user.onboarded) return <Onboarding />;
   if (workspace?.suspended && !OWN_PAGES.some((page) => location.pathname.startsWith(page))) {
     return <SuspendedWorkspace workspace={workspace} />;
   }

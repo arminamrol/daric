@@ -20,6 +20,8 @@ export const users = pgTable(
     theme: themePreference('theme').notNull().default('system'),
     /** When the User followed a link mailed to `email`; null until then. */
     emailVerifiedAt: timestamp('email_verified_at', { withTimezone: true }),
+    /** When the User finished or skipped the first-run wizard; null until then. */
+    onboardedAt: timestamp('onboarded_at', { withTimezone: true }),
     ...timestamps(),
   },
   (t) => [uniqueIndex('users_email_key').on(sql`lower(${t.email})`)],
