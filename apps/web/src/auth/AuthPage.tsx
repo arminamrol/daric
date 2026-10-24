@@ -27,20 +27,9 @@ export function AuthPage({
   footer?: ReactNode;
   children: ReactNode;
 }) {
-  const { t } = useI18n();
-  // Only once it is known nobody is signed in, so a signed-in User never sees it flash.
-  const visitor = useMe().data === null;
   return (
     <div className="mx-auto flex w-full max-w-md flex-col gap-section sm:py-4">
-      {visitor && (
-        <div className="flex flex-col items-center gap-3 text-center">
-          <Logo className="size-16 drop-shadow-sm" />
-          <div className="flex flex-col">
-            <p className="text-2xl font-bold">{t('app.name')}</p>
-            <p className="text-sm text-foreground-muted">{t('app.tagline')}</p>
-          </div>
-        </div>
-      )}
+      <VisitorBrand />
       <Card className="gap-section">
         <header className="flex flex-col gap-1.5">
           <h1 id={titleId} className="text-2xl font-bold">
@@ -55,6 +44,24 @@ export function AuthPage({
           {footer}
         </div>
       )}
+    </div>
+  );
+}
+
+/**
+ * The coin, the name and what Daric is for, shown to a visitor: their frame has no brand of its
+ * own. Only once it is known nobody is signed in, so a signed-in User never sees it flash.
+ */
+export function VisitorBrand() {
+  const { t } = useI18n();
+  if (useMe().data !== null) return null;
+  return (
+    <div className="flex flex-col items-center gap-3 text-center">
+      <Logo className="size-16 drop-shadow-sm" />
+      <div className="flex flex-col">
+        <p className="text-2xl font-bold">{t('app.name')}</p>
+        <p className="text-sm text-foreground-muted">{t('app.tagline')}</p>
+      </div>
     </div>
   );
 }

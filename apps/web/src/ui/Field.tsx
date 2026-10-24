@@ -19,6 +19,20 @@ export function Textarea({ className, ...props }: ComponentProps<'textarea'>) {
   return <textarea className={cn(controlClass, 'min-h-24 py-2', className)} {...props} />;
 }
 
+/** The browser's own checkbox, tap-sized and in the primary colour; label it with `Label`. */
+export function Checkbox({ className, ...props }: Omit<ComponentProps<'input'>, 'type'>) {
+  return (
+    <input
+      type="checkbox"
+      className={cn(
+        'size-5 shrink-0 cursor-pointer accent-primary disabled:cursor-not-allowed disabled:opacity-60',
+        className,
+      )}
+      {...props}
+    />
+  );
+}
+
 /**
  * The browser's own select, styled: phones open their native picker, and long lists (timezones)
  * stay searchable by typing.

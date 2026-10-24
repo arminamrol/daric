@@ -10,7 +10,15 @@ import { useApi } from '../api/api';
 import { useI18n } from '../i18n/locale';
 import { useOfflineDevice } from '../offline/offline';
 import { Button } from '../ui/Button';
-import { Field, FieldDescription, FieldError, FormMessage, Input, Label } from '../ui/Field';
+import {
+  Checkbox,
+  Field,
+  FieldDescription,
+  FieldError,
+  FormMessage,
+  Input,
+  Label,
+} from '../ui/Field';
 import { AuthOutcome, AuthPage, SubmitButton } from './AuthPage';
 import { logoutPending, ME_QUERY_KEY, useAfterSignIn } from './session';
 import { hasSignedIn, signedOutNotice } from './signedOut';
@@ -196,13 +204,12 @@ export function AuthForm({ mode }: { mode: Mode }) {
           )}
         </Field>
         <div className="flex items-start gap-3 rounded-md border border-border px-4 py-3">
-          <input
+          <Checkbox
             id={ids.keepData}
             name="keepData"
-            type="checkbox"
             value="yes"
             aria-describedby={ids.keepDataHint}
-            className="mt-1 size-5 shrink-0 cursor-pointer accent-primary"
+            className="mt-1"
           />
           <div className="flex flex-col gap-0.5">
             <Label htmlFor={ids.keepData} className="cursor-pointer">
