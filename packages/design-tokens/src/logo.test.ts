@@ -56,6 +56,14 @@ describe('logo colors', () => {
 });
 
 describe('logoMark', () => {
+  it('puts the rim edges on whole pixels at 16px and 32px', () => {
+    const edges = [-1, 1].map((side) => logoMark.rim.r + (side * logoMark.rim.strokeWidth) / 2);
+    for (const px of [16, 32]) {
+      const unitsPerPixel = logoMark.size / px;
+      for (const edge of edges) expect(Number.isInteger(edge / unitsPerPixel)).toBe(true);
+    }
+  });
+
   const distance = ([x, y]: readonly [number, number]) => Math.hypot(x - 32, y - 32);
 
   it('breaks the rim with the arrowhead while keeping it on the coin', () => {

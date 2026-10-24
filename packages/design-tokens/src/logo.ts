@@ -36,17 +36,18 @@ const corners: readonly Point[] = [
   [23, 41],
   [27, 37],
 ];
-const arm = 5;
+const arm = 6;
 
 /**
  * "Breaking rim" (DR-02) on a 64-unit grid: a gold coin with its struck rim, and the archer's arrow
- * rising from bottom-start to top-end, its head breaking the rim. The rim's edges fall on whole
- * pixels at 32px. The arrow keeps its direction in right-to-left: it is a mark, not an icon.
+ * rising from bottom-start to top-end, its head breaking the rim. The rim's edges (radius 20 and
+ * 24) fall on whole pixels at 16px and 32px. The arrow keeps its direction in right-to-left: it is
+ * a mark, not an icon.
  */
 export const logoMark = {
   size: 64,
   coin: { cx: 32, cy: 32, r: 30 },
-  rim: { cx: 32, cy: 32, r: 23.5, strokeWidth: 3 },
+  rim: { cx: 32, cy: 32, r: 22, strokeWidth: 4 },
   tip,
   /** The arrowhead, drawn with a slightly rounded outline. */
   head: `M${tip.join(' ')} L47 27 L37 17 Z`,
