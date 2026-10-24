@@ -140,7 +140,7 @@ describe('Account deletion', () => {
     expect(again.status).toBe(401);
     const refresh = await call(t.url, 'POST', '/v1/auth/refresh', { body: { refreshToken } });
     expect(refresh.status).toBe(401);
-    expect((await call(t.url, 'GET', '/v1/me', { token: user.token })).status).not.toBe(200);
+    expect((await call(t.url, 'GET', '/v1/me', { token: user.token })).status).toBe(401);
     // The same email may sign up again, from scratch.
     expect((await registerUser(t.url, email)).workspaceId).not.toBe(seeded.workspaceId);
   });

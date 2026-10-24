@@ -160,3 +160,13 @@ describe('sign-up', () => {
     );
   });
 });
+
+describe('the session', () => {
+  it('says so once when the API fails to say who is signed in, without asking again and again', async () => {
+    const me = vi.fn<ApiClient['me']>(() => Promise.reject(new ApiError(500, {})));
+    renderApp({ api: { ...fakeApi({ signedInAs: 'sara@example.com' }).api, me } });
+    expect((await screen.findByRole('alert')).textContent).toContain('نتوانستیم به دریک وصل شویم');
+    await new Promise((resolve) => setTimeout(resolve, 100));
+    expect(me).toHaveBeenCalledTimes(1);
+  });
+});

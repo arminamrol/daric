@@ -1,4 +1,13 @@
-import { Controller, Get, HttpCode, Inject, NotFoundException, Patch, Post } from '@nestjs/common';
+import {
+  Controller,
+  Get,
+  HttpCode,
+  Inject,
+  NotFoundException,
+  Patch,
+  Post,
+  UnauthorizedException,
+} from '@nestjs/common';
 import { ApiBearerAuth, ApiNoContentResponse, ApiOkResponse, ApiTags } from '@nestjs/swagger';
 import {
   meSchema,
@@ -49,7 +58,8 @@ export class MeController {
       })
       .from(users)
       .where(eq(users.id, userId));
-    if (!row) throw new NotFoundException();
+    // The access token outlived its User (the account was deleted): signed out, not a missing page.
+    if (!row) throw new UnauthorizedException();
     const { preferences, verifiedAt, onboardedAt, ...user } = row;
     return {
       user: { ...user, emailVerified: verifiedAt !== null, onboarded: onboardedAt !== null },

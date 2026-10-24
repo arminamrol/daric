@@ -46,6 +46,9 @@ export function useMe() {
       }
     },
     retry: false,
+    // Many components read the session and mount as it changes (the guest header's theme
+    // toggle, for one); each asking again after a failure would refetch in a loop.
+    retryOnMount: false,
   });
 }
 
