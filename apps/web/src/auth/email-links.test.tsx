@@ -1,3 +1,4 @@
+import type { ApiClient } from '@daric/api-client';
 import { screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { describe, expect, it } from 'vitest';
@@ -94,6 +95,34 @@ describe('email verification', () => {
   it('says so when the link is invalid', async () => {
     renderApp({ path: '/verify-email?token=stale', api: fakeApi().api });
     expect((await screen.findByRole('alert')).textContent).toBe(linkInvalid);
+  });
+
+  it('offers to try again when the server could not be reached', async () => {
+    const server = fakeApi();
+    await server.api.register({ email, password: testPassword });
+    await server.api.logout();
+    let attempts = 0;
+    const api: ApiClient = {
+      ...server.api,
+      verifyEmail: (token) =>
+        ++attempts === 1
+          ? Promise.reject(new TypeError('Failed to fetch'))
+          : server.api.verifyEmail(token),
+    };
+    renderApp({ path: `/verify-email?token=${server.verificationToken(email)}`, api });
+
+    expect((await screen.findByRole('alert')).textContent).toContain(
+      'مشکلی پیش آمد. دوباره امتحان کنید.',
+    );
+    await userEvent.click(screen.getByRole('button', { name: 'تلاش دوباره' }));
+    expect(await screen.findByText('ایمیل شما تأیید شد.')).toBeTruthy();
+    expect(server.emailVerified(email)).toBe(true);
+  });
+
+  it('does not offer to try an invalid link again', async () => {
+    renderApp({ path: '/verify-email?token=stale', api: fakeApi().api });
+    await screen.findByRole('alert');
+    expect(screen.queryByRole('button', { name: 'تلاش دوباره' })).toBeNull();
   });
 
   it('reminds an unverified User at home and mails the link again', async () => {

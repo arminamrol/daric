@@ -45,7 +45,7 @@ export function Shell() {
           'w-full min-w-0 flex-1 outline-none',
           frame === 'sidebar' ? 'px-gutter-wide py-12' : 'px-gutter',
           // Room at the bottom, so the tab bar never covers the end of a page.
-          frame === 'tabs' ? 'pt-6 pb-28' : 'py-12',
+          frame === 'tabs' ? 'pt-6 pb-28' : frame === 'guest' ? 'py-6 sm:py-12' : 'py-12',
         )}
       >
         <div className="mx-auto flex w-full max-w-5xl flex-col">
@@ -60,17 +60,12 @@ export function Shell() {
   );
 }
 
+/** A visitor's language and theme; the page under it carries the coin and the name. */
 function GuestHeader() {
-  const { t } = useI18n();
   return (
-    <header className="border-b border-border bg-surface">
-      <div className="mx-auto flex w-full max-w-5xl flex-wrap items-center gap-x-3 gap-y-2 px-gutter py-3">
-        <Logo className="size-10 shrink-0" />
-        <div className="me-auto">
-          <p className="text-lg leading-tight font-bold">{t('app.name')}</p>
-          <p className="text-xs text-foreground-muted">{t('app.tagline')}</p>
-        </div>
-        {/* A signed-in User chooses it in Settings. */}
+    <header>
+      <div className="mx-auto flex w-full max-w-5xl flex-wrap items-center justify-end gap-2 px-gutter pt-3">
+        {/* A signed-in User chooses them in Settings. */}
         <LanguageToggle />
         <ThemeToggle />
       </div>

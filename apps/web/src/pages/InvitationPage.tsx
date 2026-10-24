@@ -5,13 +5,18 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useState } from 'react';
 import { Link } from 'react-router';
 import { useApi } from '../api/api';
-import { alertClass, cardClass, linkClass } from '../auth/AuthForm';
+import { CalendarClock, Mail, ShieldCheck } from 'lucide-react';
+import { AuthOutcome, AuthPage } from '../auth/AuthPage';
 import { currentWorkspace, ME_QUERY_KEY, useMe } from '../auth/session';
 import { useLinkToken } from '../auth/linkToken';
 import { VerifyEmailNotice } from '../auth/VerifyEmailNotice';
 import { useI18n } from '../i18n/locale';
 import { pendingInvitation } from '../members/pendingInvitation';
 import { useFormatters } from '../settings/settings';
+import { Button } from '../ui/Button';
+import { ErrorState } from '../ui/ErrorState';
+import { FormMessage } from '../ui/Field';
+import { Loading, Skeleton } from '../ui/Skeleton';
 
 /** Why accepting failed, as a message the person can act on. */
 function failure(error: unknown): PlainMessageKey {
@@ -46,10 +51,12 @@ function Offer({ token, preview }: { token: string; preview: InvitationPreview }
   if (joined !== null) {
     return (
       <>
-        <p role="status">{t('invitation.joined', { workspace: isolate(joined) })}</p>
-        <Link to="/" className={linkClass}>
-          {t('invitation.open')}
-        </Link>
+        <AuthOutcome tone="done">
+          <p>{t('invitation.joined', { workspace: isolate(joined) })}</p>
+        </AuthOutcome>
+        <Button asChild className="w-full">
+          <Link to="/">{t('invitation.open')}</Link>
+        </Button>
       </>
     );
   }
@@ -57,34 +64,34 @@ function Offer({ token, preview }: { token: string; preview: InvitationPreview }
   const notVerified = accept.isError && failure(accept.error) === 'invitation.notVerified';
   return (
     <>
-      <p>
+      <p className="text-lg">
         {preview.invitedByEmail
           ? t('invitation.offer', { inviter: isolate(preview.invitedByEmail), workspace, role })
           : t('invitation.offerAnonymous', { workspace, role })}
       </p>
-      {preview.email && (
-        <p className="text-sm">{t('invitation.forEmail', { email: isolate(preview.email) })}</p>
-      )}
-      <p className="text-sm text-foreground-muted">
-        {t('invitation.until', {
-          date: isolate(format.date(new Date(preview.expiresAt), { style: 'long' })),
-        })}
+      <ul className="flex flex-col gap-2 text-sm text-foreground-muted">
+        {preview.email && (
+          <li className="flex items-start gap-2">
+            <Mail aria-hidden className="mt-0.5 size-4 shrink-0" />
+            {t('invitation.forEmail', { email: isolate(preview.email) })}
+          </li>
+        )}
+        <li className="flex items-start gap-2">
+          <CalendarClock aria-hidden className="mt-0.5 size-4 shrink-0" />
+          {t('invitation.until', {
+            date: isolate(format.date(new Date(preview.expiresAt), { style: 'long' })),
+          })}
+        </li>
+      </ul>
+      <p className="flex items-start gap-3 rounded-md bg-surface-muted px-4 py-3 text-sm">
+        <ShieldCheck aria-hidden className="mt-0.5 size-5 shrink-0 text-info" />
+        {t('invitation.consent')}
       </p>
-      <p className="rounded-md bg-surface-muted px-3 py-2 text-sm">{t('invitation.consent')}</p>
-      <button
-        type="button"
-        disabled={accept.isPending}
-        onClick={() => accept.mutate()}
-        className="rounded-md bg-primary px-4 py-2 font-medium text-on-primary disabled:opacity-60"
-      >
-        {t('invitation.accept')}
-      </button>
-      {accept.isError && (
-        <p role="alert" className={alertClass}>
-          {t(failure(accept.error))}
-        </p>
-      )}
+      {accept.isError && <FormMessage tone="alert">{t(failure(accept.error))}</FormMessage>}
       {notVerified && <VerifyEmailNotice />}
+      <Button disabled={accept.isPending} onClick={() => accept.mutate()} className="w-full">
+        {t('invitation.accept')}
+      </Button>
     </>
   );
 }
@@ -101,12 +108,23 @@ function SignedInInvitation({ token }: { token: string }) {
     retry: false,
   });
 
-  if (preview.isPending) return <p role="status">{t('session.loading')}</p>;
-  if (preview.isError) {
+  if (preview.isPending) {
     return (
-      <p role="alert" className={alertClass}>
-        {t(failure(preview.error))}
-      </p>
+      <Loading>
+        <Skeleton className="h-6 w-full" />
+        <Skeleton className="h-6 w-2/3" />
+        <Skeleton className="h-4 w-1/2" />
+        <Skeleton className="h-16 w-full" />
+      </Loading>
+    );
+  }
+  if (preview.isError) {
+    const reason = failure(preview.error);
+    // Only a request that went wrong on the way is worth sending again; a refused link stays so.
+    return reason === 'invitation.failed' ? (
+      <ErrorState title={t(reason)} onRetry={() => void preview.refetch()} />
+    ) : (
+      <FormMessage tone="alert">{t(reason)}</FormMessage>
     );
   }
   return <Offer token={token} preview={preview.data} />;
@@ -126,25 +144,27 @@ export function InvitationPage() {
   });
 
   return (
-    <section className={cardClass}>
-      <h1 className="text-2xl font-bold">{t('invitation.title')}</h1>
+    <AuthPage title={t('invitation.title')}>
       {me.isPending ? (
-        <p role="status">{t('session.loading')}</p>
+        <Loading>
+          <Skeleton className="h-6 w-full" />
+          <Skeleton className="h-6 w-2/3" />
+        </Loading>
       ) : me.data ? (
         <SignedInInvitation token={token} />
       ) : (
         <>
           <p>{t('invitation.signIn')}</p>
-          <div className="flex flex-wrap gap-4">
-            <Link to="/login" className={linkClass}>
-              {t('auth.login.title')}
-            </Link>
-            <Link to="/signup" className={linkClass}>
-              {t('auth.signup.title')}
-            </Link>
+          <div className="flex flex-col gap-3 sm:flex-row">
+            <Button asChild className="flex-1">
+              <Link to="/login">{t('auth.login.title')}</Link>
+            </Button>
+            <Button asChild variant="outline" className="flex-1">
+              <Link to="/signup">{t('auth.signup.title')}</Link>
+            </Button>
           </div>
         </>
       )}
-    </section>
+    </AuthPage>
   );
 }

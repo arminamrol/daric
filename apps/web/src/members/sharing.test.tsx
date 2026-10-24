@@ -1,3 +1,4 @@
+import type { ApiClient } from '@daric/api-client';
 import { isolate } from '@daric/i18n';
 import { screen, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
@@ -54,6 +55,23 @@ describe('Accepting an Invitation', () => {
   it('says when the link no longer works', async () => {
     renderApp({ path: '/invitation?token=used-up' });
     expect(await screen.findByText(/این دعوت نامعتبر است/)).toBeTruthy();
+  });
+
+  it('offers to try again when the Invitation could not be loaded', async () => {
+    const server = fakeApi({ signedInAs: 'sara@example.com' });
+    const token = server.inviteElsewhere({ workspaceName: 'Home', role: 'MEMBER' });
+    let attempts = 0;
+    const api: ApiClient = {
+      ...server.api,
+      previewInvitation: (t) =>
+        ++attempts === 1
+          ? Promise.reject(new TypeError('Failed to fetch'))
+          : server.api.previewInvitation(t),
+    };
+    renderApp({ path: `/invitation?token=${token}`, api });
+
+    await userEvent.click(await screen.findByRole('button', { name: 'تلاش دوباره' }));
+    expect(await screen.findByRole('button', { name: 'پذیرفتن و پیوستن' })).toBeTruthy();
   });
 
   it('brings a signed-out visitor back to it after logging in', async () => {

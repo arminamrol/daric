@@ -6,8 +6,10 @@ import { useId, useRef, useState } from 'react';
 import type { FormEvent } from 'react';
 import { Link } from 'react-router';
 import { useApi } from '../api/api';
-import { alertClass, cardClass, inputClass, linkClass, submitClass } from '../auth/AuthForm';
+import { AuthOutcome, AuthPage, SubmitButton } from '../auth/AuthPage';
 import { useI18n } from '../i18n/locale';
+import { Button } from '../ui/Button';
+import { Field, FieldError, FormMessage, Input, Label } from '../ui/Field';
 
 /**
  * Asks for a password-reset link. The answer reads the same whether or not the
@@ -37,25 +39,30 @@ export function ForgotPasswordPage() {
   }
 
   return (
-    <section className={cardClass}>
-      <h1 id={ids.title} className="text-2xl font-bold">
-        {t('auth.forgot.title')}
-      </h1>
+    <AuthPage
+      title={t('auth.forgot.title')}
+      titleId={ids.title}
+      description={send.isSuccess ? undefined : t('auth.forgot.intro')}
+      footer={
+        <Button asChild variant="link">
+          <Link to="/login">{t('auth.forgot.toLogin')}</Link>
+        </Button>
+      }
+    >
       {send.isSuccess ? (
-        <p role="status">{t('auth.forgot.sent')}</p>
+        <AuthOutcome tone="done">
+          <p>{t('auth.forgot.sent')}</p>
+        </AuthOutcome>
       ) : (
         <form
           aria-labelledby={ids.title}
           noValidate
           onSubmit={onSubmit}
-          className="flex flex-col gap-4"
+          className="flex flex-col gap-section"
         >
-          <p className="text-foreground-muted">{t('auth.forgot.intro')}</p>
-          <div className="flex flex-col gap-1">
-            <label htmlFor={ids.email} className="font-medium">
-              {t('auth.email')}
-            </label>
-            <input
+          <Field>
+            <Label htmlFor={ids.email}>{t('auth.email')}</Label>
+            <Input
               ref={emailRef}
               id={ids.email}
               name="email"
@@ -65,31 +72,21 @@ export function ForgotPasswordPage() {
               inputMode="email"
               aria-invalid={error ? true : undefined}
               aria-describedby={error ? ids.error : undefined}
-              className={inputClass}
             />
-            {error && (
-              <p id={ids.error} className="text-sm text-danger">
-                {t(error)}
-              </p>
-            )}
-          </div>
+            {error && <FieldError id={ids.error}>{t(error)}</FieldError>}
+          </Field>
           {send.isError && (
-            <p role="alert" className={alertClass}>
+            <FormMessage tone="alert">
               {t(
                 send.error instanceof ApiError && send.error.status === 429
                   ? 'auth.error.tooManyAttempts'
                   : 'auth.error.unexpected',
               )}
-            </p>
+            </FormMessage>
           )}
-          <button type="submit" disabled={send.isPending} className={submitClass}>
-            {t('auth.forgot.submit')}
-          </button>
+          <SubmitButton pending={send.isPending}>{t('auth.forgot.submit')}</SubmitButton>
         </form>
       )}
-      <Link to="/login" className={`text-sm ${linkClass}`}>
-        {t('auth.forgot.toLogin')}
-      </Link>
-    </section>
+    </AuthPage>
   );
 }

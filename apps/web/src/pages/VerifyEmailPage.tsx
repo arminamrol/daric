@@ -2,15 +2,19 @@ import { ApiError } from '@daric/api-client';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { Link } from 'react-router';
 import { useApi } from '../api/api';
-import { alertClass, cardClass, linkClass } from '../auth/AuthForm';
+import { AuthOutcome, AuthPage } from '../auth/AuthPage';
 import { ME_QUERY_KEY } from '../auth/session';
 import { useLinkToken } from '../auth/linkToken';
 import { useI18n } from '../i18n/locale';
+import { Button } from '../ui/Button';
+import { ErrorState } from '../ui/ErrorState';
+import { FormMessage } from '../ui/Field';
 
 /**
  * Opened from the mailed verification link (`?token=`), signed in or not. A
  * query rather than a mutation: the token works once, and a query is sent once
- * per token however often the page renders or mounts.
+ * per token however often the page renders or mounts. A link the server refused is not tried
+ * again; a request that never reached it can be.
  */
 export function VerifyEmailPage() {
   const { t } = useI18n();
@@ -33,18 +37,26 @@ export function VerifyEmailPage() {
   const linkInvalid = verify.error instanceof ApiError && verify.error.status === 400;
 
   return (
-    <section className={cardClass}>
-      <h1 className="text-2xl font-bold">{t('auth.verify.title')}</h1>
-      {verify.isPending && <p role="status">{t('auth.verify.pending')}</p>}
-      {verify.isSuccess && <p role="status">{t('auth.verify.done')}</p>}
-      {verify.isError && (
-        <p role="alert" className={alertClass}>
-          {t(linkInvalid ? 'auth.error.linkInvalid' : 'auth.error.unexpected')}
-        </p>
+    <AuthPage title={t('auth.verify.title')}>
+      {verify.isPending && (
+        <AuthOutcome tone="pending">
+          <p>{t('auth.verify.pending')}</p>
+        </AuthOutcome>
       )}
-      <Link to="/" className={linkClass}>
-        {t('auth.verify.toHome')}
-      </Link>
-    </section>
+      {verify.isSuccess && (
+        <AuthOutcome tone="done">
+          <p>{t('auth.verify.done')}</p>
+        </AuthOutcome>
+      )}
+      {verify.isError &&
+        (linkInvalid ? (
+          <FormMessage tone="alert">{t('auth.error.linkInvalid')}</FormMessage>
+        ) : (
+          <ErrorState title={t('auth.error.unexpected')} onRetry={() => void verify.refetch()} />
+        ))}
+      <Button asChild variant={verify.isSuccess ? 'primary' : 'outline'} className="w-full">
+        <Link to="/">{t('auth.verify.toHome')}</Link>
+      </Button>
+    </AuthPage>
   );
 }

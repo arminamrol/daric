@@ -3,11 +3,11 @@ import type { AccountDeletionPreview, AccountDeletionRefusal } from '@daric/core
 import { isolate } from '@daric/i18n';
 import { type FormEvent, useId } from 'react';
 import { useNavigate } from 'react-router';
-import { inputClass } from '../auth/AuthForm';
 import { currentWorkspace } from '../auth/session';
 import { useI18n } from '../i18n/locale';
 import { useAccountDeletion, useDeleteAccount } from '../settings/accountDeletion';
 import { useFormatters } from '../settings/settings';
+import { Input } from '../ui/Field';
 
 const cardClass = 'flex flex-col gap-4 rounded-xl border border-border bg-surface px-6 py-6';
 const alertClass = 'rounded-md bg-surface-muted px-3 py-2 text-sm text-danger';
@@ -77,14 +77,13 @@ function DeleteForm() {
         <label htmlFor={passwordId} className="font-medium">
           {t('deleteAccount.password')}
         </label>
-        <input
+        <Input
           id={passwordId}
           name="password"
           type="password"
           dir="ltr"
           required
           autoComplete="current-password"
-          className={inputClass}
         />
       </div>
       {remove.isError && (

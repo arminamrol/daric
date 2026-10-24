@@ -6,9 +6,11 @@ import { useId, useRef, useState } from 'react';
 import type { FormEvent } from 'react';
 import { Link } from 'react-router';
 import { useApi } from '../api/api';
-import { alertClass, cardClass, inputClass, linkClass, submitClass } from '../auth/AuthForm';
+import { AuthOutcome, AuthPage, SubmitButton } from '../auth/AuthPage';
 import { useLinkToken } from '../auth/linkToken';
 import { useI18n } from '../i18n/locale';
+import { Button } from '../ui/Button';
+import { Field, FieldDescription, FieldError, FormMessage, Input, Label } from '../ui/Field';
 
 function passwordError(password: string): PlainMessageKey | undefined {
   if (!password) return 'auth.error.passwordRequired';
@@ -47,29 +49,26 @@ export function ResetPasswordPage() {
   const linkInvalid = reset.error instanceof ApiError && reset.error.status === 400;
 
   return (
-    <section className={cardClass}>
-      <h1 id={ids.title} className="text-2xl font-bold">
-        {t('auth.reset.title')}
-      </h1>
+    <AuthPage title={t('auth.reset.title')} titleId={ids.title}>
       {reset.isSuccess ? (
         <>
-          <p role="status">{t('auth.reset.done')}</p>
-          <Link to="/login" className={linkClass}>
-            {t('auth.reset.toLogin')}
-          </Link>
+          <AuthOutcome tone="done">
+            <p>{t('auth.reset.done')}</p>
+          </AuthOutcome>
+          <Button asChild className="w-full">
+            <Link to="/login">{t('auth.reset.toLogin')}</Link>
+          </Button>
         </>
       ) : (
         <form
           aria-labelledby={ids.title}
           noValidate
           onSubmit={onSubmit}
-          className="flex flex-col gap-4"
+          className="flex flex-col gap-section"
         >
-          <div className="flex flex-col gap-1">
-            <label htmlFor={ids.password} className="font-medium">
-              {t('auth.reset.password')}
-            </label>
-            <input
+          <Field>
+            <Label htmlFor={ids.password}>{t('auth.reset.password')}</Label>
+            <Input
               ref={passwordRef}
               id={ids.password}
               name="password"
@@ -78,20 +77,13 @@ export function ResetPasswordPage() {
               autoComplete="new-password"
               aria-invalid={error ? true : undefined}
               aria-describedby={[ids.hint, error && ids.error].filter(Boolean).join(' ')}
-              className={inputClass}
             />
-            <p id={ids.hint} className="text-sm text-foreground-muted">
-              {t('auth.passwordHint')}
-            </p>
-            {error && (
-              <p id={ids.error} className="text-sm text-danger">
-                {t(error)}
-              </p>
-            )}
-          </div>
+            <FieldDescription id={ids.hint}>{t('auth.passwordHint')}</FieldDescription>
+            {error && <FieldError id={ids.error}>{t(error)}</FieldError>}
+          </Field>
           {reset.isError && (
             <div className="flex flex-col gap-2">
-              <p role="alert" className={alertClass}>
+              <FormMessage tone="alert">
                 {t(
                   linkInvalid
                     ? 'auth.error.linkInvalid'
@@ -99,19 +91,17 @@ export function ResetPasswordPage() {
                       ? 'auth.error.tooManyAttempts'
                       : 'auth.error.unexpected',
                 )}
-              </p>
+              </FormMessage>
               {linkInvalid && (
-                <Link to="/forgot-password" className={`text-sm ${linkClass}`}>
-                  {t('auth.reset.requestAgain')}
-                </Link>
+                <Button asChild variant="link" className="self-start text-sm">
+                  <Link to="/forgot-password">{t('auth.reset.requestAgain')}</Link>
+                </Button>
               )}
             </div>
           )}
-          <button type="submit" disabled={reset.isPending} className={submitClass}>
-            {t('auth.reset.submit')}
-          </button>
+          <SubmitButton pending={reset.isPending}>{t('auth.reset.submit')}</SubmitButton>
         </form>
       )}
-    </section>
+    </AuthPage>
   );
 }

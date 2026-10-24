@@ -9,6 +9,9 @@ import { Link, useNavigate } from 'react-router';
 import { useApi } from '../api/api';
 import { useI18n } from '../i18n/locale';
 import { useOfflineDevice } from '../offline/offline';
+import { Button } from '../ui/Button';
+import { Field, FieldDescription, FieldError, FormMessage, Input, Label } from '../ui/Field';
+import { AuthOutcome, AuthPage, SubmitButton } from './AuthPage';
 import { logoutPending, ME_QUERY_KEY, useAfterSignIn } from './session';
 import { hasSignedIn, signedOutNotice } from './signedOut';
 
@@ -60,15 +63,6 @@ function failureMessage(mode: Mode, error: unknown): PlainMessageKey {
   }
   return 'auth.error.unexpected';
 }
-
-export const inputClass =
-  'w-full rounded-md border border-border bg-background px-3 py-2 text-foreground aria-invalid:border-danger';
-export const cardClass =
-  'mx-auto flex max-w-sm flex-col gap-6 rounded-xl border border-border bg-surface px-6 py-8';
-export const submitClass =
-  'rounded-md bg-primary px-4 py-2 font-medium text-on-primary disabled:opacity-60';
-export const linkClass = 'font-medium text-accent underline underline-offset-4';
-export const alertClass = 'rounded-md bg-surface-muted px-3 py-2 text-sm text-danger';
 
 /**
  * The login and sign-up form; the server sets the session cookies, so success
@@ -136,34 +130,37 @@ export function AuthForm({ mode }: { mode: Mode }) {
       .join(' ') || undefined;
 
   return (
-    <section className={cardClass}>
-      <h1 id={ids.title} className="text-2xl font-bold">
-        {t(copy.title)}
-      </h1>
+    <AuthPage
+      title={t(copy.title)}
+      titleId={ids.title}
+      footer={
+        <p>
+          {t(copy.switchPrompt)}{' '}
+          <Button asChild variant="link">
+            <Link to={copy.switchTo}>{t(copy.switchLink)}</Link>
+          </Button>
+        </p>
+      }
+    >
       {signedOut && (
-        <div
-          role="status"
-          className="flex flex-col gap-2 rounded-md bg-surface-muted px-3 py-2 text-sm"
-        >
+        <AuthOutcome tone="info">
           <p>{t(`auth.signedOut.${signedOut}`)}</p>
           {(signedOut === 'DEVICE_LIMIT' || signedOut === 'PLUS_ENDED') && (
-            <Link to="/settings/subscription" className={linkClass}>
-              {t('auth.signedOut.upgrade')}
-            </Link>
+            <Button asChild variant="link" className="self-start">
+              <Link to="/settings/subscription">{t('auth.signedOut.upgrade')}</Link>
+            </Button>
           )}
-        </div>
+        </AuthOutcome>
       )}
       <form
         aria-labelledby={ids.title}
         noValidate
         onSubmit={onSubmit}
-        className="flex flex-col gap-4"
+        className="flex flex-col gap-section"
       >
-        <div className="flex flex-col gap-1">
-          <label htmlFor={ids.email} className="font-medium">
-            {t('auth.email')}
-          </label>
-          <input
+        <Field>
+          <Label htmlFor={ids.email}>{t('auth.email')}</Label>
+          <Input
             ref={emailRef}
             id={ids.email}
             name="email"
@@ -173,19 +170,12 @@ export function AuthForm({ mode }: { mode: Mode }) {
             inputMode="email"
             aria-invalid={errors.email ? true : undefined}
             aria-describedby={errors.email ? ids.emailError : undefined}
-            className={inputClass}
           />
-          {errors.email && (
-            <p id={ids.emailError} className="text-sm text-danger">
-              {t(errors.email)}
-            </p>
-          )}
-        </div>
-        <div className="flex flex-col gap-1">
-          <label htmlFor={ids.password} className="font-medium">
-            {t('auth.password')}
-          </label>
-          <input
+          {errors.email && <FieldError id={ids.emailError}>{t(errors.email)}</FieldError>}
+        </Field>
+        <Field>
+          <Label htmlFor={ids.password}>{t('auth.password')}</Label>
+          <Input
             ref={passwordRef}
             id={ids.password}
             name="password"
@@ -194,55 +184,38 @@ export function AuthForm({ mode }: { mode: Mode }) {
             autoComplete={mode === 'signup' ? 'new-password' : 'current-password'}
             aria-invalid={errors.password ? true : undefined}
             aria-describedby={passwordDescribedBy}
-            className={inputClass}
           />
           {showHint && (
-            <p id={ids.passwordHint} className="text-sm text-foreground-muted">
-              {t('auth.passwordHint')}
-            </p>
+            <FieldDescription id={ids.passwordHint}>{t('auth.passwordHint')}</FieldDescription>
           )}
-          {errors.password && (
-            <p id={ids.passwordError} className="text-sm text-danger">
-              {t(errors.password)}
-            </p>
+          {errors.password && <FieldError id={ids.passwordError}>{t(errors.password)}</FieldError>}
+          {mode === 'login' && (
+            <Button asChild variant="link" className="self-end text-sm">
+              <Link to="/forgot-password">{t('auth.login.forgot')}</Link>
+            </Button>
           )}
-        </div>
-        <div className="flex flex-col gap-1">
-          <label htmlFor={ids.keepData} className="flex items-center gap-2 font-medium">
-            <input
-              id={ids.keepData}
-              name="keepData"
-              type="checkbox"
-              value="yes"
-              aria-describedby={ids.keepDataHint}
-              className="size-4"
-            />
-            {t('auth.keepData')}
-          </label>
-          <p id={ids.keepDataHint} className="text-sm text-foreground-muted">
-            {t('auth.keepDataHint')}
-          </p>
+        </Field>
+        <div className="flex items-start gap-3 rounded-md border border-border px-4 py-3">
+          <input
+            id={ids.keepData}
+            name="keepData"
+            type="checkbox"
+            value="yes"
+            aria-describedby={ids.keepDataHint}
+            className="mt-1 size-5 shrink-0 cursor-pointer accent-primary"
+          />
+          <div className="flex flex-col gap-0.5">
+            <Label htmlFor={ids.keepData} className="cursor-pointer">
+              {t('auth.keepData')}
+            </Label>
+            <FieldDescription id={ids.keepDataHint}>{t('auth.keepDataHint')}</FieldDescription>
+          </div>
         </div>
         {submit.isError && (
-          <p role="alert" className={alertClass}>
-            {t(failureMessage(mode, submit.error))}
-          </p>
+          <FormMessage tone="alert">{t(failureMessage(mode, submit.error))}</FormMessage>
         )}
-        <button type="submit" disabled={submit.isPending} className={submitClass}>
-          {t(copy.submit)}
-        </button>
+        <SubmitButton pending={submit.isPending}>{t(copy.submit)}</SubmitButton>
       </form>
-      {mode === 'login' && (
-        <Link to="/forgot-password" className={`text-sm ${linkClass}`}>
-          {t('auth.login.forgot')}
-        </Link>
-      )}
-      <p className="text-sm text-foreground-muted">
-        {t(copy.switchPrompt)}{' '}
-        <Link to={copy.switchTo} className={linkClass}>
-          {t(copy.switchLink)}
-        </Link>
-      </p>
-    </section>
+    </AuthPage>
   );
 }
