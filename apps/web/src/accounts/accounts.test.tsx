@@ -57,7 +57,7 @@ describe('Accounts', () => {
     const form = await openNewAccountForm();
     await userEvent.type(form.getByRole('textbox', { name: 'نام' }), 'وام خودرو');
     await userEvent.selectOptions(form.getByRole('combobox', { name: 'نوع' }), 'LOAN');
-    expect(form.getByRole('radio', { name: 'بدهی' })).toHaveProperty('checked', true);
+    expect(form.getByRole('radio', { name: 'بدهی', checked: true })).toBeTruthy();
     await userEvent.selectOptions(form.getByRole('combobox', { name: 'ارز' }), 'USD');
     await userEvent.type(form.getByRole('textbox', { name: 'موجودی اولیه' }), '1500.25');
     await userEvent.click(form.getByRole('button', { name: 'ساخت حساب' }));

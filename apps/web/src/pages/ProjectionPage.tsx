@@ -17,7 +17,7 @@ import {
 import { RateNotes } from '../rates/RateNotes';
 import { useFormatters } from '../settings/settings';
 import { categoryChoices } from '../transactions/choices';
-import { ChoiceGroup } from '../ui/ChoiceGroup';
+import { SegmentedControl } from '../ui/SegmentedControl';
 
 type Figures = ProjectionReport['income'];
 
@@ -394,7 +394,7 @@ function ModeSwitch({
 
   return (
     <div className="flex flex-col gap-1">
-      <ChoiceGroup
+      <SegmentedControl
         legend={t('projection.mode')}
         choices={projectionModes.map((value) => ({ value, label: t(`projection.mode.${value}`) }))}
         value={mode}

@@ -19,7 +19,7 @@ import { useSignedIn } from '../auth/session';
 import { useI18n } from '../i18n/locale';
 import { CALENDAR_LABELS, CURRENCY_NAMES } from '../settings/labels';
 import { useFormatters } from '../settings/settings';
-import { ChoiceGroup } from '../ui/ChoiceGroup';
+import { SegmentedControl } from '../ui/SegmentedControl';
 import { categoryChoices } from './choices';
 import {
   EditConflict,
@@ -368,7 +368,7 @@ export function TransactionForm({
         onSubmit={onSubmit}
         className="flex flex-col gap-4"
       >
-        <ChoiceGroup<AnyTransactionType>
+        <SegmentedControl<AnyTransactionType>
           legend={t('transactions.form.type')}
           hideLegend
           choices={TYPE_ORDER.filter((value) => value !== 'TRANSFER' || offered.length > 1).map(

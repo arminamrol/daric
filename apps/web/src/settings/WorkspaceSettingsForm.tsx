@@ -4,7 +4,18 @@ import type { PlainMessageKey } from '@daric/i18n';
 import { useId, useState } from 'react';
 import type { FormEvent } from 'react';
 import { useI18n } from '../i18n/locale';
-import { ChoiceGroup } from '../ui/ChoiceGroup';
+import { Button } from '../ui/Button';
+import { Card, CardDescription, CardTitle } from '../ui/Card';
+import {
+  Field,
+  FieldDescription,
+  FieldSet,
+  FormMessage,
+  Input,
+  Label,
+  NativeSelect,
+} from '../ui/Field';
+import { SegmentedControl } from '../ui/SegmentedControl';
 import { CALENDAR_LABELS, CURRENCY_NAMES } from './labels';
 import { useUpdateWorkspace } from './settings';
 
@@ -12,9 +23,6 @@ const MONEY_DISPLAY_LABELS: Record<MoneyDisplay, PlainMessageKey> = {
   rial: 'settings.workspace.moneyDisplay.rial',
   toman: 'settings.workspace.moneyDisplay.toman',
 };
-
-const inputClass =
-  'w-full rounded-md border border-border bg-background px-3 py-2 text-foreground aria-invalid:border-danger disabled:cursor-not-allowed';
 
 type Draft = Required<UpdateWorkspaceInput>;
 
@@ -72,45 +80,35 @@ export function WorkspaceSettingsForm({ workspace }: { workspace: Workspace }) {
   }
 
   return (
-    <section className="flex flex-col gap-4 rounded-xl border border-border bg-surface px-6 py-6">
-      <h2 id={ids.title} className="text-xl font-bold">
-        {t('settings.workspace.title')}
-      </h2>
+    <Card>
+      <CardTitle id={ids.title}>{t('settings.workspace.title')}</CardTitle>
       <form
         aria-labelledby={ids.title}
         aria-describedby={canEdit ? undefined : ids.readOnly}
         onSubmit={onSubmit}
-        className="flex flex-col gap-5"
+        className="flex flex-col gap-section"
       >
         {!canEdit && (
-          <p id={ids.readOnly} className="text-sm text-foreground-muted">
-            {t('settings.workspace.readOnly')}
-          </p>
+          <CardDescription id={ids.readOnly}>{t('settings.workspace.readOnly')}</CardDescription>
         )}
-        <fieldset disabled={!canEdit} className="flex flex-col gap-5">
-          <div className="flex flex-col gap-1">
-            <label htmlFor={ids.name} className="font-medium">
-              {t('settings.workspace.name')}
-            </label>
-            <input
+        <FieldSet disabled={!canEdit}>
+          <Field>
+            <Label htmlFor={ids.name}>{t('settings.workspace.name')}</Label>
+            <Input
               id={ids.name}
               value={draft.name}
               maxLength={100}
               onChange={(e) => change({ name: e.target.value })}
               aria-invalid={nameMissing ? true : undefined}
-              className={inputClass}
             />
-          </div>
-          <div className="flex flex-col gap-1">
-            <label htmlFor={ids.currency} className="font-medium">
-              {t('settings.workspace.baseCurrency')}
-            </label>
-            <select
+          </Field>
+          <Field>
+            <Label htmlFor={ids.currency}>{t('settings.workspace.baseCurrency')}</Label>
+            <NativeSelect
               id={ids.currency}
               value={draft.baseCurrency}
               onChange={(e) => change({ baseCurrency: e.target.value })}
               aria-describedby={ids.currencyHint}
-              className={inputClass}
             >
               {baseCurrencyCodes.map((code) => {
                 const name = CURRENCY_NAMES[code];
@@ -120,13 +118,13 @@ export function WorkspaceSettingsForm({ workspace }: { workspace: Workspace }) {
                   </option>
                 );
               })}
-            </select>
-            <p id={ids.currencyHint} className="text-sm text-foreground-muted">
+            </NativeSelect>
+            <FieldDescription id={ids.currencyHint}>
               {t('settings.workspace.baseCurrencyHint')}
-            </p>
-          </div>
-          <div className="flex flex-col gap-1">
-            <ChoiceGroup<CalendarSystem>
+            </FieldDescription>
+          </Field>
+          <Field>
+            <SegmentedControl<CalendarSystem>
               legend={t('settings.workspace.calendar')}
               choices={calendarSystems.map((value) => ({
                 value,
@@ -135,30 +133,28 @@ export function WorkspaceSettingsForm({ workspace }: { workspace: Workspace }) {
               value={draft.calendar}
               onChange={(calendar) => change({ calendar })}
               describedBy={ids.calendarHint}
+              disabled={!canEdit}
             />
-            <p id={ids.calendarHint} className="text-sm text-foreground-muted">
+            <FieldDescription id={ids.calendarHint}>
               {t('settings.workspace.calendarHint')}
-            </p>
-          </div>
-          <div className="flex flex-col gap-1">
-            <label htmlFor={ids.timezone} className="font-medium">
-              {t('settings.workspace.timezone')}
-            </label>
-            <select
+            </FieldDescription>
+          </Field>
+          <Field>
+            <Label htmlFor={ids.timezone}>{t('settings.workspace.timezone')}</Label>
+            <NativeSelect
               id={ids.timezone}
               dir="ltr"
               value={draft.timezone}
               onChange={(e) => change({ timezone: e.target.value })}
-              className={inputClass}
             >
               {timeZoneChoices(workspace.timezone).map((zone) => (
                 <option key={zone} value={zone}>
                   {zone}
                 </option>
               ))}
-            </select>
-          </div>
-          <ChoiceGroup<MoneyDisplay>
+            </NativeSelect>
+          </Field>
+          <SegmentedControl<MoneyDisplay>
             legend={t('settings.workspace.moneyDisplay')}
             choices={moneyDisplays.map((value) => ({
               value,
@@ -166,28 +162,21 @@ export function WorkspaceSettingsForm({ workspace }: { workspace: Workspace }) {
             }))}
             value={draft.moneyDisplay}
             onChange={(moneyDisplay) => change({ moneyDisplay })}
+            disabled={!canEdit}
           />
-        </fieldset>
-        {save.isSuccess && (
-          <p role="status" className="text-sm text-foreground-muted">
-            {t('settings.saved')}
-          </p>
-        )}
-        {save.isError && (
-          <p role="alert" className="rounded-md bg-surface-muted px-3 py-2 text-sm text-danger">
-            {t('settings.saveFailed')}
-          </p>
-        )}
+        </FieldSet>
+        {save.isSuccess && <FormMessage tone="status">{t('settings.saved')}</FormMessage>}
+        {save.isError && <FormMessage tone="alert">{t('settings.saveFailed')}</FormMessage>}
         {canEdit && (
-          <button
+          <Button
             type="submit"
             disabled={save.isPending || nameMissing || Object.keys(changes).length === 0}
-            className="w-fit rounded-md bg-primary px-4 py-2 font-medium text-on-primary disabled:opacity-60"
+            className="w-fit"
           >
             {t('settings.save')}
-          </button>
+          </Button>
         )}
       </form>
-    </section>
+    </Card>
   );
 }

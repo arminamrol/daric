@@ -5,7 +5,9 @@ import { useId } from 'react';
 import { LanguageToggle } from '../i18n/LanguageToggle';
 import { useI18n } from '../i18n/locale';
 import { ThemeToggle } from '../theme/ThemeToggle';
-import { ChoiceGroup } from '../ui/ChoiceGroup';
+import { Card, CardDescription, CardHeader, CardTitle } from '../ui/Card';
+import { FormMessage } from '../ui/Field';
+import { SegmentedControl } from '../ui/SegmentedControl';
 import { CALENDAR_LABELS } from './labels';
 import { useUpdatePreferences } from './settings';
 
@@ -21,23 +23,19 @@ export function PreferencesForm({ preferences }: { preferences: UserPreferences 
   const update = useUpdatePreferences();
 
   return (
-    <section className="flex flex-col gap-4 rounded-xl border border-border bg-surface px-6 py-6">
-      <div>
-        <h2 id={`${id}-title`} className="text-xl font-bold">
-          {t('settings.preferences.title')}
-        </h2>
-        <p id={`${id}-hint`} className="text-sm text-foreground-muted">
-          {t('settings.preferences.hint')}
-        </p>
-      </div>
+    <Card>
+      <CardHeader>
+        <CardTitle id={`${id}-title`}>{t('settings.preferences.title')}</CardTitle>
+        <CardDescription id={`${id}-hint`}>{t('settings.preferences.hint')}</CardDescription>
+      </CardHeader>
       <form
         aria-labelledby={`${id}-title`}
         aria-describedby={`${id}-hint`}
         onSubmit={(e) => e.preventDefault()}
-        className="flex flex-col gap-5"
+        className="flex flex-col gap-section"
       >
         <LanguageToggle hideLegend={false} />
-        <ChoiceGroup<CalendarSystem>
+        <SegmentedControl<CalendarSystem>
           legend={t('settings.preferences.calendar')}
           choices={calendarSystems.map((value) => ({
             value,
@@ -46,19 +44,15 @@ export function PreferencesForm({ preferences }: { preferences: UserPreferences 
           value={preferences.displayCalendar}
           onChange={(displayCalendar) => update.mutate({ displayCalendar })}
         />
-        <ChoiceGroup<Digits>
+        <SegmentedControl<Digits>
           legend={t('settings.preferences.digits')}
           choices={digitSystems.map((value) => ({ value, label: t(DIGIT_LABELS[value]) }))}
           value={preferences.digits}
           onChange={(digits) => update.mutate({ digits })}
         />
         <ThemeToggle hideLegend={false} />
-        {update.isError && (
-          <p role="alert" className="rounded-md bg-surface-muted px-3 py-2 text-sm text-danger">
-            {t('settings.saveFailed')}
-          </p>
-        )}
+        {update.isError && <FormMessage tone="alert">{t('settings.saveFailed')}</FormMessage>}
       </form>
-    </section>
+    </Card>
   );
 }

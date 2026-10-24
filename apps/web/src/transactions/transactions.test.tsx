@@ -40,7 +40,7 @@ describe('Recording a Transaction', () => {
     await userEvent.click(await screen.findByRole('link', { name: 'تراکنش‌ها' }));
     const form = await entryForm();
     expect(document.activeElement).toBe(amountField(form));
-    expect(form.getByRole('radio', { name: 'هزینه' })).toHaveProperty('checked', true);
+    expect(form.getByRole('radio', { name: 'هزینه', checked: true })).toBeTruthy();
     expect(form.getByRole('textbox', { name: 'تاریخ' })).toHaveProperty('value', '۱۴۰۵/۰۷/۱۸');
   });
 

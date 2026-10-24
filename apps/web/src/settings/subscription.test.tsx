@@ -168,7 +168,9 @@ describe('Subscription page', () => {
         name: `خارج کردن ${isolate('دستگاه ناشناخته')}`,
       }),
     );
-    await userEvent.click(within(other).getByRole('button', { name: 'بله، خارج کن' }));
+    await userEvent.click(
+      within(screen.getByRole('alertdialog')).getByRole('button', { name: 'بله، خارج کن' }),
+    );
     await vi.waitFor(() => expect(section.getAllByRole('listitem')).toHaveLength(1));
     expect(fake.devices().map((d) => d.id)).toEqual(['01900000-0000-7000-8f00-000000000001']);
   });

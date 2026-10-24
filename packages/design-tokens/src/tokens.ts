@@ -86,7 +86,9 @@ export type SemanticColor =
   | 'transferSubtle'
   /** Chart marks for Income and Expense, told apart under color-vision deficiencies. */
   | 'chartIncome'
-  | 'chartExpense';
+  | 'chartExpense'
+  /** The translucent backdrop that dims the page behind a dialog or sheet. */
+  | 'scrim';
 
 export type ThemeColors = Readonly<Record<SemanticColor, string>>;
 
@@ -128,6 +130,8 @@ export const themes: Readonly<Record<ThemeName, ThemeColors>> = {
     transferSubtle: '#efecf9',
     chartIncome: green.light,
     chartExpense: navy[500],
+    // Navy at 40%: dims the page without turning it grey.
+    scrim: '#0a132866',
   },
   dark: {
     background: navy[950],
@@ -157,6 +161,8 @@ export const themes: Readonly<Record<ThemeName, ThemeColors>> = {
     transferSubtle: '#272f52',
     chartIncome: '#2fbf71',
     chartExpense: '#7d9bd0',
+    // Near-black at 60%: the page is already dark, so the backdrop goes deeper than navy.
+    scrim: '#00000099',
   },
 };
 

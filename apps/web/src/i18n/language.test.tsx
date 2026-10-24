@@ -7,7 +7,8 @@ import { renderApp } from '../test/render';
 import { LOCALE_STORAGE_KEY } from './locale';
 
 const root = () => document.documentElement;
-const option = (name: string) => screen.findByRole<HTMLInputElement>('radio', { name });
+const option = (name: string, state: { checked?: boolean } = {}) =>
+  screen.findByRole('radio', { name, ...state });
 
 describe('language', () => {
   it('starts in Persian, right to left', async () => {
@@ -15,7 +16,7 @@ describe('language', () => {
     await screen.findByRole('heading', { name: 'تنظیمات' });
     expect(root().lang).toBe('fa');
     expect(root().dir).toBe('rtl');
-    expect((await option('فارسی')).checked).toBe(true);
+    expect(await option('فارسی', { checked: true })).toBeTruthy();
   });
 
   it("switches a signed-in User's whole app to English, left to right, and keeps it with them", async () => {
@@ -34,7 +35,7 @@ describe('language', () => {
     localStorage.clear();
     renderApp({ path: '/settings', api });
     expect(await screen.findByRole('heading', { name: 'Settings' })).toBeTruthy();
-    expect((await option('English')).checked).toBe(true);
+    expect(await option('English', { checked: true })).toBeTruthy();
   });
 
   it('says so, and stays in Persian, when the choice cannot be saved', async () => {
@@ -50,7 +51,7 @@ describe('language', () => {
       'ذخیره نشد. دوباره امتحان کنید.',
     );
     expect(root().lang).toBe('fa');
-    expect((await option('فارسی')).checked).toBe(true);
+    expect(await option('فارسی', { checked: true })).toBeTruthy();
   });
 
   it("lets the User's saved language win over this device's", async () => {

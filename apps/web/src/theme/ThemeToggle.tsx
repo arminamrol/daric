@@ -1,7 +1,7 @@
 import type { ThemePreference } from '@daric/core';
 import type { PlainMessageKey } from '@daric/i18n';
 import { useI18n } from '../i18n/locale';
-import { ChoiceGroup } from '../ui/ChoiceGroup';
+import { SegmentedControl } from '../ui/SegmentedControl';
 import { useThemePreference } from './theme';
 
 const OPTIONS: readonly { value: ThemePreference; message: PlainMessageKey }[] = [
@@ -16,7 +16,7 @@ export function ThemeToggle({ hideLegend = true }: { hideLegend?: boolean }) {
   const [preference, setPreference] = useThemePreference();
 
   return (
-    <ChoiceGroup
+    <SegmentedControl
       legend={t('theme.title')}
       hideLegend={hideLegend}
       choices={OPTIONS.map(({ value, message }) => ({ value, label: t(message) }))}

@@ -2,8 +2,12 @@ import type { DownloadedFile } from '@daric/api-client';
 import type { ExportFormat } from '@daric/core';
 import { useMutation } from '@tanstack/react-query';
 import { useId } from 'react';
+import { Download } from 'lucide-react';
 import { useApi } from '../api/api';
 import { useI18n } from '../i18n/locale';
+import { Button } from '../ui/Button';
+import { Card, CardDescription, CardHeader, CardTitle } from '../ui/Card';
+import { FormMessage } from '../ui/Field';
 
 /** Hands a downloaded file to the browser to save. */
 function save({ blob, fileName }: DownloadedFile) {
@@ -18,9 +22,6 @@ function save({ blob, fileName }: DownloadedFile) {
   setTimeout(() => URL.revokeObjectURL(url), 0);
 }
 
-const buttonClass =
-  'w-fit rounded-md border border-border px-4 py-2 font-medium text-foreground disabled:opacity-60';
-
 /** Downloads every entity of the Workspace: Owner and Admin only, on every Plan. */
 export function ExportData({ workspaceId }: { workspaceId: string }) {
   const { t } = useI18n();
@@ -32,42 +33,31 @@ export function ExportData({ workspaceId }: { workspaceId: string }) {
   });
 
   return (
-    <section
-      aria-labelledby={titleId}
-      className="flex flex-col gap-4 rounded-xl border border-border bg-surface px-6 py-6"
-    >
-      <h2 id={titleId} className="text-xl font-bold">
-        {t('settings.export.title')}
-      </h2>
-      <p className="text-sm text-foreground-muted">{t('settings.export.hint')}</p>
+    <Card aria-labelledby={titleId}>
+      <CardHeader>
+        <CardTitle id={titleId}>{t('settings.export.title')}</CardTitle>
+        <CardDescription>{t('settings.export.hint')}</CardDescription>
+      </CardHeader>
       <div className="flex flex-wrap gap-3">
-        <button
-          type="button"
+        <Button
+          variant="outline"
           disabled={download.isPending}
           onClick={() => download.mutate('csv')}
-          className={buttonClass}
         >
+          <Download aria-hidden />
           {t('settings.export.csv')}
-        </button>
-        <button
-          type="button"
+        </Button>
+        <Button
+          variant="outline"
           disabled={download.isPending}
           onClick={() => download.mutate('json')}
-          className={buttonClass}
         >
+          <Download aria-hidden />
           {t('settings.export.json')}
-        </button>
+        </Button>
       </div>
-      {download.isSuccess && (
-        <p role="status" className="text-sm text-foreground-muted">
-          {t('settings.export.done')}
-        </p>
-      )}
-      {download.isError && (
-        <p role="alert" className="rounded-md bg-surface-muted px-3 py-2 text-sm text-danger">
-          {t('settings.export.failed')}
-        </p>
-      )}
-    </section>
+      {download.isSuccess && <FormMessage tone="status">{t('settings.export.done')}</FormMessage>}
+      {download.isError && <FormMessage tone="alert">{t('settings.export.failed')}</FormMessage>}
+    </Card>
   );
 }

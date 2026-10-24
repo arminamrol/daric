@@ -309,7 +309,7 @@ describe('Projection', () => {
     const { fake } = await withPlannedItems();
     renderApp({ path: '/projection', api: fake.api });
 
-    expect(await screen.findByRole('radio', { name: 'خودکار' })).toHaveProperty('checked', true);
+    expect(await screen.findByRole('radio', { name: 'خودکار', checked: true })).toBeTruthy();
     await userEvent.click(screen.getByRole('radio', { name: 'دستی' }));
 
     const expense = await totalsOf('هزینه');
@@ -373,7 +373,7 @@ describe('Projection', () => {
 
     // 125 + 40 + 15 planned; Combined adds the subscription's 3.
     expect(await (await totalsOf('هزینه')).findAllByText(rial(mt(180)))).toHaveLength(2);
-    expect(screen.getByRole('radio', { name: 'دستی' })).toHaveProperty('checked', true);
+    expect(screen.getByRole('radio', { name: 'دستی', checked: true })).toBeTruthy();
     await userEvent.click(screen.getByRole('radio', { name: 'ترکیبی' }));
     expect(await (await totalsOf('هزینه')).findByText(rial(mt(183)))).toBeTruthy();
     expect(fake.projectionSettings().mode).toBe('MANUAL');
@@ -401,7 +401,7 @@ describe('Projection', () => {
 
       await userEvent.click(await screen.findByRole('link', { name: 'قلم تازه' }));
       const form = within(await screen.findByRole('form', { name: 'قلم برنامه‌ریزی‌شدهٔ تازه' }));
-      expect(form.getByRole('radio', { name: 'ثابت ماهانه' })).toHaveProperty('checked', true);
+      expect(form.getByRole('radio', { name: 'ثابت ماهانه', checked: true })).toBeTruthy();
       await userEvent.type(form.getByRole('textbox', { name: 'نام' }), 'قسط وام');
       await userEvent.type(form.getByRole('textbox', { name: 'مبلغ' }), '80000000');
       await userEvent.click(form.getByRole('button', { name: 'ساخت' }));

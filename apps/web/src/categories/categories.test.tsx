@@ -21,7 +21,7 @@ describe('Categories', () => {
     fake.addCategory({ name: 'حقوق', kind: 'INCOME' });
     renderApp({ api: fake.api });
     await userEvent.click(await screen.findByRole('link', { name: 'دسته‌ها' }));
-    expect(screen.getByRole('radio', { name: 'هزینه' })).toHaveProperty('checked', true);
+    expect(screen.getByRole('radio', { name: 'هزینه', checked: true })).toBeTruthy();
     expect(await screen.findByText('هنوز دسته‌ای نیست.')).toBeTruthy();
 
     await userEvent.click(screen.getByRole('radio', { name: 'درآمد' }));
@@ -37,7 +37,7 @@ describe('Categories', () => {
     await userEvent.click(icons.getByRole('radio', { name: 'غذا' }));
     const colors = within(form.getByRole('group', { name: 'رنگ' }));
     await userEvent.click(colors.getByRole('radio', { name: 'نارنجی' }));
-    expect(colors.getByRole('radio', { name: 'نارنجی' })).toHaveProperty('checked', true);
+    expect(colors.getByRole('radio', { name: 'نارنجی', checked: true })).toBeTruthy();
     await userEvent.click(form.getByRole('button', { name: 'ساخت دسته' }));
 
     expect(await within(await categoryList()).findByText('خوراک')).toBeTruthy();
@@ -52,7 +52,7 @@ describe('Categories', () => {
     const salary = fake.addCategory({ name: 'حقوق', kind: 'INCOME' });
     renderApp({ path: '/categories?kind=INCOME', api: fake.api });
     const form = await openNewCategoryForm();
-    expect(form.getByRole('radio', { name: 'درآمد' })).toHaveProperty('checked', true);
+    expect(form.getByRole('radio', { name: 'درآمد', checked: true })).toBeTruthy();
     const parent = form.getByRole('combobox', { name: 'دسته والد' });
     expect(
       within(parent)

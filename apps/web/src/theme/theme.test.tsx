@@ -7,12 +7,13 @@ import { fakeApi } from '../test/fake-api';
 import { renderApp } from '../test/render';
 
 const theme = () => document.documentElement.dataset['theme'];
-const option = (name: string) => screen.findByRole<HTMLInputElement>('radio', { name });
+const option = (name: string, state: { checked?: boolean } = {}) =>
+  screen.findByRole('radio', { name, ...state });
 
 describe('theme', () => {
   it('follows the system preference by default', async () => {
     renderApp();
-    expect((await option('سیستم')).checked).toBe(true);
+    expect(await option('سیستم', { checked: true })).toBeTruthy();
     expect(theme()).toBeUndefined();
   });
 
@@ -27,7 +28,7 @@ describe('theme', () => {
     document.documentElement.removeAttribute('data-theme');
     renderApp({ api });
     await screen.findByRole('heading', { name: 'به دریک خوش آمدید' });
-    expect((await option('تیره')).checked).toBe(true);
+    expect(await option('تیره', { checked: true })).toBeTruthy();
     expect(theme()).toBe('dark');
   });
 
@@ -50,7 +51,7 @@ describe('theme', () => {
     view.unmount();
     document.documentElement.removeAttribute('data-theme');
     renderApp({ path: '/login', api: fakeApi().api });
-    expect((await option('تیره')).checked).toBe(true);
+    expect(await option('تیره', { checked: true })).toBeTruthy();
     expect(theme()).toBe('dark');
   });
 
@@ -83,6 +84,6 @@ describe('theme', () => {
 
   it('is a labelled group of choices', async () => {
     renderApp();
-    expect(await screen.findByRole('group', { name: 'ظاهر' })).toBeTruthy();
+    expect(await screen.findByRole('radiogroup', { name: 'ظاهر' })).toBeTruthy();
   });
 });

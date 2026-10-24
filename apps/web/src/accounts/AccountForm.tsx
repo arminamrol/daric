@@ -16,7 +16,7 @@ import { useSignedIn } from '../auth/session';
 import { useI18n } from '../i18n/locale';
 import { CURRENCY_NAMES, MONEY_DISPLAY_UNITS } from '../settings/labels';
 import { useFormatters } from '../settings/settings';
-import { ChoiceGroup } from '../ui/ChoiceGroup';
+import { SegmentedControl } from '../ui/SegmentedControl';
 import { currencyOf, useCreateAccount, useUpdateAccount } from './accounts';
 import { ACCOUNT_CLASS_LABELS, ACCOUNT_TYPE_LABELS } from './labels';
 
@@ -194,7 +194,7 @@ export function AccountForm({ account }: { account?: Account }) {
           </select>
         </div>
         <div className="flex flex-col gap-1">
-          <ChoiceGroup<AccountClass>
+          <SegmentedControl<AccountClass>
             legend={t('accounts.form.class')}
             choices={accountClasses.map((value) => ({
               value,

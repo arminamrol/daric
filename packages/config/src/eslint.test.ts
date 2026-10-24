@@ -123,6 +123,15 @@ describe('logical properties', () => {
 
   it('ignores strings outside className', async () => {
     expect(await physicalClasses("<div title='ml-2'>{'pr-4'}</div>")).toEqual([]);
+    expect(await physicalClasses("format('ml-2', 'pr-4')")).toEqual([]);
+  });
+
+  it('checks class helpers wherever they are called, including variant maps', async () => {
+    expect(
+      await physicalClasses(
+        "[cva('ml-2 ms-2', { variants: { side: { start: 'left-0', end: 'end-0' } } }), cn('pr-4', x && 'pe-1'), clsx({ 'text-right': x }), twMerge(['rounded-l'])]",
+      ),
+    ).toEqual(['ml-2', 'left-0', 'pr-4', 'text-right', 'rounded-l']);
   });
 
   it('rejects physical left/right properties in CSS but allows block-axis ones', async () => {

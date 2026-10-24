@@ -25,8 +25,8 @@ import {
   useUpdateMember,
 } from '../members/members';
 import { useFormatters } from '../settings/settings';
-import { ChoiceGroup } from '../ui/ChoiceGroup';
-import { ConfirmButton } from '../ui/ConfirmButton';
+import { SegmentedControl } from '../ui/SegmentedControl';
+import { ConfirmDialog } from '../ui/ConfirmDialog';
 import { CHECKOUT_PATH, Paywall } from '../ui/Paywall';
 
 const cardClass = 'flex flex-col gap-4 rounded-xl border border-border bg-surface px-6 py-6';
@@ -83,7 +83,7 @@ function MemberRow({ member }: { member: Member }) {
                 </option>
               ))}
             </select>
-            <ConfirmButton
+            <ConfirmDialog
               label={t('members.remove')}
               ariaLabel={t('members.removeLabel', { email: member.email })}
               question={t('members.removeConfirm', { email: isolate(member.email) })}
@@ -93,7 +93,7 @@ function MemberRow({ member }: { member: Member }) {
               onConfirm={() => remove.mutate(member.id)}
             />
             {workspace.role === 'OWNER' && (
-              <ConfirmButton
+              <ConfirmDialog
                 label={t('members.makeOwner')}
                 ariaLabel={t('members.makeOwnerLabel', { email: member.email })}
                 question={t('members.makeOwnerConfirm', { email: isolate(member.email) })}
@@ -108,7 +108,7 @@ function MemberRow({ member }: { member: Member }) {
           <span className="text-sm text-foreground-muted">{t(`roles.${member.role}`)}</span>
         )}
         {self && member.role !== 'OWNER' && (
-          <ConfirmButton
+          <ConfirmDialog
             label={t('members.leave')}
             question={t('members.leaveConfirm')}
             confirm={t('members.leaveYes')}
@@ -274,7 +274,7 @@ function InviteForm() {
           {t('invitations.emailHint')}
         </p>
       </div>
-      <ChoiceGroup
+      <SegmentedControl
         legend={t('invitations.role')}
         choices={roles.map((value) => ({ value, label: t(`roles.${value}`) }))}
         value={role}
