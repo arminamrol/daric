@@ -11,6 +11,7 @@ import { LanguageChoices } from '../i18n/LanguageChoices';
 import { useI18n } from '../i18n/locale';
 import { Button } from '../ui/Button';
 import { Field } from '../ui/Field';
+import { Logo } from '../ui/Logo';
 import { Screen, Status } from '../ui/Screen';
 import { Text } from '../ui/Text';
 import { useTheme } from '../ui/theme';
@@ -53,6 +54,7 @@ export default function LoginScreen() {
       <SafeAreaView style={styles.fill}>
         <KeyboardAvoidingView behavior="padding" style={styles.fill}>
           <ScrollView contentContainerStyle={styles.form} keyboardShouldPersistTaps="handled">
+            <Logo size={56} />
             <Text size="2xl" bold accessibilityRole="header">
               {t('auth.login.title')}
             </Text>

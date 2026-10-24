@@ -10,8 +10,7 @@
     "preview": "vite preview --configLoader runner",
     "lint": "eslint .",
     "typecheck": "tsc --noEmit",
-    "test": "vitest run",
-    "icons": "pnpm dlx @vite-pwa/assets-generator@2 --preset minimal-2023 public/favicon.svg"
+    "test": "vitest run"
   },
   "dependencies": {
     "@daric/api-client": "workspace:*",
