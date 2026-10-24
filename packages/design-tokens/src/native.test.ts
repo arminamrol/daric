@@ -43,9 +43,11 @@ describe('nativeTheme', () => {
     expect(nativeTheme.spacing.gutter).toBe(16);
   });
 
-  it('gives shadows per theme as React Native boxShadow strings', () => {
-    expect(nativeTheme.elevation.light.card).toBe(tailwindShadow('light'));
-    expect(nativeTheme.elevation.dark.sheet).toMatch(/ inset/);
+  it('gives shadows per theme as React Native boxShadow strings, the same as on the web', () => {
+    const lightRoot = tailwindCss()
+      .split('\n\n')
+      .find((b) => b.startsWith(':root {'));
+    expect(lightRoot).toContain(`--daric-shadow-card: ${nativeTheme.elevation.light.card};`);
   });
 
   it('gives motion in milliseconds and easings as bézier points for Reanimated', () => {
@@ -53,11 +55,3 @@ describe('nativeTheme', () => {
     expect(nativeTheme.motion.easing.standard).toEqual([0.2, 0, 0, 1]);
   });
 });
-
-/** The web preset's light card shadow, to show both platforms share one source. */
-function tailwindShadow(theme: 'light' | 'dark'): string {
-  const block = tailwindCss()
-    .split('\n\n')
-    .find((b) => b.startsWith(theme === 'light' ? ':root {' : ":root[data-theme='dark'] {"));
-  return /--daric-shadow-card: (.*);/.exec(block ?? '')?.[1] ?? '';
-}

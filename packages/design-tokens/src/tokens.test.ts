@@ -43,19 +43,19 @@ const text: [SemanticColor, SemanticColor][] = [
       ).map((fg) => [fg, bg]),
   ),
   ['onPrimary', 'primary'],
-  // Subtle surfaces carry their own role's text (a pill, a banner) and plain text.
-  ['accent', 'primarySubtle'],
-  ['foreground', 'primarySubtle'],
-  ['income', 'incomeSubtle'],
-  ['foreground', 'incomeSubtle'],
-  ['transfer', 'transferSubtle'],
-  ['foreground', 'transferSubtle'],
-  ['warning', 'warningSubtle'],
-  ['foreground', 'warningSubtle'],
-  ['info', 'infoSubtle'],
-  ['foreground', 'infoSubtle'],
-  ['danger', 'dangerSubtle'],
-  ['foreground', 'dangerSubtle'],
+  // A toast inverts the theme.
+  ['background', 'foreground'],
+  // Subtle surfaces carry their own role's text (a pill, a banner) and plain and muted text.
+  ...(Object.keys(themes.light) as SemanticColor[])
+    .filter((name) => name.endsWith('Subtle'))
+    .flatMap((subtle): [SemanticColor, SemanticColor][] => {
+      const role = subtle.replace(/Subtle$/, '') as SemanticColor;
+      return [
+        [role === 'primary' ? 'accent' : role, subtle],
+        ['foreground', subtle],
+        ['foregroundMuted', subtle],
+      ];
+    }),
 ];
 const ui: [SemanticColor, SemanticColor][] = [
   ['focus', 'background'],
@@ -110,7 +110,7 @@ describe('scales', () => {
     expect(spacing.touch).toBeGreaterThanOrEqual(44);
   });
 
-  it('rounds bigger objects more: chips, inputs, cards, sheets', () => {
+  it('rounds bigger objects more: small parts, inputs, cards, sheets', () => {
     expect([radius.sm, radius.md, radius.lg, radius.xl]).toEqual([6, 12, 18, 28]);
   });
 

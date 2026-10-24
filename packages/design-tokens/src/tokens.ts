@@ -92,6 +92,9 @@ export type ThemeColors = Readonly<Record<SemanticColor, string>>;
 
 const { gold, navy } = palette;
 
+/** Income is shown in the success color, so a gain reads as good news. */
+const green = { light: '#067647', dark: '#47cd89' } as const;
+
 /**
  * Semantic colors per theme, each theme designed rather than inverted; text pairs meet WCAG AA
  * contrast (see tokens.test.ts). A `…Subtle` color is a tinted surface for its role's text.
@@ -114,16 +117,16 @@ export const themes: Readonly<Record<ThemeName, ThemeColors>> = {
     focus: gold[600],
     danger: '#b42318',
     dangerSubtle: '#f8e9e8',
-    success: '#067647',
+    success: green.light,
     warning: '#b54708',
     warningSubtle: '#f8ede6',
     info: '#0b6aa2',
     infoSubtle: '#e7f0f6',
-    income: '#067647',
+    income: green.light,
     incomeSubtle: '#e6f1ed',
     transfer: '#5a45c7',
     transferSubtle: '#efecf9',
-    chartIncome: '#067647',
+    chartIncome: green.light,
     chartExpense: navy[500],
   },
   dark: {
@@ -143,12 +146,12 @@ export const themes: Readonly<Record<ThemeName, ThemeColors>> = {
     focus: gold[300],
     danger: '#f97066',
     dangerSubtle: '#31293d',
-    success: '#47cd89',
+    success: green.dark,
     warning: '#f5b046',
     warningSubtle: '#313238',
     info: '#6cc3f5',
     infoSubtle: '#1e3451',
-    income: '#47cd89',
+    income: green.dark,
     incomeSubtle: '#193642',
     transfer: '#ada1ff',
     transferSubtle: '#272f52',
@@ -196,7 +199,7 @@ export const spacing = {
   touch: 44,
 } as const;
 
-/** Corner radii in pixels: chips `full`, inputs and buttons `md`, cards `lg`, sheets `xl`. */
+/** Corner radii in pixels: small parts `sm`, chips `full`, inputs and buttons `md`, cards `lg`, sheets `xl`. */
 export const radius = { sm: 6, md: 12, lg: 18, xl: 28, full: 9999 } as const;
 
 /** A cubic-bézier curve as its two control points: `[x1, y1, x2, y2]`. */
