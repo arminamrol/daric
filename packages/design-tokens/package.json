@@ -12,10 +12,12 @@
     "lint": "eslint .",
     "typecheck": "tsc --noEmit",
     "test": "vitest run",
-    "generate": "vitest run --update src/tailwind.test.ts"
+    "generate": "vitest run --update src/tailwind.test.ts src/logo.test.ts",
+    "rasterize": "node scripts/rasterize.js"
   },
   "devDependencies": {
     "@daric/config": "workspace:*",
+    "@resvg/resvg-js": "^2.6.2",
     "eslint": "^10.12.0",
     "typescript": "~6.0.3",
     "vitest": "^5.0.3"

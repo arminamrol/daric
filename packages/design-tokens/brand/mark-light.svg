@@ -1,0 +1,12 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" role="img">
+  <title>Daric</title>
+  <circle cx="32" cy="32" r="30" fill="#c38f26"/>
+  <circle cx="32" cy="32" r="23.5" fill="none" stroke="#0a1328" stroke-width="3"/>
+  <path d="M50.5 13.5 L47 27 L37 17 Z" fill="#c38f26" stroke="#c38f26" stroke-width="5" stroke-linejoin="round"/>
+  <path d="M22 42 L42 22" stroke="#0a1328" stroke-width="5" stroke-linecap="round"/>
+  <path d="M50.5 13.5 L47 27 L37 17 Z" fill="#0a1328" stroke="#0a1328" stroke-width="1.5" stroke-linejoin="round"/>
+  <g fill="none" stroke="#0a1328" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+    <path d="M18 41 H23 V46"/>
+    <path d="M22 37 H27 V42"/>
+  </g>
+</svg>
