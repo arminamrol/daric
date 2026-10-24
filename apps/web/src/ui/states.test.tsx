@@ -89,6 +89,28 @@ describe('SectionBoundary', () => {
     expect(screen.queryByRole('alert')).toBeNull();
   });
 
+  it('tries again by itself when its reset key changes, such as on a new route', async () => {
+    vi.spyOn(console, 'error').mockImplementation(() => undefined);
+    let broken = true;
+    function Month() {
+      const [month, setMonth] = useState(7);
+      return (
+        <>
+          <Button onClick={() => setMonth((m) => m + 1)}>ماه بعد</Button>
+          <SectionBoundary resetKey={month}>
+            <Flaky fail={() => broken} />
+          </SectionBoundary>
+        </>
+      );
+    }
+    renderUi(<Month />);
+    expect(screen.getByRole('alert')).toBeTruthy();
+    broken = false;
+    await userEvent.click(screen.getByRole('button', { name: 'ماه بعد' }));
+    expect(await screen.findByText('بخش سالم')).toBeTruthy();
+    expect(screen.queryByRole('alert')).toBeNull();
+  });
+
   it('asks a failed query again on retry', async () => {
     vi.spyOn(console, 'error').mockImplementation(() => undefined);
     let calls = 0;
@@ -119,8 +141,10 @@ describe('SectionBoundary', () => {
 describe('PasswordConfirmDialog', () => {
   function Example({
     onConfirm,
+    reasonRequired = false,
   }: {
     onConfirm: (password: string, form: FormData) => Promise<unknown>;
+    reasonRequired?: boolean;
   }) {
     const [done, setDone] = useState(false);
     return (
@@ -138,7 +162,7 @@ describe('PasswordConfirmDialog', () => {
         >
           <Field>
             <Label htmlFor="reason">دلیل</Label>
-            <Input id="reason" name="reason" />
+            <Input id="reason" name="reason" required={reasonRequired} />
           </Field>
         </PasswordConfirmDialog>
         {done && <p>انجام شد</p>}
@@ -208,6 +232,20 @@ describe('PasswordConfirmDialog', () => {
     expect((within(dialog).getByLabelText(UI_LABELS_FA.password) as HTMLInputElement).value).toBe(
       '',
     );
+  });
+
+  it('waits for a required reason as well as the password', async () => {
+    const onConfirm = vi.fn(() => Promise.resolve());
+    renderUi(<Example onConfirm={onConfirm} reasonRequired />);
+    const dialog = await open();
+    await userEvent.type(within(dialog).getByLabelText(UI_LABELS_FA.password), 'secret{Enter}');
+    const confirm = within(dialog).getByRole('button', { name: 'حذف برای همیشه' });
+    expect((confirm as HTMLButtonElement).disabled).toBe(true);
+    expect(onConfirm).not.toHaveBeenCalled();
+
+    await userEvent.type(within(dialog).getByLabelText('دلیل'), 'درخواست کاربر');
+    await userEvent.click(confirm);
+    expect(onConfirm).toHaveBeenCalledOnce();
   });
 
   it('cannot be sent twice while the first is on its way', async () => {

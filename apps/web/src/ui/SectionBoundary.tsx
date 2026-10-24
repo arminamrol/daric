@@ -1,4 +1,4 @@
-import { useQueryErrorResetBoundary } from '@tanstack/react-query';
+import { QueryErrorResetBoundary } from '@tanstack/react-query';
 import { Component } from 'react';
 import type { ReactNode } from 'react';
 import { ErrorState } from './ErrorState';
@@ -7,6 +7,8 @@ interface Props {
   children: ReactNode;
   /** What the error state says; defaults to the primitives' own "could not be loaded". */
   title?: string | undefined;
+  /** When it changes (a new route or Period), a failed section tries again by itself. */
+  resetKey?: unknown;
   onReset: () => void;
 }
 
@@ -15,6 +17,10 @@ class Boundary extends Component<Props, { failed: boolean }> {
 
   static getDerivedStateFromError() {
     return { failed: true };
+  }
+
+  override componentDidUpdate(previous: Props) {
+    if (this.state.failed && !Object.is(previous.resetKey, this.props.resetKey)) this.retry();
   }
 
   retry = () => {
@@ -30,14 +36,25 @@ class Boundary extends Component<Props, { failed: boolean }> {
 
 /**
  * Keeps a failure in one section of a screen to that section: it shows an error state with retry
- * and the rest keeps working. Retry draws the section again and asks its failed queries (those
- * that throw to a boundary) again.
+ * and the rest keeps working. Retry draws the section again and asks its own failed queries (those
+ * that throw to a boundary) again, leaving other sections' alone.
  */
-export function SectionBoundary({ children, title }: { children: ReactNode; title?: string }) {
-  const { reset } = useQueryErrorResetBoundary();
+export function SectionBoundary({
+  children,
+  title,
+  resetKey,
+}: {
+  children: ReactNode;
+  title?: string;
+  resetKey?: unknown;
+}) {
   return (
-    <Boundary title={title} onReset={reset}>
-      {children}
-    </Boundary>
+    <QueryErrorResetBoundary>
+      {({ reset }) => (
+        <Boundary title={title} resetKey={resetKey} onReset={reset}>
+          {children}
+        </Boundary>
+      )}
+    </QueryErrorResetBoundary>
   );
 }

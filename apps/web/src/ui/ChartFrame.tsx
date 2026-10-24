@@ -55,8 +55,8 @@ export function ChartFrame({
   legend?: readonly LegendItem[];
   status?: 'ready' | 'loading' | 'empty' | 'error';
   /** What the empty state says, and the action that fills the chart. */
-  empty?: { title: string; description?: ReactNode; action?: ReactNode };
-  onRetry?: () => void;
+  empty: { title: string; description?: ReactNode; action?: ReactNode };
+  onRetry: () => void;
   level?: 2 | 3;
   /** Controls at the title's end, such as a Period switcher. */
   actions?: ReactNode;
@@ -69,7 +69,7 @@ export function ChartFrame({
   let body: ReactNode;
   if (status === 'loading') body = <ChartSkeleton />;
   else if (status === 'error') body = <ErrorState onRetry={onRetry} />;
-  else if (status === 'empty') body = empty && <EmptyState level={3} {...empty} />;
+  else if (status === 'empty') body = <EmptyState level={level === 2 ? 3 : 4} {...empty} />;
   else
     body = (
       <>

@@ -14,7 +14,8 @@ import { useUiLabels } from './UiProvider';
 
 /**
  * A step that needs the password typed again before it happens: deleting the account, or any
- * change in the Back Office. Extra fields (a reason) go in `children` and arrive in the form data.
+ * change in the Back Office. Extra fields (a reason) go in `children` and arrive in the form data;
+ * confirm stays off until every `required` one, and the password, is filled.
  *
  * `onConfirm` acts; when it resolves the dialog closes, when it rejects the dialog stays open with
  * `errorMessage(error)` under the password, so a typo costs nothing. Cancel forgets what was typed.
@@ -45,6 +46,8 @@ export function PasswordConfirmDialog({
   const [open, setOpen] = useState(false);
   const [password, setPassword] = useState('');
   const [pending, setPending] = useState(false);
+  /** Whether every required field, the password among them, is filled. */
+  const [complete, setComplete] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const passwordRef = useRef<HTMLInputElement>(null);
   const passwordId = useId();
@@ -56,13 +59,14 @@ export function PasswordConfirmDialog({
     setOpen(next);
     if (!next) {
       setPassword('');
+      setComplete(false);
       setError(null);
     }
   }
 
   async function onSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
-    if (!password || pending) return;
+    if (!event.currentTarget.checkValidity() || pending) return;
     const form = new FormData(event.currentTarget);
     setPending(true);
     setError(null);
@@ -70,6 +74,7 @@ export function PasswordConfirmDialog({
       await onConfirm(password, form);
       setOpen(false);
       setPassword('');
+      setComplete(false);
     } catch (failure) {
       setError(errorMessage(failure));
       passwordRef.current?.select();
@@ -87,7 +92,12 @@ export function PasswordConfirmDialog({
           <DialogTitle>{title}</DialogTitle>
           {description && <DialogDescription>{description}</DialogDescription>}
         </DialogHeader>
-        <form noValidate onSubmit={(event) => void onSubmit(event)} className="flex flex-col gap-4">
+        <form
+          noValidate
+          onSubmit={(event) => void onSubmit(event)}
+          onInput={(event) => setComplete(event.currentTarget.checkValidity())}
+          className="flex flex-col gap-4"
+        >
           {children}
           <Field>
             <Label htmlFor={passwordId}>{labels.password}</Label>
@@ -110,7 +120,7 @@ export function PasswordConfirmDialog({
             <Button variant="outline" disabled={pending} onClick={() => onOpenChange(false)}>
               {labels.cancel}
             </Button>
-            <Button type="submit" variant={tone} disabled={!password || pending}>
+            <Button type="submit" variant={tone} disabled={!complete || pending}>
               {confirm}
             </Button>
           </DialogFooter>

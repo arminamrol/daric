@@ -2,6 +2,8 @@ import type { ReactNode } from 'react';
 import { CoinMotif } from './CoinMotif';
 import { cn } from './cn';
 
+const HEADINGS = { 2: 'h2', 3: 'h3', 4: 'h4' } as const;
+
 /**
  * What an empty list or chart shows: what goes here, and the action that fills it. Leave the
  * action out for someone who may not add (a Member viewing a shared Workspace).
@@ -17,10 +19,10 @@ export function EmptyState({
   description?: ReactNode;
   action?: ReactNode;
   /** The heading level, one below the section the state sits in. */
-  level?: 2 | 3;
+  level?: 2 | 3 | 4;
   className?: string;
 }) {
-  const Heading = level === 2 ? 'h2' : 'h3';
+  const Heading = HEADINGS[level];
   return (
     <div
       className={cn(

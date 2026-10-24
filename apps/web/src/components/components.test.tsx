@@ -53,7 +53,27 @@ describe('Amount', () => {
     expect(income).toMatch(/^\+[۰-۹]/);
     expect(expense).toMatch(/^−[۰-۹]/);
     expect(transfer).toMatch(/^[۰-۹]/);
-    expect(screen.getAllByRole('listitem')[2]?.querySelector('svg')).not.toBeNull();
+    // A Transfer has no sign; its icon says what it is to a screen reader too.
+    const [, , transferItem] = screen.getAllByRole('listitem');
+    expect(within(transferItem as HTMLElement).getByRole('img', { name: 'انتقال' })).toBeTruthy();
+  });
+
+  it('flips the sign of a negative amount of a kind', async () => {
+    renderSignedIn(
+      <ul>
+        <li>
+          <Amount value={money(-5000n, IRR)} kind="income" />
+        </li>
+        <li>
+          <Amount value={money(-5000n, IRR)} kind="expense" />
+        </li>
+      </ul>,
+    );
+    const [income, expense] = (await screen.findAllByRole('listitem')).map(
+      (item) => item.textContent,
+    );
+    expect(income).toMatch(/^−[۰-۹]/);
+    expect(expense).toMatch(/^\+[۰-۹]/);
   });
 
   it('signs a negative balance only', async () => {
