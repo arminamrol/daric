@@ -55,15 +55,35 @@ export type SemanticColor =
   | 'background'
   | 'surface'
   | 'surfaceMuted'
+  /** Popovers and sheets: a step lighter than `surface` in dark, where shadows barely show. */
+  | 'surfaceRaised'
   | 'foreground'
   | 'foregroundMuted'
+  /** Dividers and the edge of flat surfaces and cards. */
   | 'border'
+  /** The edge of popovers and sheets on `surfaceRaised`. */
+  | 'borderRaised'
+  /** Input and control borders, visible at 3:1. */
+  | 'borderStrong'
+  /** Gold: only for the primary action, the active state and highlights. */
   | 'primary'
   | 'onPrimary'
+  | 'primarySubtle'
   | 'accent'
   | 'focus'
   | 'danger'
+  | 'dangerSubtle'
   | 'success'
+  | 'warning'
+  | 'warningSubtle'
+  | 'info'
+  | 'infoSubtle'
+  /** Money in: amounts shown with "+". */
+  | 'income'
+  | 'incomeSubtle'
+  /** Money moved between Accounts: never mistaken for Income or Expense. */
+  | 'transfer'
+  | 'transferSubtle'
   /** Chart marks for Income and Expense, told apart under color-vision deficiencies. */
   | 'chartIncome'
   | 'chartExpense';
@@ -72,49 +92,136 @@ export type ThemeColors = Readonly<Record<SemanticColor, string>>;
 
 const { gold, navy } = palette;
 
-/** Semantic colors per theme; text pairs meet WCAG AA contrast (see tokens.test.ts). */
+/** Income is shown in the success color, so a gain reads as good news. */
+const green = { light: '#067647', dark: '#47cd89' } as const;
+
+/**
+ * Semantic colors per theme, each theme designed rather than inverted; text pairs meet WCAG AA
+ * contrast (see tokens.test.ts). A `…Subtle` color is a tinted surface for its role's text.
+ */
 export const themes: Readonly<Record<ThemeName, ThemeColors>> = {
   light: {
-    background: '#f8f7f3',
+    background: '#f5f6f8',
     surface: palette.white,
-    surfaceMuted: navy[50],
+    surfaceMuted: '#eef1f6',
+    surfaceRaised: palette.white,
     foreground: navy[950],
-    foregroundMuted: navy[600],
-    border: navy[100],
+    foregroundMuted: '#46587a',
+    border: '#e3e8f0',
+    borderRaised: '#dde3ec',
+    borderStrong: '#7489ad',
     primary: gold[500],
     onPrimary: navy[950],
+    primarySubtle: gold[50],
     accent: gold[700],
     focus: gold[600],
     danger: '#b42318',
-    success: '#067647',
-    chartIncome: '#067647',
-    chartExpense: '#1d4ed8',
+    dangerSubtle: '#f8e9e8',
+    success: green.light,
+    warning: '#b54708',
+    warningSubtle: '#f8ede6',
+    info: '#0b6aa2',
+    infoSubtle: '#e7f0f6',
+    income: green.light,
+    incomeSubtle: '#e6f1ed',
+    transfer: '#5a45c7',
+    transferSubtle: '#efecf9',
+    chartIncome: green.light,
+    chartExpense: navy[500],
   },
   dark: {
     background: navy[950],
-    surface: navy[900],
-    surfaceMuted: navy[800],
+    surface: '#111d36',
+    surfaceMuted: '#18284a',
+    surfaceRaised: '#1a2b4d',
     foreground: '#f4f1e8',
     foregroundMuted: navy[300],
-    border: navy[800],
+    border: '#1f3053',
+    borderRaised: '#2a3d63',
+    borderStrong: '#5b77a8',
     primary: gold[400],
     onPrimary: navy[950],
+    primarySubtle: '#2a2410',
     accent: gold[300],
     focus: gold[300],
     danger: '#f97066',
-    success: '#47cd89',
-    chartIncome: '#16a34a',
-    chartExpense: '#3b82f6',
+    dangerSubtle: '#31293d',
+    success: green.dark,
+    warning: '#f5b046',
+    warningSubtle: '#313238',
+    info: '#6cc3f5',
+    infoSubtle: '#1e3451',
+    income: green.dark,
+    incomeSubtle: '#193642',
+    transfer: '#ada1ff',
+    transferSubtle: '#272f52',
+    chartIncome: '#2fbf71',
+    chartExpense: '#7d9bd0',
+  },
+};
+
+export type Elevation = 'card' | 'popover' | 'sheet';
+
+/**
+ * Shadows (CSS `box-shadow`, also React Native's `boxShadow`) per elevation level. Cards sit on
+ * `surface` with `border`; popovers and sheets on `surfaceRaised` with `borderRaised`. Dark adds
+ * an inner top highlight, because shadows barely show on navy.
+ */
+export const elevation: Readonly<Record<ThemeName, Readonly<Record<Elevation, string>>>> = {
+  light: {
+    card: '0 1px 2px rgb(10 19 40 / 0.06), 0 1px 1px rgb(10 19 40 / 0.04)',
+    popover: '0 4px 12px -2px rgb(10 19 40 / 0.08), 0 2px 4px rgb(10 19 40 / 0.04)',
+    sheet: '0 16px 40px -8px rgb(10 19 40 / 0.18), 0 4px 10px rgb(10 19 40 / 0.06)',
+  },
+  dark: {
+    card: '0 1px 0 rgb(255 255 255 / 0.04) inset, 0 1px 2px rgb(0 0 0 / 0.4)',
+    popover: '0 1px 0 rgb(255 255 255 / 0.05) inset, 0 6px 16px -4px rgb(0 0 0 / 0.5)',
+    sheet: '0 1px 0 rgb(255 255 255 / 0.06) inset, 0 20px 44px -10px rgb(0 0 0 / 0.65)',
   },
 };
 
 /** Spacing grid step in pixels; spacing `n` is `n × spacingUnit`. */
 export const spacingUnit = 4;
 
-/** Corner radii in pixels. */
-export const radius = { sm: 4, md: 8, lg: 12, xl: 16, full: 9999 } as const;
+/** Named spacing in pixels, all on the 4-point grid. */
+export const spacing = {
+  /** Space between a screen's edge and its content on a phone. */
+  gutter: 16,
+  /** The same on wider screens. */
+  gutterWide: 32,
+  /** Padding inside a card. */
+  card: 16,
+  /** Gap between items in a stack, such as rows in a card. */
+  stack: 12,
+  /** Gap between sections of a screen. */
+  section: 24,
+  /** Smallest touch target edge. */
+  touch: 44,
+} as const;
 
-export type TextSize = 'xs' | 'sm' | 'base' | 'lg' | 'xl' | '2xl' | '3xl';
+/** Corner radii in pixels: small parts `sm`, chips `full`, inputs and buttons `md`, cards `lg`, sheets `xl`. */
+export const radius = { sm: 6, md: 12, lg: 18, xl: 28, full: 9999 } as const;
+
+/** A cubic-bézier curve as its two control points: `[x1, y1, x2, y2]`. */
+export type Easing = readonly [number, number, number, number];
+
+/**
+ * Motion durations in milliseconds and easings. `emphasis` is for a balance counting up or a
+ * chart drawing in; everything drops to no motion when the system asks for reduced motion.
+ */
+export const motion = {
+  duration: { fast: 120, base: 200, slow: 320, emphasis: 600 },
+  easing: {
+    /** Moving or resizing something already on screen. */
+    standard: [0.2, 0, 0, 1],
+    /** Something arriving: a sheet, a dialog, a menu. */
+    enter: [0, 0, 0, 1],
+    /** Something leaving. */
+    exit: [0.3, 0, 1, 1],
+  } satisfies Record<string, Easing>,
+} as const;
+
+export type TextSize = 'xs' | 'sm' | 'base' | 'lg' | 'xl' | '2xl' | '3xl' | '4xl' | '5xl' | '6xl';
 
 export const typography = {
   /**
@@ -125,7 +232,10 @@ export const typography = {
     fa: ['Vazirmatn', 'Tahoma', 'system-ui', 'sans-serif'],
     en: ['Inter', 'system-ui', 'sans-serif'],
   },
-  /** Font size and line height in pixels; Persian script gets generous leading. */
+  /**
+   * Font size and line height in pixels; Persian script gets generous leading. `4xl` to `6xl`
+   * are display sizes for balances, set bold.
+   */
   size: {
     xs: { fontSize: 12, lineHeight: 20 },
     sm: { fontSize: 14, lineHeight: 22 },
@@ -134,6 +244,9 @@ export const typography = {
     xl: { fontSize: 20, lineHeight: 30 },
     '2xl': { fontSize: 24, lineHeight: 34 },
     '3xl': { fontSize: 30, lineHeight: 40 },
+    '4xl': { fontSize: 36, lineHeight: 48 },
+    '5xl': { fontSize: 48, lineHeight: 60 },
+    '6xl': { fontSize: 60, lineHeight: 72 },
   } satisfies Record<TextSize, { fontSize: number; lineHeight: number }>,
   weight: { normal: 400, medium: 500, semibold: 600, bold: 700 },
 } as const;
