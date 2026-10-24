@@ -1,4 +1,4 @@
-import { hasRole, mayChangeTransaction } from '@daric/core';
+import { mayChangeTransaction } from '@daric/core';
 import { useId, useState } from 'react';
 import { Link, useSearchParams } from 'react-router';
 import { useAccounts } from '../accounts/accounts';
@@ -8,7 +8,7 @@ import { useI18n } from '../i18n/locale';
 import { useLabels } from '../labels/labels';
 import { useFormatters } from '../settings/settings';
 import { categoryChoices } from '../transactions/choices';
-import { TransactionForm } from '../transactions/TransactionForm';
+import { RecordTransaction } from '../transactions/RecordTransaction';
 import { TransactionList } from '../transactions/TransactionList';
 import {
   useDeleteTransaction,
@@ -50,8 +50,6 @@ export function TransactionsPage() {
     ...(categoryId && { categoryId }),
     ...(labelId && { labelId }),
   });
-  const canRecord = hasRole(workspace.role, 'MEMBER');
-  const activeAccounts = accounts.data?.filter((a) => !a.archived) ?? [];
   const remove = useDeleteTransaction();
   const restore = useRestoreTransaction();
   // The Transaction just deleted, which can still be brought back.
@@ -73,37 +71,7 @@ export function TransactionsPage() {
   return (
     <div className="mx-auto flex max-w-2xl flex-col gap-6">
       <h1 className="text-2xl font-bold">{t('transactions.title')}</h1>
-      {!canRecord ? (
-        <p className="text-sm text-foreground-muted">{t('transactions.readOnly')}</p>
-      ) : accounts.isPending || categories.isPending || labels.isPending ? (
-        <p role="status" className="text-foreground-muted">
-          {t('session.loading')}
-        </p>
-      ) : accounts.isError || categories.isError || labels.isError ? (
-        <p role="alert" className="text-danger">
-          {t('transactions.list.loadFailed')}
-        </p>
-      ) : activeAccounts.length === 0 ? (
-        hasRole(workspace.role, 'ADMIN') ? (
-          <div className="flex flex-wrap items-center gap-3">
-            <p>{t('transactions.noAccount')}</p>
-            <Link
-              to="/accounts/new"
-              className="rounded-md bg-primary px-4 py-2 font-medium text-on-primary"
-            >
-              {t('accounts.new')}
-            </Link>
-          </div>
-        ) : (
-          <p>{t('transactions.noAccountAskAdmin')}</p>
-        )
-      ) : (
-        <TransactionForm
-          accounts={activeAccounts}
-          categories={categories.data}
-          labels={labels.data}
-        />
-      )}
+      <RecordTransaction />
 
       <div className="flex flex-col gap-4">
         <div className="flex flex-wrap items-center gap-3">

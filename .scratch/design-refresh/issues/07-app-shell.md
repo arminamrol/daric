@@ -4,7 +4,7 @@
 
 **Blocked by:** 03, 06
 
-**Status:** ready-for-agent
+**Status:** in-progress
 
 - [ ] Sections: Home, Transactions, Budgets, Insights, More (as split in 01); More lists Accounts, Categories, Labels, Recurring, Rates, Settings
 - [ ] Desktop sidebar collapsible, with Workspace switcher and record-a-Transaction action
