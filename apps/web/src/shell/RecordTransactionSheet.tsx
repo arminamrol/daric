@@ -24,7 +24,8 @@ export function RecordTransactionSheet({
       <SheetContent
         side={side}
         aria-describedby={undefined}
-        className={side === 'end' ? 'max-w-md sm:w-full' : 'h-[90dvh]'}
+        // Full screen on a phone, so the keyboard leaves the form room.
+        className={side === 'end' ? 'max-w-md sm:w-full' : 'h-dvh max-h-dvh rounded-none'}
       >
         {/* The form has the same heading; this one names the sheet. */}
         <SheetTitle className="sr-only">{t('transactions.form.title')}</SheetTitle>

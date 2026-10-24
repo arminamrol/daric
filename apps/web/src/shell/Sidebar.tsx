@@ -11,8 +11,8 @@ import { Logo } from './Logo';
 import { LogoutButton } from './LogoutButton';
 import { RecordTransactionSheet } from './RecordTransactionSheet';
 import { SectionLink } from './SectionLink';
-import { BUDGETS, HOME, INSIGHTS, TRANSACTIONS, type Section } from './sections';
-import { useNavigation } from './useNavigation';
+import { BUDGETS, HOME, INSIGHTS, RECURRING, TRANSACTIONS, type Section } from './sections';
+import { useShellNavigation } from './useShellNavigation';
 import { WorkspaceSwitcher } from './WorkspaceSwitcher';
 
 /** Remembered on this device: whether the User folded the sidebar down to its icons. */
@@ -28,11 +28,11 @@ const iconButtonClass =
  */
 export function Sidebar() {
   const { t, dir } = useI18n();
-  const { more, dueCount, canRecord } = useNavigation();
+  const { more, dueCount, canRecord } = useShellNavigation();
   // Popovers open away from the sidebar, which sits at the start edge.
   const outward = dir === 'rtl' ? 'left' : 'right';
   const [collapsed, setCollapsed] = useState(collapsedFlag.get);
-  const workspaces = useMe().data?.workspaces.length ?? 0;
+  const workspaceCount = useMe().data?.workspaces.length ?? 0;
   const ids = { insights: useId(), more: useId() };
 
   function toggle() {
@@ -45,7 +45,7 @@ export function Sidebar() {
       <SectionLink
         section={section}
         iconOnly={collapsed}
-        waiting={section.to === '/recurring' ? dueCount : 0}
+        waiting={section.to === RECURRING.to ? dueCount : 0}
       />
     </li>
   );
@@ -77,7 +77,7 @@ export function Sidebar() {
         <p className={collapsed ? 'sr-only' : 'text-lg leading-tight font-bold'}>{t('app.name')}</p>
       </div>
 
-      {workspaces > 1 &&
+      {workspaceCount > 1 &&
         (collapsed ? (
           <Popover>
             <PopoverTrigger

@@ -2,14 +2,13 @@ import { ChartPie, Ellipsis, type LucideIcon, Plus } from 'lucide-react';
 import { type ReactNode, useState } from 'react';
 import { useLocation } from 'react-router';
 import { useI18n } from '../i18n/locale';
-import { useFormatters } from '../settings/settings';
 import { ThemeToggle } from '../theme/ThemeToggle';
 import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetTrigger } from '../ui/Sheet';
 import { LogoutButton } from './LogoutButton';
 import { RecordTransactionSheet } from './RecordTransactionSheet';
-import { SectionLink } from './SectionLink';
+import { DueBadge, SectionLink } from './SectionLink';
 import { tabClass } from './tabClass';
-import { useNavigation } from './useNavigation';
+import { useShellNavigation } from './useShellNavigation';
 import {
   BUDGETS,
   HOME,
@@ -26,7 +25,7 @@ import {
  */
 export function TabBar() {
   const { t } = useI18n();
-  const { more, dueCount, canRecord } = useNavigation();
+  const { more, dueCount, canRecord } = useShellNavigation();
 
   return (
     <nav
@@ -91,8 +90,6 @@ function SectionList({
   waiting?: number;
   children?: ReactNode;
 }) {
-  const { t } = useI18n();
-  const format = useFormatters();
   const [open, setOpen] = useState(false);
   const active = isWithin(useLocation().pathname, sections);
 
@@ -101,17 +98,7 @@ function SectionList({
       <SheetTrigger aria-current={active ? 'true' : undefined} className={tabClass(active)}>
         <Icon aria-hidden className="size-5" strokeWidth={1.9} />
         {label}
-        {waiting > 0 && (
-          <span
-            aria-hidden
-            className="absolute end-1/4 top-0.5 rounded-full bg-primary px-1.5 text-xs font-medium text-on-primary tabular-nums"
-          >
-            {format.count(waiting)}
-          </span>
-        )}
-        {waiting > 0 && (
-          <span className="sr-only"> {t('nav.dueCount', { count: format.count(waiting) })}</span>
-        )}
+        <DueBadge count={waiting} className="absolute end-1/4 top-0.5" />
       </SheetTrigger>
       <SheetContent side="bottom" aria-describedby={undefined}>
         <SheetHeader>

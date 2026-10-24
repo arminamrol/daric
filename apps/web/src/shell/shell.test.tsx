@@ -121,11 +121,11 @@ describe('on a wide screen', () => {
   it('shows the Back Office only to Operators', async () => {
     const view = renderApp({ api: setUp().api });
     await home();
-    expect(screen.queryByRole('link', { name: 'پنل مدیریت' })).toBeNull();
+    expect(screen.queryByRole('link', { name: 'بک‌آفیس' })).toBeNull();
 
     view.unmount();
     renderApp({ api: operator().api });
-    expect(await within(await sections()).findByRole('link', { name: 'پنل مدیریت' })).toBeTruthy();
+    expect(await within(await sections()).findByRole('link', { name: 'بک‌آفیس' })).toBeTruthy();
   });
 });
 
@@ -179,7 +179,7 @@ describe('on a phone', () => {
     ]);
     expect(sheet.getByRole('radiogroup', { name: 'ظاهر' })).toBeTruthy();
     expect(sheet.getByRole('button', { name: 'خروج' })).toBeTruthy();
-    expect(sheet.queryByRole('link', { name: 'پنل مدیریت' })).toBeNull();
+    expect(sheet.queryByRole('link', { name: 'بک‌آفیس' })).toBeNull();
 
     await userEvent.click(sheet.getByRole('link', { name: 'دسته‌ها' }));
     expect(await screen.findByRole('heading', { level: 1, name: 'دسته‌ها' })).toBeTruthy();
@@ -190,7 +190,7 @@ describe('on a phone', () => {
     renderApp({ api: operator().api });
     await userEvent.click(within(await sections()).getByRole('button', { name: 'بیشتر' }));
     const sheet = within(await screen.findByRole('dialog', { name: 'بیشتر' }));
-    expect(await sheet.findByRole('link', { name: 'پنل مدیریت' })).toBeTruthy();
+    expect(await sheet.findByRole('link', { name: 'بک‌آفیس' })).toBeTruthy();
   });
 
   it('records a Transaction with the "+" in a sheet', async () => {

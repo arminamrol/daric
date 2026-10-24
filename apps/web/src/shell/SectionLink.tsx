@@ -24,7 +24,6 @@ export function SectionLink({
   onNavigate?: () => void;
 }) {
   const { t } = useI18n();
-  const format = useFormatters();
   const { icon: Icon } = section;
 
   return (
@@ -49,20 +48,31 @@ export function SectionLink({
       <span className={iconOnly ? 'sr-only' : look === 'row' ? 'me-auto' : undefined}>
         {t(section.label)}
       </span>
-      {waiting > 0 && (
-        <>
-          <span
-            aria-hidden
-            className={cn(
-              'rounded-full bg-primary px-1.5 text-xs font-medium text-on-primary tabular-nums',
-              (iconOnly || look === 'tab') && 'absolute end-1 top-1',
-            )}
-          >
-            {format.count(waiting)}
-          </span>
-          <span className="sr-only"> {t('nav.dueCount', { count: format.count(waiting) })}</span>
-        </>
-      )}
+      <DueBadge
+        count={waiting}
+        className={iconOnly || look === 'tab' ? 'absolute end-1 top-1' : undefined}
+      />
     </NavLink>
+  );
+}
+
+/** How many Due Occurrences wait: a count to see, and a sentence for screen readers. */
+export function DueBadge({ count, className }: { count: number; className?: string | undefined }) {
+  const { t } = useI18n();
+  const format = useFormatters();
+  if (count === 0) return null;
+  return (
+    <>
+      <span
+        aria-hidden
+        className={cn(
+          'rounded-full bg-primary px-1.5 text-xs font-medium text-on-primary tabular-nums',
+          className,
+        )}
+      >
+        {format.count(count)}
+      </span>
+      <span className="sr-only"> {t('nav.dueCount', { count: format.count(count) })}</span>
+    </>
   );
 }

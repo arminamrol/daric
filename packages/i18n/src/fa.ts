@@ -35,7 +35,7 @@ export const fa = {
   'nav.logout': 'خروج',
   'nav.more': 'بیشتر',
   'nav.insights': 'تحلیل‌ها',
-  'nav.backOffice': 'پنل مدیریت',
+  'nav.backOffice': 'بک‌آفیس',
   'nav.sidebar': 'نوار کناری',
   'home.title': 'به دریک خوش آمدید',
   'home.today': 'امروز: {date}',
