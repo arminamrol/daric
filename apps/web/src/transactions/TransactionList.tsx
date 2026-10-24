@@ -7,7 +7,7 @@ import { ArrowLeftRight, CircleAlert, Clock, Pencil, Trash2 } from 'lucide-react
 import { useId, useMemo } from 'react';
 import { Link } from 'react-router';
 import { currencyOf } from '../accounts/accounts';
-import { CategoryBadge } from '../categories/CategoryBadge';
+import { CategoryBadge } from '../components/CategoryBadge';
 import { useSignedIn } from '../auth/session';
 import { useI18n } from '../i18n/locale';
 import { PeriodTotals } from '../rates/PeriodTotals';

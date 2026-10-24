@@ -13,6 +13,7 @@ import {
 } from 'recharts';
 import type { NameType, ValueType } from 'recharts/types/component/DefaultTooltipContent';
 import { useI18n } from '../i18n/locale';
+import { chartTheme } from '../ui/chartTheme';
 import { useFormatters } from '../settings/settings';
 
 interface Point {
@@ -29,7 +30,7 @@ function ChartTooltip({ active, payload }: TooltipContentProps<ValueType, NameTy
   if (!point) return null;
   const { snapshot } = point;
   return (
-    <div className="rounded-md border border-border bg-surface px-3 py-2 text-sm shadow-sm">
+    <div className={chartTheme.tooltipClass}>
       <p className="text-foreground-muted">
         {format.day(snapshot.day)} · {t(`netWorth.kind.${snapshot.kind}`)}
       </p>
@@ -85,11 +86,11 @@ export default function HistoryChart({
       >
         <LineChart
           data={points}
-          margin={{ top: 8, bottom: 8, left: 8, right: 8 }}
+          margin={chartTheme.margin}
           // The table beside the chart is the keyboard and screen-reader view.
           accessibilityLayer={false}
         >
-          <CartesianGrid stroke="var(--color-border)" vertical={false} />
+          <CartesianGrid {...chartTheme.grid} />
           <XAxis
             dataKey="x"
             type="number"
@@ -98,36 +99,22 @@ export default function HistoryChart({
             ticks={ticks}
             reversed={rtl}
             tickFormatter={dayAt}
-            tick={{ fill: 'var(--color-foreground-muted)', fontSize: 12 }}
-            stroke="var(--color-border)"
-            tickLine={false}
+            {...chartTheme.xAxis}
           />
           <YAxis
             orientation={rtl ? 'right' : 'left'}
-            width={112}
             tickFormatter={(value: number) =>
               format.money(money(BigInt(Math.round(value)), base), { label: false })
             }
-            tick={{ fill: 'var(--color-foreground-muted)', fontSize: 12 }}
-            axisLine={false}
-            tickLine={false}
+            {...chartTheme.yAxis}
           />
-          <Tooltip
-            content={ChartTooltip}
-            cursor={{ stroke: 'var(--color-foreground-muted)', strokeDasharray: '4 4' }}
-          />
+          <Tooltip content={ChartTooltip} cursor={chartTheme.lineCursor} />
           <Line
             dataKey="total"
-            type="monotone"
-            stroke="var(--color-accent)"
-            strokeWidth={2}
-            dot={{
-              r: 4,
-              fill: 'var(--color-accent)',
-              stroke: 'var(--color-surface)',
-              strokeWidth: 2,
-            }}
-            activeDot={{ r: 6, stroke: 'var(--color-surface)', strokeWidth: 2 }}
+            {...chartTheme.line}
+            stroke={chartTheme.series.total}
+            dot={{ ...chartTheme.dot, fill: chartTheme.series.total }}
+            activeDot={chartTheme.activeDot}
             isAnimationActive={false}
           />
         </LineChart>

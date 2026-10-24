@@ -3,7 +3,7 @@ import type { CategoryColor, CategoryIcon } from '@daric/core';
 import { Check } from 'lucide-react';
 import { useId } from 'react';
 import { useI18n } from '../i18n/locale';
-import { CATEGORY_COLORS, CATEGORY_ICONS } from './CategoryBadge';
+import { CATEGORY_COLORS, CATEGORY_ICONS } from '../components/CategoryBadge';
 import { CATEGORY_COLOR_LABELS, CATEGORY_ICON_LABELS } from './labels';
 
 // Native radios, visually hidden, keep arrow-key navigation and screen-reader

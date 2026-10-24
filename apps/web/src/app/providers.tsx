@@ -6,6 +6,7 @@ import { ApiProvider } from '../api/api';
 import { useForgetWhenSignedOut } from '../auth/logout';
 import { hasSignedIn, reportSignedOut } from '../auth/signedOut';
 import { LocaleProvider, useI18n } from '../i18n/locale';
+import { uiLabels } from '../i18n/uiLabels';
 import { OfflineProvider } from '../offline/offline';
 import { UiProvider } from '../ui/UiProvider';
 
@@ -56,10 +57,7 @@ function ForgetWhenSignedOut() {
 /** The UI primitives in the active language and direction. */
 function LocalizedUi({ children }: { children: ReactNode }) {
   const { t, dir } = useI18n();
-  const labels = useMemo(
-    () => ({ close: t('ui.close'), notifications: t('ui.notifications') }),
-    [t],
-  );
+  const labels = useMemo(() => uiLabels(t), [t]);
   return (
     <UiProvider dir={dir} labels={labels}>
       {children}

@@ -6,7 +6,7 @@ import type { FormEvent } from 'react';
 import { Link, useNavigate } from 'react-router';
 import { useI18n } from '../i18n/locale';
 import { SegmentedControl } from '../ui/SegmentedControl';
-import { CategoryBadge } from './CategoryBadge';
+import { CategoryBadge } from '../components/CategoryBadge';
 import { KIND_ORDER, useCategories, useCreateCategory, useUpdateCategory } from './categories';
 import { CATEGORY_KIND_LABELS } from './labels';
 import { ColorPicker, IconPicker } from './pickers';
