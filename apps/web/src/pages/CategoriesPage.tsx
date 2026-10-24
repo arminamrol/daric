@@ -5,7 +5,7 @@ import { isolate } from '@daric/i18n';
 import { useId, useState } from 'react';
 import { Link, useSearchParams } from 'react-router';
 import { useSignedIn } from '../auth/session';
-import { CategoryBadge } from '../categories/CategoryBadge';
+import { CategoryBadge } from '../components/CategoryBadge';
 import {
   KIND_ORDER,
   kindParam,

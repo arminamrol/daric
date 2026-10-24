@@ -20,12 +20,11 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from './Tabs';
 import { toast } from './Toast';
 import { Tooltip, TooltipContent, TooltipTrigger } from './Tooltip';
 import { UiProvider } from './UiProvider';
-
-const labels = { close: 'بستن', notifications: 'اعلان‌ها' };
+import { UI_LABELS_FA } from './test-labels';
 
 function renderUi(ui: ReactNode, dir: 'ltr' | 'rtl' = 'rtl') {
   return render(
-    <UiProvider dir={dir} labels={labels}>
+    <UiProvider dir={dir} labels={UI_LABELS_FA}>
       {ui}
     </UiProvider>,
   );

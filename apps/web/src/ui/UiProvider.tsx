@@ -7,9 +7,23 @@ import { Toaster } from './Toast';
 export interface UiLabels {
   readonly close: string;
   readonly notifications: string;
+  readonly loading: string;
+  /** The default words of a section that failed to load. */
+  readonly loadFailed: string;
+  readonly retry: string;
+  readonly cancel: string;
+  readonly password: string;
 }
 
-const LabelsContext = createContext<UiLabels>({ close: 'Close', notifications: 'Notifications' });
+const LabelsContext = createContext<UiLabels>({
+  close: 'Close',
+  notifications: 'Notifications',
+  loading: 'Loading…',
+  loadFailed: 'This part could not be loaded.',
+  retry: 'Try again',
+  cancel: 'Cancel',
+  password: 'Password',
+});
 
 export function useUiLabels(): UiLabels {
   return use(LabelsContext);

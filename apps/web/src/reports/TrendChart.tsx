@@ -14,6 +14,7 @@ import {
 } from 'recharts';
 import type { NameType, ValueType } from 'recharts/types/component/DefaultTooltipContent';
 import { useI18n } from '../i18n/locale';
+import { chartTheme } from '../ui/chartTheme';
 import { useFormatters } from '../settings/settings';
 
 type TrendPoint = Report['trend'][number];
@@ -26,8 +27,8 @@ interface Point {
 }
 
 const SERIES = [
-  { key: 'income', color: 'var(--color-chart-income)' },
-  { key: 'expense', color: 'var(--color-chart-expense)' },
+  { key: 'income', color: chartTheme.series.income },
+  { key: 'expense', color: chartTheme.series.expense },
 ] as const;
 
 function ChartTooltip({
@@ -42,7 +43,7 @@ function ChartTooltip({
   const base = currencyByCode(baseCurrency);
   const { point } = data;
   return (
-    <div className="rounded-md border border-border bg-surface px-3 py-2 text-sm shadow-sm">
+    <div className={chartTheme.tooltipClass}>
       <p className="text-foreground-muted">{format.period(point.month)}</p>
       {SERIES.map(({ key, color }) => (
         <p key={key} className="flex items-center gap-2 tabular-nums">
@@ -103,33 +104,23 @@ export default function TrendChart({
       >
         <BarChart
           data={points}
-          margin={{ top: 8, bottom: 8, left: 8, right: 8 }}
+          margin={chartTheme.margin}
           barGap={2}
           // The table beside the chart is the keyboard and screen-reader view.
           accessibilityLayer={false}
         >
-          <CartesianGrid stroke="var(--color-border)" vertical={false} />
-          <XAxis
-            dataKey="key"
-            reversed={rtl}
-            tickFormatter={label}
-            tick={{ fill: 'var(--color-foreground-muted)', fontSize: 12 }}
-            stroke="var(--color-border)"
-            tickLine={false}
-          />
+          <CartesianGrid {...chartTheme.grid} />
+          <XAxis dataKey="key" reversed={rtl} tickFormatter={label} {...chartTheme.xAxis} />
           <YAxis
             orientation={rtl ? 'right' : 'left'}
-            width={112}
             tickFormatter={(value: number) =>
               format.money(money(BigInt(Math.round(value)), base), { label: false })
             }
-            tick={{ fill: 'var(--color-foreground-muted)', fontSize: 12 }}
-            axisLine={false}
-            tickLine={false}
+            {...chartTheme.yAxis}
           />
           <Tooltip
             content={(props) => <ChartTooltip {...props} baseCurrency={baseCurrency} />}
-            cursor={{ fill: 'var(--color-surface-muted)' }}
+            cursor={chartTheme.barCursor}
           />
           <Legend
             formatter={(key: string) => (
@@ -141,8 +132,7 @@ export default function TrendChart({
               key={key}
               dataKey={key}
               fill={color}
-              radius={[4, 4, 0, 0]}
-              maxBarSize={24}
+              {...chartTheme.bar}
               isAnimationActive={false}
             />
           ))}
