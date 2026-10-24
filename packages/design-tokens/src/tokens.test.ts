@@ -1,5 +1,14 @@
 import { describe, expect, it } from 'vitest';
-import { categoryPalette, themes } from './index';
+import {
+  categoryPalette,
+  elevation,
+  motion,
+  radius,
+  spacing,
+  spacingUnit,
+  themes,
+  typography,
+} from './index';
 import type { SemanticColor } from './index';
 
 /** WCAG 2.x contrast ratio of two `#rrggbb` colors. */
@@ -17,25 +26,51 @@ function contrast(a: string, b: string): number {
 
 // Text needs 4.5:1 (WCAG AA); focus rings and other UI parts need 3:1.
 const text: [SemanticColor, SemanticColor][] = [
-  ['foreground', 'background'],
-  ['foreground', 'surface'],
-  ['foreground', 'surfaceMuted'],
-  ['foregroundMuted', 'background'],
-  ['foregroundMuted', 'surface'],
-  ['accent', 'background'],
-  ['accent', 'surface'],
+  ...(['background', 'surface', 'surfaceMuted', 'surfaceRaised'] as const).flatMap(
+    (bg): [SemanticColor, SemanticColor][] =>
+      (
+        [
+          'foreground',
+          'foregroundMuted',
+          'accent',
+          'danger',
+          'success',
+          'income',
+          'transfer',
+          'warning',
+          'info',
+        ] as const
+      ).map((fg) => [fg, bg]),
+  ),
   ['onPrimary', 'primary'],
-  ['danger', 'background'],
-  ['danger', 'surface'],
-  ['success', 'background'],
-  ['success', 'surface'],
+  // Subtle surfaces carry their own role's text (a pill, a banner) and plain text.
+  ['accent', 'primarySubtle'],
+  ['foreground', 'primarySubtle'],
+  ['income', 'incomeSubtle'],
+  ['foreground', 'incomeSubtle'],
+  ['transfer', 'transferSubtle'],
+  ['foreground', 'transferSubtle'],
+  ['warning', 'warningSubtle'],
+  ['foreground', 'warningSubtle'],
+  ['info', 'infoSubtle'],
+  ['foreground', 'infoSubtle'],
+  ['danger', 'dangerSubtle'],
+  ['foreground', 'dangerSubtle'],
 ];
 const ui: [SemanticColor, SemanticColor][] = [
   ['focus', 'background'],
   ['focus', 'surface'],
   ['focus', 'surfaceMuted'],
+  ['focus', 'surfaceRaised'],
+  // Input borders must be visible on whatever the input sits on.
+  ['borderStrong', 'background'],
+  ['borderStrong', 'surface'],
+  ['borderStrong', 'surfaceMuted'],
+  ['borderStrong', 'surfaceRaised'],
   ['chartIncome', 'surface'],
   ['chartExpense', 'surface'],
+  ['chartIncome', 'surfaceRaised'],
+  ['chartExpense', 'surfaceRaised'],
 ];
 
 describe('contrast helper', () => {
@@ -64,4 +99,50 @@ describe('category palette', () => {
       expect(contrast('#ffffff', hex)).toBeGreaterThanOrEqual(4.5);
     },
   );
+});
+
+describe('scales', () => {
+  it('keeps every named spacing on the 4-point grid', () => {
+    for (const px of Object.values(spacing)) expect(px % spacingUnit).toBe(0);
+  });
+
+  it('keeps touch targets at least 44 points', () => {
+    expect(spacing.touch).toBeGreaterThanOrEqual(44);
+  });
+
+  it('rounds bigger objects more: chips, inputs, cards, sheets', () => {
+    expect([radius.sm, radius.md, radius.lg, radius.xl]).toEqual([6, 12, 18, 28]);
+  });
+
+  it('gives every text size a line height of at least 1.2, more for Persian body text', () => {
+    for (const { fontSize, lineHeight } of Object.values(typography.size)) {
+      expect(lineHeight / fontSize).toBeGreaterThanOrEqual(1.2);
+    }
+    expect(typography.size.base.lineHeight / typography.size.base.fontSize).toBeGreaterThanOrEqual(
+      1.5,
+    );
+  });
+
+  it('has display sizes for balances', () => {
+    expect(typography.size['4xl']).toEqual({ fontSize: 36, lineHeight: 48 });
+    expect(typography.size['5xl']).toEqual({ fontSize: 48, lineHeight: 60 });
+    expect(typography.size['6xl']).toEqual({ fontSize: 60, lineHeight: 72 });
+  });
+
+  it('gives each theme a shadow for each elevation level', () => {
+    for (const theme of ['light', 'dark'] as const) {
+      expect(Object.keys(elevation[theme])).toEqual(['card', 'popover', 'sheet']);
+    }
+    // Shadows barely show on navy, so dark elevation adds an inner top highlight.
+    for (const shadow of Object.values(elevation.dark)) expect(shadow).toMatch(/ inset/);
+  });
+
+  it('orders motion durations from quick to emphasised, with easings as cubic-bézier points', () => {
+    const { fast, base, slow, emphasis } = motion.duration;
+    expect(fast < base && base < slow && slow < emphasis).toBe(true);
+    for (const curve of Object.values(motion.easing)) {
+      expect(curve).toHaveLength(4);
+      for (const x of [curve[0], curve[2]]) expect(x >= 0 && x <= 1).toBe(true);
+    }
+  });
 });
