@@ -24,7 +24,7 @@ import { useI18n } from '../i18n/locale';
 import { CALENDAR_LABELS, CURRENCY_NAMES, MONEY_DISPLAY_UNITS } from '../settings/labels';
 import { useFormatters } from '../settings/settings';
 import { categoryChoices } from '../transactions/choices';
-import { ChoiceGroup } from '../ui/ChoiceGroup';
+import { SegmentedControl } from '../ui/SegmentedControl';
 import { FREQUENCY_LABELS } from './labels';
 import { useCreateRecurringRule, useUpdateRecurringRule } from './recurring';
 
@@ -271,7 +271,7 @@ export function RecurringForm({
             className={inputClass}
           />
         ))}
-        <ChoiceGroup
+        <SegmentedControl
           legend={t('recurring.form.type')}
           choices={TYPES.map((value) => ({ value, label: t(`transactions.type.${value}`) }))}
           value={type}
@@ -339,7 +339,7 @@ export function RecurringForm({
             />
           ),
         )}
-        <ChoiceGroup
+        <SegmentedControl
           legend={t('recurring.form.frequency')}
           choices={recurrenceFrequencies.map((value) => ({
             value,

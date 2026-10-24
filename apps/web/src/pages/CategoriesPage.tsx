@@ -14,7 +14,7 @@ import {
 } from '../categories/categories';
 import { CATEGORY_KIND_LABELS } from '../categories/labels';
 import { useI18n } from '../i18n/locale';
-import { ChoiceGroup } from '../ui/ChoiceGroup';
+import { SegmentedControl } from '../ui/SegmentedControl';
 
 // aria-disabled, not disabled: a button that becomes unusable keeps the focus.
 const moveButtonClass =
@@ -151,7 +151,7 @@ export function CategoriesPage() {
       </div>
       {!canManage && <p className="text-sm text-foreground-muted">{t('categories.readOnly')}</p>}
       <div className="flex flex-wrap items-center justify-between gap-3">
-        <ChoiceGroup<CategoryKind>
+        <SegmentedControl<CategoryKind>
           legend={t('categories.kind')}
           hideLegend
           choices={KIND_ORDER.map((value) => ({ value, label: t(CATEGORY_KIND_LABELS[value]) }))}

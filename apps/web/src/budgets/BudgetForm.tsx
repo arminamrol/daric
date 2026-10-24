@@ -11,7 +11,7 @@ import { useI18n } from '../i18n/locale';
 import { CURRENCY_NAMES, MONEY_DISPLAY_UNITS } from '../settings/labels';
 import { useFormatters } from '../settings/settings';
 import { categoryChoices } from '../transactions/choices';
-import { ChoiceGroup } from '../ui/ChoiceGroup';
+import { SegmentedControl } from '../ui/SegmentedControl';
 import { useCreateBudget, useDeleteBudget, useUpdateBudget } from './budgets';
 import { BUDGET_PERIOD_LABELS } from './labels';
 
@@ -223,7 +223,7 @@ export function BudgetForm({
             {t('budgets.form.labelHint')}
           </p>
         </div>
-        <ChoiceGroup
+        <SegmentedControl
           legend={t('budgets.form.period')}
           choices={budgetPeriods.map((value) => ({
             value,

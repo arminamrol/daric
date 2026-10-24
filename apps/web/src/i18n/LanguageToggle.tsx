@@ -1,5 +1,5 @@
 import { locales } from '@daric/core';
-import { ChoiceGroup } from '../ui/ChoiceGroup';
+import { SegmentedControl } from '../ui/SegmentedControl';
 import { useI18n } from './locale';
 
 /**
@@ -10,7 +10,7 @@ export function LanguageToggle({ hideLegend = true }: { hideLegend?: boolean }) 
   const { t, locale, setLocale, saveFailed } = useI18n();
   return (
     <>
-      <ChoiceGroup
+      <SegmentedControl
         legend={t('language.title')}
         hideLegend={hideLegend}
         choices={locales.map((value) => ({ value, label: t(`language.${value}`) }))}

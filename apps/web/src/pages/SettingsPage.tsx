@@ -1,4 +1,6 @@
 import { hasRole } from '@daric/core';
+import { ChevronRight } from 'lucide-react';
+import type { ReactNode } from 'react';
 import { Link } from 'react-router';
 import { useSignedIn } from '../auth/session';
 import { useI18n } from '../i18n/locale';
@@ -6,42 +8,53 @@ import { DisplayPreview } from '../settings/DisplayPreview';
 import { ExportData } from '../settings/ExportData';
 import { PreferencesForm } from '../settings/PreferencesForm';
 import { WorkspaceSettingsForm } from '../settings/WorkspaceSettingsForm';
+import { Button } from '../ui/Button';
 
-const linkClass = 'w-fit font-medium text-accent underline underline-offset-4';
+/** A row leading to a Settings sub-page; its chevron points onward, so it turns in right-to-left. */
+function SectionLink({ to, children }: { to: string; children: ReactNode }) {
+  return (
+    <li>
+      <Link
+        to={to}
+        className="flex min-h-touch items-center justify-between gap-3 px-card py-2 font-medium transition-colors duration-(--daric-duration-fast) hover:bg-surface-muted"
+      >
+        {children}
+        <ChevronRight
+          aria-hidden
+          className="size-4 shrink-0 text-foreground-muted rtl:-scale-x-100"
+        />
+      </Link>
+    </li>
+  );
+}
 
 export function SettingsPage() {
   const { t } = useI18n();
   const { me, workspace } = useSignedIn();
 
   return (
-    <div className="mx-auto flex max-w-2xl flex-col gap-6">
+    <div className="mx-auto flex w-full max-w-2xl flex-col gap-section">
       <h1 className="text-2xl font-bold">{t('settings.title')}</h1>
-      <nav className="flex flex-col gap-2">
-        <Link to="/settings/subscription" className={linkClass}>
-          {t('subscription.link')}
-        </Link>
-        <Link to="/settings/members" className={linkClass}>
-          {t('members.link')}
-        </Link>
-        <Link to="/settings/consents" className={linkClass}>
-          {t('consents.link')}
-        </Link>
-        {workspace.role === 'OWNER' && (
-          <Link to="/settings/audit" className={linkClass}>
-            {t('audit.link')}
-          </Link>
-        )}
+      <nav
+        aria-label={t('settings.sections')}
+        className="overflow-hidden rounded-lg border border-border bg-surface shadow-card"
+      >
+        <ul className="divide-y divide-border">
+          <SectionLink to="/settings/subscription">{t('subscription.link')}</SectionLink>
+          <SectionLink to="/settings/members">{t('members.link')}</SectionLink>
+          <SectionLink to="/settings/consents">{t('consents.link')}</SectionLink>
+          {workspace.role === 'OWNER' && (
+            <SectionLink to="/settings/audit">{t('audit.link')}</SectionLink>
+          )}
+        </ul>
       </nav>
       <DisplayPreview />
       <PreferencesForm preferences={me.preferences} />
       <WorkspaceSettingsForm workspace={workspace} />
       {hasRole(workspace.role, 'ADMIN') && <ExportData workspaceId={workspace.id} />}
-      <Link
-        to="/settings/delete-account"
-        className="w-fit font-medium text-danger underline underline-offset-4"
-      >
-        {t('deleteAccount.link')}
-      </Link>
+      <Button asChild variant="danger" className="w-fit">
+        <Link to="/settings/delete-account">{t('deleteAccount.link')}</Link>
+      </Button>
     </div>
   );
 }

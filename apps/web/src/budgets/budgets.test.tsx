@@ -52,7 +52,7 @@ describe('Budgets', () => {
     renderApp({ path: '/budgets', api: fake.api });
     const form = await openNewBudgetForm();
     await userEvent.selectOptions(form.getByRole('combobox', { name: 'دسته' }), 'خوراک');
-    expect(form.getByRole('radio', { name: 'ماهانه' })).toHaveProperty('checked', true);
+    expect(form.getByRole('radio', { name: 'ماهانه', checked: true })).toBeTruthy();
     await userEvent.type(form.getByRole('textbox', { name: 'سقف' }), '1000');
     await userEvent.click(form.getByRole('button', { name: 'ساخت بودجه' }));
 

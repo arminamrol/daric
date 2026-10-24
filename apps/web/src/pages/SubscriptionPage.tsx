@@ -18,7 +18,7 @@ import {
   useSignOutDevice,
   useSubscription,
 } from '../settings/subscription';
-import { ConfirmButton } from '../ui/ConfirmButton';
+import { ConfirmDialog } from '../ui/ConfirmDialog';
 import { CHECKOUT_PATH } from '../ui/Paywall';
 
 /** The Plan and how long it lasts; shown only when billing is enabled. */
@@ -122,7 +122,7 @@ function DeviceRow({ device }: { device: SignedInDevice }) {
       </p>
       {/* This device signs out with the logout button, which also wipes what it kept. */}
       {!device.current && (
-        <ConfirmButton
+        <ConfirmDialog
           label={t('devices.signOut')}
           ariaLabel={t('devices.signOutNamed', { name: isolate(name) })}
           question={t('devices.signOutConfirm')}

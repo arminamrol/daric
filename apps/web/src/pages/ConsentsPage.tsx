@@ -4,7 +4,7 @@ import { useNavigate } from 'react-router';
 import { useI18n } from '../i18n/locale';
 import { useConsents, useRevokeConsent } from '../members/members';
 import { useFormatters } from '../settings/settings';
-import { ConfirmButton } from '../ui/ConfirmButton';
+import { ConfirmDialog } from '../ui/ConfirmDialog';
 
 function ConsentRow({ consent }: { consent: Consent }) {
   const { t } = useI18n();
@@ -27,7 +27,7 @@ function ConsentRow({ consent }: { consent: Consent }) {
         {t('consents.policy', { version: isolate(consent.policyVersion) })}
       </p>
       {!consent.revokedAt && (
-        <ConfirmButton
+        <ConfirmDialog
           label={t('consents.revoke')}
           question={t('consents.revokeConfirm')}
           confirm={t('consents.revokeYes')}

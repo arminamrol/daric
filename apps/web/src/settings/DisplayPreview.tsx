@@ -14,13 +14,13 @@ export function DisplayPreview() {
     <section
       data-testid="display-preview"
       aria-label={t('settings.preview.title')}
-      className="rounded-xl border border-border bg-surface-muted px-6 py-4"
+      className="rounded-lg bg-surface-muted px-card py-card sm:px-section"
     >
       <dl className="grid grid-cols-[auto_1fr] gap-x-4 gap-y-1 text-sm">
         <dt className="text-foreground-muted">{t('settings.preview.date')}</dt>
-        <dd>{format.date(new Date())}</dd>
+        <dd className="font-medium">{format.date(new Date())}</dd>
         <dt className="text-foreground-muted">{t('settings.preview.money')}</dt>
-        <dd>{format.money(sample)}</dd>
+        <dd className="font-medium tabular-nums">{format.money(sample)}</dd>
       </dl>
     </section>
   );

@@ -15,7 +15,7 @@ import { useI18n } from '../i18n/locale';
 import { CALENDAR_LABELS, CURRENCY_NAMES, MONEY_DISPLAY_UNITS } from '../settings/labels';
 import { useFormatters } from '../settings/settings';
 import { categoryChoices } from '../transactions/choices';
-import { ChoiceGroup } from '../ui/ChoiceGroup';
+import { SegmentedControl } from '../ui/SegmentedControl';
 import { useCreatePlannedItem, useDeletePlannedItem, useUpdatePlannedItem } from './planned-items';
 
 const inputClass =
@@ -229,7 +229,7 @@ export function PlannedItemForm({
         )}
         {!item && (
           <>
-            <ChoiceGroup
+            <SegmentedControl
               legend={t('plannedItems.form.kind')}
               choices={plannedItemKinds.map((value) => ({
                 value,
@@ -241,7 +241,7 @@ export function PlannedItemForm({
                 setKind(value);
               }}
             />
-            <ChoiceGroup
+            <SegmentedControl
               legend={t('plannedItems.form.type')}
               choices={TYPES.map((value) => ({ value, label: t(`transactions.type.${value}`) }))}
               value={type}

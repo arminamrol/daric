@@ -75,7 +75,9 @@ describe('Delete account page', () => {
 
     const list = within(await screen.findByRole('list', { name: 'اعضا' }));
     await userEvent.click(list.getByRole('button', { name: 'مالک کردن reza@example.com' }));
-    await userEvent.click(list.getByRole('button', { name: 'بله، مالک شود' }));
+    await userEvent.click(
+      within(screen.getByRole('alertdialog')).getByRole('button', { name: 'بله، مالک شود' }),
+    );
     // The User stays on as an Admin.
     expect(await list.findByText('مدیر')).toBeTruthy();
     expect(server.members().find((m) => m.id === reza.id)?.role).toBe('OWNER');

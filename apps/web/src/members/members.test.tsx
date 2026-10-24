@@ -120,7 +120,7 @@ describe('Members page', () => {
     server.addMember('reza@example.com', 'VIEWER');
     renderApp({ path: '/settings/members', api: server.api });
     const region = await invitationRegion();
-    expect((await region.findAllByRole('radio')).map((r) => r.parentElement?.textContent)).toEqual([
+    expect((await region.findAllByRole('radio')).map((r) => r.textContent)).toEqual([
       'عضو',
       'بیننده',
     ]);
@@ -154,7 +154,9 @@ describe('Members page', () => {
 
     await userEvent.click(list.getByRole('button', { name: 'برداشتن reza@example.com' }));
     expect(server.members()).toHaveLength(2);
-    await userEvent.click(list.getByRole('button', { name: 'بله، بردار' }));
+    await userEvent.click(
+      within(screen.getByRole('alertdialog')).getByRole('button', { name: 'بله، بردار' }),
+    );
     expect(await list.findByText('sara@example.com')).toBeTruthy();
     expect(list.queryByText('reza@example.com')).toBeNull();
     expect(server.members().map((m) => m.email)).toEqual(['sara@example.com']);
@@ -165,7 +167,9 @@ describe('Members page', () => {
     renderApp({ path: '/settings/members', api: server.api });
     const list = await memberList();
     await userEvent.click(list.getByRole('button', { name: 'ترک این فضای کاری' }));
-    await userEvent.click(list.getByRole('button', { name: 'بله، ترک می‌کنم' }));
+    await userEvent.click(
+      within(screen.getByRole('alertdialog')).getByRole('button', { name: 'بله، ترک می‌کنم' }),
+    );
     expect(await screen.findByRole('heading', { name: 'به دریک خوش آمدید' })).toBeTruthy();
     expect(server.members().map((m) => m.email)).toEqual(['owner@example.com']);
   });

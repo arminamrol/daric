@@ -14,3 +14,7 @@
 - [ ] Web tests cover empty-state action, error retry and password confirmation behaviour
 
 Spec: `.scratch/design-refresh/spec.md`.
+
+## Comments
+
+**2026-10-24:** ticket 05 already built the confirmation dialog (`apps/web/src/ui/ConfirmDialog.tsx`, an alert dialog that starts on Cancel); reuse it here rather than building another.

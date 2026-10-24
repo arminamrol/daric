@@ -57,8 +57,8 @@ describe('Recurring Rules', () => {
     await userEvent.click(await screen.findByRole('link', { name: 'تکرارشوندهٔ تازه' }));
     const form = within(await screen.findByRole('form', { name: 'تکرارشوندهٔ تازه' }));
     await userEvent.type(form.getByRole('textbox', { name: 'نام' }), 'اجارهٔ خانه');
-    expect(form.getByRole('radio', { name: 'هزینه' })).toHaveProperty('checked', true);
-    expect(form.getByRole('radio', { name: 'ماهانه' })).toHaveProperty('checked', true);
+    expect(form.getByRole('radio', { name: 'هزینه', checked: true })).toBeTruthy();
+    expect(form.getByRole('radio', { name: 'ماهانه', checked: true })).toBeTruthy();
     await userEvent.selectOptions(form.getByRole('combobox', { name: 'دسته' }), 'اجاره');
     await userEvent.type(form.getByRole('textbox', { name: 'مبلغ' }), '250000');
     const start = addDays(today, 3);

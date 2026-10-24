@@ -73,12 +73,25 @@ function checkClasses(context, node, text) {
   }
 }
 
+/** Functions that build class lists (shadcn/ui keeps its classes in these, outside className). */
+const CLASS_HELPERS = new Set(['cn', 'cva', 'clsx', 'twMerge']);
+
+/** @param {any} node */
+function isClassHelperCall(node) {
+  return (
+    node.type === 'CallExpression' &&
+    node.callee.type === 'Identifier' &&
+    CLASS_HELPERS.has(node.callee.name)
+  );
+}
+
 /** @type {import('eslint').Rule.RuleModule} */
 export const logicalClasses = {
   meta: {
     type: 'problem',
     docs: {
-      description: 'Disallow left/right Tailwind utilities in className; use start/end ones',
+      description:
+        'Disallow left/right Tailwind utilities in className and class helpers; use start/end ones',
     },
     messages,
     schema: [],
@@ -87,10 +100,12 @@ export const logicalClasses = {
     const { visitorKeys } = context.sourceCode;
 
     /**
-     * Checks every string inside a className value, including inside calls and conditionals.
-     * Class strings kept in variables elsewhere are not seen.
+     * Checks every string inside a className value or a class helper's arguments, including inside
+     * calls, conditionals and variant maps. Class strings kept in plain variables are not seen.
      */
-    function visit(/** @type {any} */ node) {
+    function visit(/** @type {any} */ node, root = false) {
+      // A class helper is checked once, by its own listener.
+      if (!root && isClassHelperCall(node)) return;
       if (node.type === 'Literal' && typeof node.value === 'string') {
         checkClasses(context, node, node.value);
       }
@@ -105,6 +120,9 @@ export const logicalClasses = {
     }
 
     return {
+      CallExpression(/** @type {any} */ node) {
+        if (isClassHelperCall(node)) visit(node, true);
+      },
       JSXAttribute(/** @type {any} */ node) {
         const { name, value } = node;
         if (value && name.type === 'JSXIdentifier' && /^(?:className|class)$/.test(name.name)) {

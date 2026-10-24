@@ -95,6 +95,7 @@
   --color-transfer-subtle: var(--daric-transfer-subtle);
   --color-chart-income: var(--daric-chart-income);
   --color-chart-expense: var(--daric-chart-expense);
+  --color-scrim: var(--daric-scrim);
   --shadow-card: var(--daric-shadow-card);
   --shadow-popover: var(--daric-shadow-popover);
   --shadow-sheet: var(--daric-shadow-sheet);
@@ -129,6 +130,7 @@
   --daric-transfer-subtle: #efecf9;
   --daric-chart-income: #067647;
   --daric-chart-expense: #4a6aa3;
+  --daric-scrim: #0a132866;
   --daric-shadow-card: 0 1px 2px rgb(10 19 40 / 0.06), 0 1px 1px rgb(10 19 40 / 0.04);
   --daric-shadow-popover: 0 4px 12px -2px rgb(10 19 40 / 0.08), 0 2px 4px rgb(10 19 40 / 0.04);
   --daric-shadow-sheet: 0 16px 40px -8px rgb(10 19 40 / 0.18), 0 4px 10px rgb(10 19 40 / 0.06);
@@ -171,6 +173,7 @@
   --daric-transfer-subtle: #272f52;
   --daric-chart-income: #2fbf71;
   --daric-chart-expense: #7d9bd0;
+  --daric-scrim: #00000099;
   --daric-shadow-card: 0 1px 0 rgb(255 255 255 / 0.04) inset, 0 1px 2px rgb(0 0 0 / 0.4);
   --daric-shadow-popover: 0 1px 0 rgb(255 255 255 / 0.05) inset, 0 6px 16px -4px rgb(0 0 0 / 0.5);
   --daric-shadow-sheet: 0 1px 0 rgb(255 255 255 / 0.06) inset, 0 20px 44px -10px rgb(0 0 0 / 0.65);
@@ -206,6 +209,7 @@
     --daric-transfer-subtle: #272f52;
     --daric-chart-income: #2fbf71;
     --daric-chart-expense: #7d9bd0;
+    --daric-scrim: #00000099;
     --daric-shadow-card: 0 1px 0 rgb(255 255 255 / 0.04) inset, 0 1px 2px rgb(0 0 0 / 0.4);
     --daric-shadow-popover: 0 1px 0 rgb(255 255 255 / 0.05) inset, 0 6px 16px -4px rgb(0 0 0 / 0.5);
     --daric-shadow-sheet:
